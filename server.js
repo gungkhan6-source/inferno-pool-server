@@ -94,17 +94,18 @@ function relayShot(ws, msg) {
 }
 
 function relaySync(ws, msg) {
-  if (ws.slot !== 0) return; // Sadece host sync gönderir
   const room = rooms.get(ws.roomId);
   if (!room) return;
-  send(room.guest, {type:'sync', 
-    ballPositions:msg.ballPositions, 
+  const target = ws.slot === 0 ? room.guest : room.host;
+  const data = {type:'sync', 
+    ballPositions: ws.slot===0 ? msg.ballPositions : null,
     turn:msg.turn,
     scores:msg.scores,
     assigned:msg.assigned,
     sunk0:msg.sunk0, sunk1:msg.sunk1,
     inHand:msg.inHand
-  });
+  };
+  send(target, data);
 }
 
 function relayTurn(ws, msg) {
