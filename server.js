@@ -16,7 +16,7 @@ const POCKETS=[
   {x:PAD,y:PAD},{x:CW/2,y:PAD-6},{x:CW-PAD,y:PAD},
   {x:PAD,y:CH-PAD},{x:CW/2,y:CH-PAD+6},{x:CW-PAD,y:CH-PAD}
 ];
-const PR=18;
+const PR=22;
 
 function makeBalls(seed) {
   let s = seed;
@@ -121,6 +121,9 @@ function startPhysicsLoop(room) {
       if(!room.sunkBalls.includes(id)){
         room.sunkBalls.push(id);
         room.sunkThisShot.push(id);
+        // Hangi oyuncunun attığını kaydet
+        if(room.shooter===0) room.sunk0.push(id);
+        else room.sunk1.push(id);
       }
     });
     
@@ -181,14 +184,16 @@ function sendSync(room) {
     turn: room.turn,
     moving: room.moving,
     inHand: room.inHand,
-    sunkBalls: room.sunkBalls
+    sunkBalls: room.sunkBalls,
+    sunk0: room.sunk0,
+    sunk1: room.sunk1
   };
   sendToRoom(room, data);
 }
 
 function sendTurn(room) {
   const balls = room.balls.map(b=>({id:b.id,x:Math.round(b.x*10)/10,y:Math.round(b.y*10)/10,vx:0,vy:0,sunk:b.sunk}));
-  sendToRoom(room, {type:'turn', turn:room.turn, inHand:room.inHand, sunkBalls:room.sunkBalls, balls});
+  sendToRoom(room, {type:'turn', turn:room.turn, inHand:room.inHand, sunkBalls:room.sunkBalls, sunk0:room.sunk0, sunk1:room.sunk1, balls});
 }
 
 function sendToRoom(room, data) {
@@ -239,6 +244,8 @@ function findMatch(ws, msg) {
       balls: makeBalls(ballSeed),
       turn:0, moving:false, inHand:false,
       sunkBalls:[], sunkThisShot:[],
+      sunk0:[], sunk1:[],
+      shooter:0,
       physInterval:null, syncCounter:0
     };
     ws.roomId=roomId; ws.slot=0;
@@ -259,6 +266,7 @@ function handleShot(ws, msg) {
   cue.vx=msg.vx; cue.vy=msg.vy;
   room.moving=true;
   room.sunkThisShot=[];
+  room.shooter=ws.slot;
   
   // Her ikisine bildir
   sendToRoom(room, {type:'shot_ack', shooter:ws.slot, vx:msg.vx, vy:msg.vy});
