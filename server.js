@@ -139,6 +139,7 @@ function handleTurnEnd(room) {
     return;
   }
   if(room.sunkThisShot.length>0){
+    console.log('sunkThisShot:', room.sunkThisShot);
     if(room.sunkThisShot.includes(8)){
       // 8 top - tüm toplarını bitirmişse kazan, değilse kaybet
       let winner = room.turn;
