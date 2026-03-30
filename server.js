@@ -71,7 +71,7 @@ function physStep(balls) {
     });
     
     // Wall collision (skip sunk balls)
-    all.filter(b=>!b.sunk).forEach(b=>{ (sunk topları atla)
+    all.filter(b=>!b.sunk).forEach(b=>{
     all.filter(b=>!b.sunk).forEach(b=>{
       if(b.x-R<PAD){b.x=PAD+R;b.vx=Math.abs(b.vx)*0.85;}
       if(b.x+R>CW-PAD){b.x=CW-PAD-R;b.vx=-Math.abs(b.vx)*0.85;}
