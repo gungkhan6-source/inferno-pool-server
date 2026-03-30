@@ -149,8 +149,11 @@ function handleTurnEnd(room) {
         if(myLeft > 0) winner = room.turn===0?1:0; // Erken vurdu, kaybetti
       }
       if(room.physInterval) clearInterval(room.physInterval);
-      sendToRoom(room,{type:'game_over',winner,reason:winner===room.turn?'8 Ball Potted - Victory!':'8 Ball Too Early - Forfeit!'});
-      rooms.delete(room.id);
+      console.log('Sending game_over, winner='+winner+' host='+!!room.host+' guest='+!!room.guest);
+      const goMsg = {type:'game_over',winner,reason:winner===room.turn?'8 Ball Potted - Victory!':'8 Ball Too Early - Forfeit!'};
+      send(room.host, goMsg);
+      send(room.guest, goMsg);
+      setTimeout(()=>rooms.delete(room.id), 5000);
       return;
     }
     const sunkBall=room.balls.find(b=>b.id===room.sunkThisShot[0]);
