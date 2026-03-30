@@ -246,9 +246,16 @@ function handleRematch(ws,msg) {
 function handleRematchAccept(ws,msg) {
   const room=rooms.get(ws.roomId);
   if(!room) return;
-  const target=ws.slot===0?room.guest:room.host;
-  send(target,{type:'rematch_accepted'});
-  send(ws,{type:'rematch_accepted'});
+  // Yeni oyun - aynı oyuncularla yeni top dizimi
+  const newSeed=Math.floor(Math.random()*999999);
+  room.balls=makeBalls(newSeed);
+  room.turn=0; room.moving=false; room.inHand=false;
+  room.sunkBalls=[]; room.sunkThisShot=[]; room.sunk0=[]; room.sunk1=[];
+  room.assigned=null; room.shooter=0; room.syncCounter=0; room.shotCount=0;
+  if(room.physInterval){clearInterval(room.physInterval);room.physInterval=null;}
+  // Her ikisine de yeni oyun başlat
+  send(room.host,{type:'game_start',slot:0,ballSeed:newSeed,hostNick:'Player 1',guestNick:'Player 2'});
+  send(room.guest,{type:'game_start',slot:1,ballSeed:newSeed,hostNick:'Player 1',guestNick:'Player 2'});
 }
 
 function handleRematchDecline(ws,msg) {
