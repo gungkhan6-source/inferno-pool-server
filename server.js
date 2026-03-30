@@ -52,42 +52,51 @@ function makeBalls(seed) {
 function physStep(balls) {
   const all = balls.filter(b=>b&&!b.sunk);
   
-  // Hareket
-  all.forEach(b=>{
-    b.x+=b.vx; b.y+=b.vy;
-    b.vx*=FRICTION; b.vy*=FRICTION;
-    if(Math.abs(b.vx)<MIN_V) b.vx=0;
-    if(Math.abs(b.vy)<MIN_V) b.vy=0;
-  });
-  
-  // Duvar çarpışması
-  all.forEach(b=>{
-    if(b.x-R<PAD){b.x=PAD+R;b.vx=Math.abs(b.vx)*0.85;}
-    if(b.x+R>CW-PAD){b.x=CW-PAD-R;b.vx=-Math.abs(b.vx)*0.85;}
-    if(b.y-R<PAD){b.y=PAD+R;b.vy=Math.abs(b.vy)*0.85;}
-    if(b.y+R>CH-PAD){b.y=CH-PAD-R;b.vy=-Math.abs(b.vy)*0.85;}
-  });
-  
-  // Top-top çarpışması
-  for(let i=0;i<all.length;i++){
-    for(let j=i+1;j<all.length;j++){
-      const a=all[i],b=all[j];
-      const dx=b.x-a.x, dy=b.y-a.y;
-      const dist=Math.sqrt(dx*dx+dy*dy);
-      if(dist<R*2&&dist>0){
-        const nx=dx/dist, ny=dy/dist;
-        const overlap=(R*2-dist)/2;
-        a.x-=nx*overlap; a.y-=ny*overlap;
-        b.x+=nx*overlap; b.y+=ny*overlap;
-        const dvx=a.vx-b.vx, dvy=a.vy-b.vy;
-        const dot=dvx*nx+dvy*ny;
-        if(dot>0){
-          a.vx-=dot*nx; a.vy-=dot*ny;
-          b.vx+=dot*nx; b.vy+=dot*ny;
+  const STEPS=4;
+  for(let step=0;step<STEPS;step++){
+    // Hareket
+    all.forEach(b=>{
+      b.x+=b.vx/STEPS; b.y+=b.vy/STEPS;
+    });
+    
+    // Duvar çarpışması
+    all.forEach(b=>{
+      if(b.x-R<PAD){b.x=PAD+R;b.vx=Math.abs(b.vx)*0.85;}
+      if(b.x+R>CW-PAD){b.x=CW-PAD-R;b.vx=-Math.abs(b.vx)*0.85;}
+      if(b.y-R<PAD){b.y=PAD+R;b.vy=Math.abs(b.vy)*0.85;}
+      if(b.y+R>CH-PAD){b.y=CH-PAD-R;b.vy=-Math.abs(b.vy)*0.85;}
+    });
+    
+    // Top-top çarpışması (2 pass)
+    for(let pass=0;pass<2;pass++){
+      for(let i=0;i<all.length;i++){
+        for(let j=i+1;j<all.length;j++){
+          const a=all[i],b=all[j];
+          const dx=b.x-a.x, dy=b.y-a.y;
+          const dist=Math.sqrt(dx*dx+dy*dy);
+          if(dist<R*2&&dist>0.001){
+            const nx=dx/dist, ny=dy/dist;
+            const overlap=(R*2-dist)/2;
+            a.x-=nx*overlap; a.y-=ny*overlap;
+            b.x+=nx*overlap; b.y+=ny*overlap;
+            const dvx=a.vx-b.vx, dvy=a.vy-b.vy;
+            const dot=dvx*nx+dvy*ny;
+            if(dot>0){
+              a.vx-=dot*nx; a.vy-=dot*ny;
+              b.vx+=dot*nx; b.vy+=dot*ny;
+            }
+          }
         }
       }
     }
   }
+  
+  // Sürtünme (her adımda değil, sonunda)
+  all.forEach(b=>{
+    b.vx*=FRICTION; b.vy*=FRICTION;
+    if(Math.abs(b.vx)<MIN_V) b.vx=0;
+    if(Math.abs(b.vy)<MIN_V) b.vy=0;
+  });
   
   // Cebe girme
   const sunk=[];
