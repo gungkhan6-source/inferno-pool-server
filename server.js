@@ -164,7 +164,7 @@ function handleTurnEnd(room) {
       const goMsg = {type:'game_over',winner,reason:winner===room.turn?'8 Ball Potted - Victory!':'8 Ball Too Early - Forfeit!'};
       send(room.host, goMsg);
       send(room.guest, goMsg);
-      setTimeout(()=>rooms.delete(room.id), 5000);
+      room.finished=true; // Keep room for rematch
       return;
     }
     const sunkBall=room.balls.find(b=>b.id===room.sunkThisShot[0]);
