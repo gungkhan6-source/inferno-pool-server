@@ -234,7 +234,7 @@ function sendSync(room) {
 
 function sendTurn(room) {
   const balls = room.balls.map(b=>({id:b.id,x:Math.round(b.x*10)/10,y:Math.round(b.y*10)/10,vx:0,vy:0,sunk:b.sunk,stripe:b.stripe,type:b.type}));
-  sendToRoom(room, {type:'turn', turn:room.turn, inHand:room.inHand, sunkBalls:room.sunkBalls, sunk0:room.sunk0, sunk1:room.sunk1, balls});
+  sendToRoom(room, {type:'turn', turn:room.turn, inHand:room.inHand, sunkBalls:room.sunkBalls, sunk0:room.sunk0, sunk1:room.sunk1, balls, assigned:room.assigned});
 }
 
 function sendToRoom(room, data) {
