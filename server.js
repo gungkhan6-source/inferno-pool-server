@@ -142,6 +142,16 @@ function handleTurnEnd(room) {
   if(room.sunkThisShot.length>0){
     console.log('sunkThisShot:', room.sunkThisShot);
     if(room.sunkThisShot.includes(8)){
+      // First shot - rerack
+      if(room.shotCount<=1){
+        const newSeed=Math.floor(Math.random()*999999);
+        room.balls=makeBalls(newSeed);
+        room.sunkBalls=[]; room.sunk0=[]; room.sunk1=[];
+        room.assigned=null; room.inHand=false; room.sunkThisShot=[];
+        sendToRoom(room,{type:'rerack',ballSeed:newSeed});
+        sendTurn(room);
+        return;
+      }
       // 8 ball - win if all your balls sunk, lose if not
       let winner = room.turn;
       if(room.assigned && room.assigned[room.turn]!==null){
@@ -262,7 +272,8 @@ function findMatch(ws,msg) {
     const room={id:roomId,host:ws,guest:null,ballSeed,hostNick:msg.nickname,
       balls:makeBalls(ballSeed),turn:0,moving:false,inHand:false,
       sunkBalls:[],sunkThisShot:[],sunk0:[],sunk1:[],shooter:0,
-      assigned:null,physInterval:null,syncCounter:0};
+      assigned:null,physInterval:null,syncCounter:0,
+      shotCount:0,ballSeed};
     ws.roomId=roomId; ws.slot=0; waitingRoom=room;
     console.log('Waiting room:',roomId);
     send(ws,{type:'waiting',roomId});
@@ -277,6 +288,7 @@ function handleShot(ws,msg) {
   if(!cue||cue.sunk) return;
   cue.vx=msg.vx; cue.vy=msg.vy;
   room.moving=true; room.sunkThisShot=[]; room.shooter=ws.slot;
+  room.shotCount++;
   sendToRoom(room,{type:'shot_ack',shooter:ws.slot,vx:msg.vx,vy:msg.vy});
   startPhysicsLoop(room);
 }
