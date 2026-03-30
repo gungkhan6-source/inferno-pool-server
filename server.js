@@ -59,8 +59,20 @@ function physStep(balls) {
       b.x+=b.vx/STEPS; b.y+=b.vy/STEPS;
     });
     
-    // Duvar çarpışması
+    // Cep kontrolü (duvardan önce - geri sekmesini önler)
     all.forEach(b=>{
+      if(b.sunk) return;
+      POCKETS.forEach(p=>{
+        const dx=b.x-p.x, dy=b.y-p.y;
+        if(Math.sqrt(dx*dx+dy*dy)<PR){
+          b.sunk=true; b.vx=0; b.vy=0;
+        }
+      });
+    });
+    
+    // Duvar çarpışması (sunk topları atla)
+    all.filter(b=>!b.sunk).forEach(b=>{ (sunk topları atla)
+    all.filter(b=>!b.sunk).forEach(b=>{
       if(b.x-R<PAD){b.x=PAD+R;b.vx=Math.abs(b.vx)*0.85;}
       if(b.x+R>CW-PAD){b.x=CW-PAD-R;b.vx=-Math.abs(b.vx)*0.85;}
       if(b.y-R<PAD){b.y=PAD+R;b.vy=Math.abs(b.vy)*0.85;}
@@ -99,8 +111,10 @@ function physStep(balls) {
   });
   
   // Cebe girme
+  // Cep kontrolü - duvar çarpışmasından ÖNCE
   const sunk=[];
   all.forEach(b=>{
+    if(b.sunk) return;
     POCKETS.forEach(p=>{
       const dx=b.x-p.x, dy=b.y-p.y;
       if(Math.sqrt(dx*dx+dy*dy)<PR){
