@@ -119,11 +119,7 @@ function startPhysicsLoop(room) {
     // Cebe giren topları işle
     sunk.forEach(id=>{
       if(!room.sunkBalls.includes(id)){
-        room.sunkBalls.push(id);
         room.sunkThisShot.push(id);
-        // Hangi oyuncunun attığını kaydet
-        if(room.shooter===0) room.sunk0.push(id);
-        else room.sunk1.push(id);
       }
     });
     
@@ -149,23 +145,68 @@ function startPhysicsLoop(room) {
 function handleTurnEnd(room) {
   const cue = room.balls.find(b=>b.id===0);
   
-  // Beyaz top cebe girdiyse
+  // Beyaz top cebe girdiyse - foul
   if(cue && cue.sunk){
     cue.sunk=false;
     cue.x=CW*0.25; cue.y=CH/2;
     cue.vx=0; cue.vy=0;
     room.turn = room.turn===0?1:0;
     room.inHand=true;
-  } else if(room.sunkThisShot.length>0){
-    // Top cebe girdiyse aynı oyuncu devam eder
-    // (sadece 8 top için özel kural)
-    const eightSunk = room.sunkThisShot.includes(8);
-    if(eightSunk){
-      // Oyun bitti
+    room.sunkThisShot=[];
+    sendTurn(room);
+    return;
+  }
+  
+  if(room.sunkThisShot.length>0){
+    // 8 top kontrolü
+    if(room.sunkThisShot.includes(8)){
       const winner = room.turn;
       sendToRoom(room, {type:'game_over', winner, reason:'8 top cebe girdi'});
       clearInterval(room.physInterval);
       return;
+    }
+    
+    // İlk top - assigned belirle
+    const sunkBall = room.balls.find(b=>b.id===room.sunkThisShot[0]);
+    if(sunkBall && room.assigned===null){
+      room.assigned = [null, null];
+      room.assigned[room.turn] = sunkBall.stripe;
+      room.assigned[room.turn===0?1:0] = !sunkBall.stripe;
+    }
+    
+    // Kimin topu? 
+    let ownBall = true;
+    if(room.assigned && room.assigned[room.turn]!==null){
+      const myStripe = room.assigned[room.turn];
+      ownBall = room.sunkThisShot.every(id=>{
+        const b = room.balls.find(x=>x.id===id);
+        return b && b.stripe===myStripe;
+      });
+    }
+    
+    if(ownBall){
+      // Doğru top - sıra aynı oyuncuda
+      room.sunkThisShot.forEach(id=>{
+        if(!room.sunkBalls.includes(id)){
+          room.sunkBalls.push(id);
+          if(room.turn===0) room.sunk0.push(id);
+          else room.sunk1.push(id);
+        }
+      });
+      room.inHand=false;
+      // Sıra değişmez
+    } else {
+      // Yanlış top - sıra değişir
+      room.sunkThisShot.forEach(id=>{
+        if(!room.sunkBalls.includes(id)){
+          room.sunkBalls.push(id);
+          // Yanlış top - karşı oyuncunun paneline ekle
+          if(room.turn===0) room.sunk1.push(id);
+          else room.sunk0.push(id);
+        }
+      });
+      room.turn = room.turn===0?1:0;
+      room.inHand=false;
     }
   } else {
     // Top girmedi - sıra değişir
@@ -246,6 +287,7 @@ function findMatch(ws, msg) {
       sunkBalls:[], sunkThisShot:[],
       sunk0:[], sunk1:[],
       shooter:0,
+      assigned:null, // null=unassigned, [true/false, true/false] = [p0stripe, p1stripe]
       physInterval:null, syncCounter:0
     };
     ws.roomId=roomId; ws.slot=0;
