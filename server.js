@@ -129,6 +129,7 @@ function startPhysicsLoop(room) {
 }
 
 function handleTurnEnd(room) {
+  console.log('handleTurnEnd called, sunkThisShot=', room.sunkThisShot, 'cue.sunk=', room.balls.find(b=>b.id===0)?.sunk);
   const cue = room.balls.find(b=>b.id===0);
   if(cue && cue.sunk){
     cue.sunk=false; cue.x=CW*0.25; cue.y=CH/2; cue.vx=0; cue.vy=0;
@@ -141,12 +142,12 @@ function handleTurnEnd(room) {
   if(room.sunkThisShot.length>0){
     console.log('sunkThisShot:', room.sunkThisShot);
     if(room.sunkThisShot.includes(8)){
-      // 8 top - tüm toplarını bitirmişse kazan, değilse kaybet
+      // 8 ball - win if all your balls sunk, lose if not
       let winner = room.turn;
       if(room.assigned && room.assigned[room.turn]!==null){
         const myStripe = room.assigned[room.turn];
         const myLeft = room.balls.filter(b=>!b.sunk&&b.stripe===myStripe&&b.type!=='eight').length;
-        if(myLeft > 0) winner = room.turn===0?1:0; // Erken vurdu, kaybetti
+        if(myLeft > 0) winner = room.turn===0?1:0; // Potted too early, loses
       }
       if(room.physInterval) clearInterval(room.physInterval);
       console.log('Sending game_over, winner='+winner+' host='+!!room.host+' guest='+!!room.guest);
