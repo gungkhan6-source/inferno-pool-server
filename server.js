@@ -226,6 +226,7 @@ wss.on('connection',(ws)=>{
 });
 
 function handleMessage(ws,msg) {
+  if(msg.type!=='ping') console.log('MSG:',msg.type,'roomId:',ws.roomId,'rooms:',rooms.size);
   switch(msg.type){
     case 'find_match': findMatch(ws,msg); break;
     case 'shot': handleShot(ws,msg); break;
