@@ -238,8 +238,10 @@ function handleMessage(ws,msg) {
 }
 
 function handleRematch(ws,msg) {
+  console.log('handleRematch called, roomId='+ws.roomId+' rooms='+rooms.size);
   const room=rooms.get(ws.roomId);
-  if(!room) return;
+  if(!room){ console.log('Room not found!'); return; }
+  console.log('Sending rematch_request to other player');
   const target=ws.slot===0?room.guest:room.host;
   send(target,{type:'rematch_request'});
 }
