@@ -140,7 +140,16 @@ function handleTurnEnd(room) {
   }
   if(room.sunkThisShot.length>0){
     if(room.sunkThisShot.includes(8)){
-      sendToRoom(room,{type:'game_over',winner:room.turn,reason:'8 ball potted'});
+      // 8 top - tüm toplarını bitirmişse kazan, değilse kaybet
+      let winner = room.turn;
+      if(room.assigned && room.assigned[room.turn]!==null){
+        const myStripe = room.assigned[room.turn];
+        const myLeft = room.balls.filter(b=>!b.sunk&&b.stripe===myStripe&&b.type!=='eight').length;
+        if(myLeft > 0) winner = room.turn===0?1:0; // Erken vurdu, kaybetti
+      }
+      if(room.physInterval) clearInterval(room.physInterval);
+      sendToRoom(room,{type:'game_over',winner,reason:winner===room.turn?'8 Ball Potted - Victory!':'8 Ball Too Early - Forfeit!'});
+      rooms.delete(room.id);
       return;
     }
     const sunkBall=room.balls.find(b=>b.id===room.sunkThisShot[0]);
@@ -205,8 +214,33 @@ function handleMessage(ws,msg) {
   switch(msg.type){
     case 'find_match': findMatch(ws,msg); break;
     case 'shot': handleShot(ws,msg); break;
+    case 'rematch_request': handleRematch(ws,msg); break;
+    case 'rematch_accept': handleRematchAccept(ws,msg); break;
+    case 'rematch_decline': handleRematchDecline(ws,msg); break;
     case 'ping': send(ws,{type:'pong'}); break;
   }
+}
+
+function handleRematch(ws,msg) {
+  const room=rooms.get(ws.roomId);
+  if(!room) return;
+  const target=ws.slot===0?room.guest:room.host;
+  send(target,{type:'rematch_request'});
+}
+
+function handleRematchAccept(ws,msg) {
+  const room=rooms.get(ws.roomId);
+  if(!room) return;
+  const target=ws.slot===0?room.guest:room.host;
+  send(target,{type:'rematch_accepted'});
+  send(ws,{type:'rematch_accepted'});
+}
+
+function handleRematchDecline(ws,msg) {
+  const room=rooms.get(ws.roomId);
+  if(!room) return;
+  const target=ws.slot===0?room.guest:room.host;
+  send(target,{type:'rematch_declined'});
 }
 
 function findMatch(ws,msg) {
