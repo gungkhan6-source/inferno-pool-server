@@ -59,7 +59,7 @@ function physStep(balls) {
       b.x+=b.vx/STEPS; b.y+=b.vy/STEPS;
     });
     
-    // Cep kontrolü (duvardan önce - geri sekmesini önler)
+    // Pocket check before wall (prevents bounce back)
     all.forEach(b=>{
       if(b.sunk) return;
       POCKETS.forEach(p=>{
@@ -70,7 +70,7 @@ function physStep(balls) {
       });
     });
     
-    // Duvar çarpışması (sunk topları atla)
+    // Wall collision (skip sunk balls)
     all.filter(b=>!b.sunk).forEach(b=>{ (sunk topları atla)
     all.filter(b=>!b.sunk).forEach(b=>{
       if(b.x-R<PAD){b.x=PAD+R;b.vx=Math.abs(b.vx)*0.85;}
@@ -111,7 +111,7 @@ function physStep(balls) {
   });
   
   // Cebe girme
-  // Cep kontrolü - duvar çarpışmasından ÖNCE
+  // Pocket check - before wall collision
   const sunk=[];
   all.forEach(b=>{
     if(b.sunk) return;
