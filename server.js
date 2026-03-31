@@ -38,7 +38,7 @@ function physStep(balls) {
   const all = balls.filter(b=>b&&!b.sunk);
   const sunkIds=[];
   
-  const STEPS=4;
+  const STEPS=8;
   for(let step=0;step<STEPS;step++){
     // Move
     all.forEach(b=>{
@@ -70,7 +70,7 @@ function physStep(balls) {
     
     // Ball-ball collision (2 passes, skip sunk)
     const active = all.filter(b=>!b.sunk);
-    for(let pass=0;pass<2;pass++){
+    for(let pass=0;pass<3;pass++){
       for(let i=0;i<active.length;i++){
         for(let j=i+1;j<active.length;j++){
           const a=active[i],b=active[j];
@@ -78,14 +78,15 @@ function physStep(balls) {
           const dist=Math.sqrt(dx*dx+dy*dy);
           if(dist<R*2&&dist>0.001){
             const nx=dx/dist, ny=dy/dist;
-            const overlap=(R*2-dist)/2;
+            const overlap=(R*2-dist)*0.35;
             a.x-=nx*overlap; a.y-=ny*overlap;
             b.x+=nx*overlap; b.y+=ny*overlap;
             const dvx=a.vx-b.vx, dvy=a.vy-b.vy;
             const dot=dvx*nx+dvy*ny;
             if(dot>0){
-              a.vx-=dot*nx; a.vy-=dot*ny;
-              b.vx+=dot*nx; b.vy+=dot*ny;
+              const imp=dot*0.92;
+              a.vx-=imp*nx; a.vy-=imp*ny;
+              b.vx+=imp*nx; b.vy+=imp*ny;
             }
           }
         }
