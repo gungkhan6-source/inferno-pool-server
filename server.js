@@ -22,13 +22,17 @@ function makeBalls(seed) {
   const order=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
   for(let i=order.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
   const balls=[];
-  const sx=CW*0.65, sy=CH/2, sp=R*2.05;
-  const pos=[[0,0],[1,-1],[1,0],[1,1],[2,-2],[2,-1],[2,0],[2,1],[2,2],[3,-3],[3,-2],[3,-1],[3,0],[3,1],[3,2],[3,3]];
+  const sx=CW*0.625, sy=CH/2;
+  const rdx=Math.sqrt(3)*R; // horizontal exact touch
+  const rdy=R*2;             // vertical exact touch
   let orderIdx=0;
-  for(let i=1;i<pos.length;i++){
-    const [row,col]=pos[i];
-    const id=order[orderIdx++];
-    balls.push({id,x:sx+row*sp*0.866,y:sy+col*sp*0.5,vx:0,vy:0,sunk:false,stripe:id>8,type:id===8?'eight':'ball'});
+  for(let row=0;row<5;row++){
+    for(let col=0;col<=row;col++){
+      const x=sx + row*rdx;
+      const y=sy + (col - row/2)*rdy;
+      const id=order[orderIdx++];
+      balls.push({id,x,y,vx:0,vy:0,sunk:false,stripe:id>8,type:id===8?'eight':'ball'});
+    }
   }
   balls.unshift({id:0,x:CW*0.25,y:CH/2,vx:0,vy:0,sunk:false,type:'cue'});
   return balls;
@@ -117,7 +121,7 @@ function startPhysicsLoop(room) {
       if(!room.sunkBalls.includes(id)) room.sunkThisShot.push(id);
     });
     room.syncCounter=(room.syncCounter||0)+1;
-    if(room.syncCounter%2===0) sendSync(room);
+    sendSync(room); // Send every frame for smooth animation
     if(!isMoving(room.balls)){
       room.moving=false;
       clearInterval(room.physInterval);
@@ -230,11 +234,21 @@ function handleMessage(ws,msg) {
   switch(msg.type){
     case 'find_match': findMatch(ws,msg); break;
     case 'shot': handleShot(ws,msg); break;
+    case 'client_sync': handleClientSync(ws,msg); break;
     case 'rematch_request': handleRematch(ws,msg); break;
     case 'rematch_accept': handleRematchAccept(ws,msg); break;
     case 'rematch_decline': handleRematchDecline(ws,msg); break;
     case 'ping': send(ws,{type:'pong'}); break;
   }
+}
+
+function handleClientSync(ws,msg) {
+  const room=rooms.get(ws.roomId);
+  if(!room||ws.slot!==0) return; // Only host can send client_sync
+  const target=room.guest;
+  send(target,{type:'client_sync', balls:msg.balls, moving:msg.moving,
+    turn:msg.turn, inHand:msg.inHand, assigned:msg.assigned,
+    sunk0:msg.sunk0, sunk1:msg.sunk1});
 }
 
 function handleRematch(ws,msg) {
