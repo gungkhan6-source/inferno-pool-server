@@ -22,16 +22,13 @@ function makeBalls(seed) {
   const order=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
   for(let i=order.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
   const balls=[];
-  const gap=0.3;
-  const sx=CW*0.65, sy=CH/2;
-  const sp_x=Math.sqrt(3)*(R+gap);
-  const sp_y=(R+gap)*2;
+  const sx=CW*0.65, sy=CH/2, sp=R*2.05;
   const pos=[[0,0],[1,-1],[1,0],[1,1],[2,-2],[2,-1],[2,0],[2,1],[2,2],[3,-3],[3,-2],[3,-1],[3,0],[3,1],[3,2],[3,3]];
   let orderIdx=0;
   for(let i=1;i<pos.length;i++){
     const [row,col]=pos[i];
     const id=order[orderIdx++];
-    balls.push({id,x:sx+row*sp_x,y:sy+col*sp_y,vx:0,vy:0,sunk:false,stripe:id>8,type:id===8?'eight':'ball'});
+    balls.push({id,x:sx+row*sp*0.866,y:sy+col*sp*0.5,vx:0,vy:0,sunk:false,stripe:id>8,type:id===8?'eight':'ball'});
   }
   balls.unshift({id:0,x:CW*0.25,y:CH/2,vx:0,vy:0,sunk:false,type:'cue'});
   return balls;
@@ -41,7 +38,7 @@ function physStep(balls) {
   const all = balls.filter(b=>b&&!b.sunk);
   const sunkIds=[];
   
-  const STEPS=8;
+  const STEPS=4;
   for(let step=0;step<STEPS;step++){
     // Move
     all.forEach(b=>{
@@ -73,7 +70,7 @@ function physStep(balls) {
     
     // Ball-ball collision (2 passes, skip sunk)
     const active = all.filter(b=>!b.sunk);
-    for(let pass=0;pass<3;pass++){
+    for(let pass=0;pass<2;pass++){
       for(let i=0;i<active.length;i++){
         for(let j=i+1;j<active.length;j++){
           const a=active[i],b=active[j];
@@ -81,15 +78,14 @@ function physStep(balls) {
           const dist=Math.sqrt(dx*dx+dy*dy);
           if(dist<R*2&&dist>0.001){
             const nx=dx/dist, ny=dy/dist;
-            const overlap=(R*2-dist)*0.35;
+            const overlap=(R*2-dist)/2;
             a.x-=nx*overlap; a.y-=ny*overlap;
             b.x+=nx*overlap; b.y+=ny*overlap;
             const dvx=a.vx-b.vx, dvy=a.vy-b.vy;
             const dot=dvx*nx+dvy*ny;
             if(dot>0){
-              const imp=dot*0.92;
-              a.vx-=imp*nx; a.vy-=imp*ny;
-              b.vx+=imp*nx; b.vy+=imp*ny;
+              a.vx-=dot*nx; a.vy-=dot*ny;
+              b.vx+=dot*nx; b.vy+=dot*ny;
             }
           }
         }
@@ -145,20 +141,7 @@ function handleTurnEnd(room) {
   }
   if(room.sunkThisShot.length>0){
     console.log('sunkThisShot:', room.sunkThisShot);
-    // 8 top + beyaz top aynı anda → KAYIP
-    const cueAlsoSunk = room.sunkThisShot.includes(0);
     if(room.sunkThisShot.includes(8)){
-      if(cueAlsoSunk){
-        // Beyaz top da girdi - atış yapan KAYBEDER
-        if(room.physInterval) clearInterval(room.physInterval);
-        console.log('8+cue sunk - shooter loses!');
-        const loser = room.turn;
-        const winner = loser===0?1:0;
-        send(room.host,{type:'game_over',winner,reason:'8 Ball + Scratch - Loss!'});
-        send(room.guest,{type:'game_over',winner,reason:'8 Ball + Scratch - Loss!'});
-        setTimeout(()=>rooms.delete(room.id),5000);
-        return;
-      }
       // First shot - rerack
       if(room.shotCount<=1){
         const newSeed=Math.floor(Math.random()*999999);
@@ -266,14 +249,14 @@ function handleRematch(ws,msg) {
 function handleRematchAccept(ws,msg) {
   const room=rooms.get(ws.roomId);
   if(!room) return;
-  // Yeni oyun - aynı oyuncularla yeni top dizimi
+  // New game - same players, new ball setup
   const newSeed=Math.floor(Math.random()*999999);
   room.balls=makeBalls(newSeed);
   room.turn=0; room.moving=false; room.inHand=false;
   room.sunkBalls=[]; room.sunkThisShot=[]; room.sunk0=[]; room.sunk1=[];
   room.assigned=null; room.shooter=0; room.syncCounter=0; room.shotCount=0;
   if(room.physInterval){clearInterval(room.physInterval);room.physInterval=null;}
-  // Her ikisine de yeni oyun başlat
+  // Send game_start to both players
   send(room.host,{type:'game_start',slot:0,ballSeed:newSeed,hostNick:'Player 1',guestNick:'Player 2'});
   send(room.guest,{type:'game_start',slot:1,ballSeed:newSeed,hostNick:'Player 1',guestNick:'Player 2'});
 }
