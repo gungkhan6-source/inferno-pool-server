@@ -235,11 +235,19 @@ function handleMessage(ws,msg) {
     case 'find_match': findMatch(ws,msg); break;
     case 'shot': handleShot(ws,msg); break;
     case 'client_sync': handleClientSync(ws,msg); break;
+    case 'host_turn': handleHostTurn(ws,msg); break;
     case 'rematch_request': handleRematch(ws,msg); break;
     case 'rematch_accept': handleRematchAccept(ws,msg); break;
     case 'rematch_decline': handleRematchDecline(ws,msg); break;
     case 'ping': send(ws,{type:'pong'}); break;
   }
+}
+
+function handleHostTurn(ws,msg) {
+  const room=rooms.get(ws.roomId);
+  if(!room||ws.slot!==0) return;
+  send(room.guest,{type:'host_turn',turn:msg.turn,inHand:msg.inHand,
+    assigned:msg.assigned,sunk0:msg.sunk0,sunk1:msg.sunk1});
 }
 
 function handleClientSync(ws,msg) {
