@@ -22,13 +22,16 @@ function makeBalls(seed) {
   const order=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
   for(let i=order.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
   const balls=[];
-  const sx=CW*0.65, sy=CH/2, sp=R*2.05;
+  const gap=0.3;
+  const sx=CW*0.65, sy=CH/2;
+  const sp_x=Math.sqrt(3)*(R+gap);
+  const sp_y=(R+gap)*2;
   const pos=[[0,0],[1,-1],[1,0],[1,1],[2,-2],[2,-1],[2,0],[2,1],[2,2],[3,-3],[3,-2],[3,-1],[3,0],[3,1],[3,2],[3,3]];
   let orderIdx=0;
   for(let i=1;i<pos.length;i++){
     const [row,col]=pos[i];
     const id=order[orderIdx++];
-    balls.push({id,x:sx+row*sp*0.866,y:sy+col*sp*0.5,vx:0,vy:0,sunk:false,stripe:id>8,type:id===8?'eight':'ball'});
+    balls.push({id,x:sx+row*sp_x,y:sy+col*sp_y,vx:0,vy:0,sunk:false,stripe:id>8,type:id===8?'eight':'ball'});
   }
   balls.unshift({id:0,x:CW*0.25,y:CH/2,vx:0,vy:0,sunk:false,type:'cue'});
   return balls;
