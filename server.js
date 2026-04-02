@@ -145,7 +145,15 @@ function handleTurnEnd(room) {
   }
   if(room.sunkThisShot.length>0){
     console.log('sunkThisShot:', room.sunkThisShot);
+    const cueAlsoSunk = room.sunkThisShot.includes(0);
     if(room.sunkThisShot.includes(8)){
+      if(cueAlsoSunk){
+        if(room.physInterval) clearInterval(room.physInterval);
+        const winner = room.turn===0?1:0;
+        send(room.host,{type:'game_over',winner,reason:'8 Ball + Scratch - Loss!'});
+        send(room.guest,{type:'game_over',winner,reason:'8 Ball + Scratch - Loss!'});
+        room.finished=true; return;
+      }
       // First shot - rerack
       if(room.shotCount<=1){
         const newSeed=Math.floor(Math.random()*999999);
