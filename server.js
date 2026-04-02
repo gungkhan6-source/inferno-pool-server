@@ -10,7 +10,7 @@ const wss = new WebSocket.Server({ server });
 const rooms = new Map();
 let waitingRoom = null;
 
-const CW=740, CH=400, PAD=32, R=10, FRICTION=0.984, MIN_V=0.07, PR=22;
+const CW=740, CH=400, PAD=32, R=10, FRICTION=0.988, MIN_V=0.07, PR=22;
 const POCKETS=[
   {x:PAD,y:PAD},{x:CW/2,y:PAD-6},{x:CW-PAD,y:PAD},
   {x:PAD,y:CH-PAD},{x:CW/2,y:CH-PAD+6},{x:CW-PAD,y:CH-PAD}
@@ -67,10 +67,10 @@ function physStep(balls) {
     // Wall collision (skip sunk)
     all.forEach(b=>{
       if(b.sunk) return;
-      if(b.x-R<PAD){b.x=PAD+R;b.vx=Math.abs(b.vx)*0.85;}
-      if(b.x+R>CW-PAD){b.x=CW-PAD-R;b.vx=-Math.abs(b.vx)*0.85;}
-      if(b.y-R<PAD){b.y=PAD+R;b.vy=Math.abs(b.vy)*0.85;}
-      if(b.y+R>CH-PAD){b.y=CH-PAD-R;b.vy=-Math.abs(b.vy)*0.85;}
+      if(b.x-R<PAD){b.x=PAD+R;b.vx=Math.abs(b.vx)*0.88;}
+      if(b.x+R>CW-PAD){b.x=CW-PAD-R;b.vx=-Math.abs(b.vx)*0.88;}
+      if(b.y-R<PAD){b.y=PAD+R;b.vy=Math.abs(b.vy)*0.88;}
+      if(b.y+R>CH-PAD){b.y=CH-PAD-R;b.vy=-Math.abs(b.vy)*0.88;}
     });
     
     // Ball-ball collision (2 passes, skip sunk)
@@ -89,8 +89,10 @@ function physStep(balls) {
             const dvx=a.vx-b.vx, dvy=a.vy-b.vy;
             const dot=dvx*nx+dvy*ny;
             if(dot>0){
-              a.vx-=dot*nx; a.vy-=dot*ny;
-              b.vx+=dot*nx; b.vy+=dot*ny;
+              // Full elastic + slight extra push for livelier breaks
+              const imp = dot * 1.0;
+              a.vx-=imp*nx; a.vy-=imp*ny;
+              b.vx+=imp*nx; b.vy+=imp*ny;
             }
           }
         }
