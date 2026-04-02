@@ -42,7 +42,7 @@ function physStep(balls) {
   const all = balls.filter(b=>b&&!b.sunk);
   const sunkIds=[];
   
-  const STEPS=4;
+  const STEPS=6;
   for(let step=0;step<STEPS;step++){
     // Move
     all.forEach(b=>{
@@ -74,7 +74,7 @@ function physStep(balls) {
     
     // Ball-ball collision (2 passes, skip sunk)
     const active = all.filter(b=>!b.sunk);
-    for(let pass=0;pass<2;pass++){
+    for(let pass=0;pass<4;pass++){
       for(let i=0;i<active.length;i++){
         for(let j=i+1;j<active.length;j++){
           const a=active[i],b=active[j];
