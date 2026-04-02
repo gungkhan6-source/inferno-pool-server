@@ -290,6 +290,7 @@ function handleRematchAccept(ws,msg) {
   // Send game_start to both players
   send(room.host,{type:'game_start',slot:0,ballSeed:newSeed,hostNick:'Player 1',guestNick:'Player 2'});
   send(room.guest,{type:'game_start',slot:1,ballSeed:newSeed,hostNick:'Player 1',guestNick:'Player 2'});
+  setTimeout(()=>sendSync(room), 100);
 }
 
 function handleRematchDecline(ws,msg) {
@@ -307,6 +308,8 @@ function findMatch(ws,msg) {
     console.log('Match found! Room:',room.id);
     send(room.host,{type:'game_start',slot:0,ballSeed:room.ballSeed,hostNick:room.hostNick,guestNick:msg.nickname});
     send(room.guest,{type:'game_start',slot:1,ballSeed:room.ballSeed,hostNick:room.hostNick,guestNick:msg.nickname});
+    // Send initial positions immediately
+    setTimeout(()=>sendSync(room), 100);
   } else {
     const roomId=Math.random().toString(36).substr(2,8);
     const ballSeed=Math.floor(Math.random()*999999);
