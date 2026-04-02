@@ -23,8 +23,9 @@ function makeBalls(seed) {
   for(let i=order.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
   const balls=[];
   const sx=CW*0.625, sy=CH/2;
-  const rdx=Math.sqrt(3)*R; // horizontal exact touch
-  const rdy=R*2;             // vertical exact touch
+  const gap=0.4; // tiny gap prevents initial overlap/sticking
+  const rdx=Math.sqrt(3)*(R+gap); // horizontal
+  const rdy=(R+gap)*2;             // vertical
   let orderIdx=0;
   for(let row=0;row<5;row++){
     for(let col=0;col<=row;col++){
@@ -42,7 +43,7 @@ function physStep(balls) {
   const all = balls.filter(b=>b&&!b.sunk);
   const sunkIds=[];
   
-  const STEPS=6;
+  const STEPS=8;
   for(let step=0;step<STEPS;step++){
     // Move
     all.forEach(b=>{
@@ -82,7 +83,7 @@ function physStep(balls) {
           const dist=Math.sqrt(dx*dx+dy*dy);
           if(dist<R*2&&dist>0.001){
             const nx=dx/dist, ny=dy/dist;
-            const overlap=(R*2-dist)/2;
+            const overlap=(R*2-dist)*0.4;
             a.x-=nx*overlap; a.y-=ny*overlap;
             b.x+=nx*overlap; b.y+=ny*overlap;
             const dvx=a.vx-b.vx, dvy=a.vy-b.vy;
