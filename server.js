@@ -23,7 +23,7 @@ function makeBalls(seed) {
   for(let i=order.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
   const balls=[];
   const sx=CW*0.625, sy=CH/2;
-  const gap=0.4; // tiny gap prevents initial overlap/sticking
+  const gap=0.8; // tiny gap prevents initial overlap/sticking
   const rdx=Math.sqrt(3)*(R+gap); // horizontal
   const rdy=(R+gap)*2;             // vertical
   let orderIdx=0;
@@ -43,7 +43,7 @@ function physStep(balls) {
   const all = balls.filter(b=>b&&!b.sunk);
   const sunkIds=[];
   
-  const STEPS=8;
+  const STEPS=4;
   for(let step=0;step<STEPS;step++){
     // Move
     all.forEach(b=>{
