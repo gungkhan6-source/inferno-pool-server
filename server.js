@@ -10,7 +10,7 @@ const wss = new WebSocket.Server({ server });
 const rooms = new Map();
 let waitingRoom = null;
 
-const CW=740, CH=400, PAD=32, R=10, FRICTION=0.988, MIN_V=0.07, PR=22;
+const CW=740, CH=400, PAD=32, R=10, FRICTION=0.984, MIN_V=0.07, PR=22;
 const POCKETS=[
   {x:PAD,y:PAD},{x:CW/2,y:PAD-6},{x:CW-PAD,y:PAD},
   {x:PAD,y:CH-PAD},{x:CW/2,y:CH-PAD+6},{x:CW-PAD,y:CH-PAD}
@@ -23,16 +23,15 @@ function makeBalls(seed) {
   for(let i=order.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
   const balls=[];
   const sx=CW*0.625, sy=CH/2;
-  const gap=0.8; // tiny gap prevents initial overlap/sticking
-  const rdx=Math.sqrt(3)*(R+gap); // horizontal
-  const rdy=(R+gap)*2;             // vertical
+  const rdx=Math.sqrt(3)*R; // horizontal exact touch
+  const rdy=R*2;             // vertical exact touch
   let orderIdx=0;
   for(let row=0;row<5;row++){
     for(let col=0;col<=row;col++){
       const x=sx + row*rdx;
       const y=sy + (col - row/2)*rdy;
       const id=order[orderIdx++];
-      balls.push({id,x,y,vx:0,vy:0,sunk:false,stripe:id>8,type:id===8?'8ball':'ball'});
+      balls.push({id,x,y,vx:0,vy:0,sunk:false,stripe:id>8,type:id===8?'eight':'ball'});
     }
   }
   balls.unshift({id:0,x:CW*0.25,y:CH/2,vx:0,vy:0,sunk:false,type:'cue'});
@@ -67,15 +66,15 @@ function physStep(balls) {
     // Wall collision (skip sunk)
     all.forEach(b=>{
       if(b.sunk) return;
-      if(b.x-R<PAD){b.x=PAD+R;b.vx=Math.abs(b.vx)*0.88;}
-      if(b.x+R>CW-PAD){b.x=CW-PAD-R;b.vx=-Math.abs(b.vx)*0.88;}
-      if(b.y-R<PAD){b.y=PAD+R;b.vy=Math.abs(b.vy)*0.88;}
-      if(b.y+R>CH-PAD){b.y=CH-PAD-R;b.vy=-Math.abs(b.vy)*0.88;}
+      if(b.x-R<PAD){b.x=PAD+R;b.vx=Math.abs(b.vx)*0.85;}
+      if(b.x+R>CW-PAD){b.x=CW-PAD-R;b.vx=-Math.abs(b.vx)*0.85;}
+      if(b.y-R<PAD){b.y=PAD+R;b.vy=Math.abs(b.vy)*0.85;}
+      if(b.y+R>CH-PAD){b.y=CH-PAD-R;b.vy=-Math.abs(b.vy)*0.85;}
     });
     
     // Ball-ball collision (2 passes, skip sunk)
     const active = all.filter(b=>!b.sunk);
-    for(let pass=0;pass<4;pass++){
+    for(let pass=0;pass<2;pass++){
       for(let i=0;i<active.length;i++){
         for(let j=i+1;j<active.length;j++){
           const a=active[i],b=active[j];
@@ -83,16 +82,14 @@ function physStep(balls) {
           const dist=Math.sqrt(dx*dx+dy*dy);
           if(dist<R*2&&dist>0.001){
             const nx=dx/dist, ny=dy/dist;
-            const overlap=(R*2-dist)*0.4;
+            const overlap=(R*2-dist)/2;
             a.x-=nx*overlap; a.y-=ny*overlap;
             b.x+=nx*overlap; b.y+=ny*overlap;
             const dvx=a.vx-b.vx, dvy=a.vy-b.vy;
             const dot=dvx*nx+dvy*ny;
             if(dot>0){
-              // Full elastic + slight extra push for livelier breaks
-              const imp = dot * 1.0;
-              a.vx-=imp*nx; a.vy-=imp*ny;
-              b.vx+=imp*nx; b.vy+=imp*ny;
+              a.vx-=dot*nx; a.vy-=dot*ny;
+              b.vx+=dot*nx; b.vy+=dot*ny;
             }
           }
         }
@@ -148,15 +145,7 @@ function handleTurnEnd(room) {
   }
   if(room.sunkThisShot.length>0){
     console.log('sunkThisShot:', room.sunkThisShot);
-    const cueAlsoSunk = room.sunkThisShot.includes(0);
     if(room.sunkThisShot.includes(8)){
-      if(cueAlsoSunk){
-        if(room.physInterval) clearInterval(room.physInterval);
-        const winner = room.turn===0?1:0;
-        send(room.host,{type:'game_over',winner,reason:'8 Ball + Scratch - Loss!'});
-        send(room.guest,{type:'game_over',winner,reason:'8 Ball + Scratch - Loss!'});
-        room.finished=true; return;
-      }
       // First shot - rerack
       if(room.shotCount<=1){
         const newSeed=Math.floor(Math.random()*999999);
@@ -171,7 +160,7 @@ function handleTurnEnd(room) {
       let winner = room.turn;
       if(room.assigned && room.assigned[room.turn]!==null){
         const myStripe = room.assigned[room.turn];
-        const myLeft = room.balls.filter(b=>!b.sunk&&b.stripe===myStripe&&b.type!=='8ball').length;
+        const myLeft = room.balls.filter(b=>!b.sunk&&b.stripe===myStripe&&b.type!=='eight').length;
         if(myLeft > 0) winner = room.turn===0?1:0; // Potted too early, loses
       }
       if(room.physInterval) clearInterval(room.physInterval);
@@ -292,7 +281,6 @@ function handleRematchAccept(ws,msg) {
   // Send game_start to both players
   send(room.host,{type:'game_start',slot:0,ballSeed:newSeed,hostNick:'Player 1',guestNick:'Player 2'});
   send(room.guest,{type:'game_start',slot:1,ballSeed:newSeed,hostNick:'Player 1',guestNick:'Player 2'});
-  setTimeout(()=>sendSync(room), 100);
 }
 
 function handleRematchDecline(ws,msg) {
@@ -310,8 +298,6 @@ function findMatch(ws,msg) {
     console.log('Match found! Room:',room.id);
     send(room.host,{type:'game_start',slot:0,ballSeed:room.ballSeed,hostNick:room.hostNick,guestNick:msg.nickname});
     send(room.guest,{type:'game_start',slot:1,ballSeed:room.ballSeed,hostNick:room.hostNick,guestNick:msg.nickname});
-    // Send initial positions immediately
-    setTimeout(()=>sendSync(room), 100);
   } else {
     const roomId=Math.random().toString(36).substr(2,8);
     const ballSeed=Math.floor(Math.random()*999999);
