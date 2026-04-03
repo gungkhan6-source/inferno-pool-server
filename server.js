@@ -32,7 +32,7 @@ function makeBalls(seed) {
       const x=sx + row*rdx;
       const y=sy + (col - row/2)*rdy;
       const id=order[orderIdx++];
-      balls.push({id,x,y,vx:0,vy:0,sunk:false,stripe:id>8,type:id===8?'eight':'ball'});
+      balls.push({id,x,y,vx:0,vy:0,sunk:false,stripe:id>8,type:id===8?'8ball':'ball'});
     }
   }
   balls.unshift({id:0,x:CW*0.25,y:CH/2,vx:0,vy:0,sunk:false,type:'cue'});
@@ -171,7 +171,7 @@ function handleTurnEnd(room) {
       let winner = room.turn;
       if(room.assigned && room.assigned[room.turn]!==null){
         const myStripe = room.assigned[room.turn];
-        const myLeft = room.balls.filter(b=>!b.sunk&&b.stripe===myStripe&&b.type!=='eight').length;
+        const myLeft = room.balls.filter(b=>!b.sunk&&b.stripe===myStripe&&b.type!=='8ball').length;
         if(myLeft > 0) winner = room.turn===0?1:0; // Potted too early, loses
       }
       if(room.physInterval) clearInterval(room.physInterval);
