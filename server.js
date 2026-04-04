@@ -8,20 +8,17 @@ const server = http.createServer((req,res)=>{
   res.end(html);
 });
 
-const wss = new WebSocket.Server({ server });
+// ⚡ KRİTİK: ayrı ws server
+const wss = new WebSocket.Server({ port: 3001 });
 
 let waiting = null;
-
-function makeBalls(){
-  return [{id:0,x:200,y:200,vx:0,vy:0,sunk:false}];
-}
 
 function send(ws,data){
   try{ ws.send(JSON.stringify(data)); }catch(e){}
 }
 
 wss.on('connection',(ws)=>{
-  console.log("CONNECTED");
+  console.log("WS CONNECTED");
 
   if(waiting){
     const p1 = waiting;
@@ -35,9 +32,8 @@ wss.on('connection',(ws)=>{
     waiting = ws;
     send(ws,{type:"waiting"});
   }
-
-  ws.on('close',()=>console.log("CLOSED"));
-  ws.on('error',()=>console.log("ERROR"));
 });
 
-server.listen(3000,()=>console.log("RUN http://127.0.0.1:3000"));
+server.listen(3000,()=>{
+  console.log("HTTP OK http://127.0.0.1:3000");
+});

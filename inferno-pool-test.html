@@ -12,7 +12,7 @@
 const status=document.getElementById("status");
 
 // FORCE correct WS
-const ws=new WebSocket("ws://127.0.0.1:3000");
+const ws=new WebSocket("ws://127.0.0.1:3001");
 
 ws.onopen=()=>{
   status.innerText="CONNECTED";
