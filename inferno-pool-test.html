@@ -2,10 +2,9 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Inferno Matchmaking</title>
+<title>Match FIX</title>
 <style>
 body{margin:0;background:black;color:white;text-align:center}
-#status{margin-top:20px}
 canvas{display:block;margin:auto;background:#111}
 </style>
 </head>
@@ -16,6 +15,7 @@ canvas{display:block;margin:auto;background:#111}
 
 <script>
 const ws=new WebSocket("ws://127.0.0.1:3000");
+
 const status=document.getElementById("status");
 const canvas=document.getElementById("c");
 const ctx=canvas.getContext("2d");
@@ -25,8 +25,8 @@ let balls=[];
 ws.onmessage=(msg)=>{
   const data=JSON.parse(msg.data);
 
-  if(data.type==="waiting") status.innerText="Waiting for player...";
-  if(data.type==="match") status.innerText="Match Found!";
+  if(data.type==="waiting") status.innerText="Waiting...";
+  if(data.type==="match") status.innerText="MATCHED";
 
   if(data.type==="init") balls=data.balls;
   if(data.type==="sync") balls=data.balls;
