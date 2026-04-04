@@ -3,37 +3,21 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-// HTTP SERVER
 const server = http.createServer((req,res)=>{
-  let filePath = "inferno-pool-test.html";
-
-  if(req.url === "/" || req.url === "/inferno-pool-test.html"){
-    filePath = "inferno-pool-test.html";
-  }
-
-  try{
-    const file = fs.readFileSync(path.join(__dirname,filePath));
-    res.writeHead(200,{"Content-Type":"text/html"});
-    res.end(file);
-  }catch(e){
-    res.writeHead(404);
-    res.end("Not found");
-  }
+  const file = fs.readFileSync(path.join(__dirname,"inferno-pool-test.html"));
+  res.writeHead(200,{"Content-Type":"text/html"});
+  res.end(file);
 });
 
-server.listen(3000,()=>{
-  console.log("HTTP OK http://localhost:3000");
-});
+server.listen(3000,()=>console.log("HTTP OK"));
 
-// WS SERVER (PORT 3001)
-const wss = new WebSocket.Server({ port:3001 },()=>{
-  console.log("WS OK ws://localhost:3001");
-});
+const wss = new WebSocket.Server({ server });
+
+let waitingPlayer = null;
 
 function makeBalls(){
   const balls=[];
   balls.push({id:0,x:200,y:200,vx:0,vy:0,sunk:false});
-
   let id=1;
   for(let r=0;r<5;r++){
     for(let c=0;c<=r;c++){
@@ -48,18 +32,40 @@ function makeBalls(){
   return balls;
 }
 
+function send(ws,data){
+  try{ ws.send(JSON.stringify(data)); }catch(e){}
+}
+
 wss.on('connection',(ws)=>{
-  console.log("WS CONNECTED");
+  if(waitingPlayer){
+    const p1=waitingPlayer;
+    const p2=ws;
 
-  const room={
-    balls:makeBalls(),
-    moving:false
-  };
+    const room={
+      players:[p1,p2],
+      balls:makeBalls(),
+      moving:false
+    };
 
-  ws.send(JSON.stringify({type:"init",balls:room.balls}));
+    p1.room=room;
+    p2.room=room;
+
+    send(p1,{type:"match"});
+    send(p2,{type:"match"});
+
+    send(p1,{type:"init",balls:room.balls});
+    send(p2,{type:"init",balls:room.balls});
+
+    waitingPlayer=null;
+  }else{
+    waitingPlayer=ws;
+    send(ws,{type:"waiting"});
+  }
 
   ws.on('message',(msg)=>{
     const data=JSON.parse(msg);
+    const room=ws.room;
+    if(!room) return;
 
     if(data.type==="shoot"){
       const cue=room.balls[0];
@@ -68,9 +74,12 @@ wss.on('connection',(ws)=>{
       room.moving=true;
     }
   });
+});
 
-  setInterval(()=>{
-    if(!room.moving) return;
+setInterval(()=>{
+  wss.clients.forEach(ws=>{
+    const room=ws.room;
+    if(!room||!room.moving) return;
 
     room.balls.forEach(b=>{
       b.x+=b.vx;
@@ -79,9 +88,11 @@ wss.on('connection',(ws)=>{
       b.vy*=0.98;
     });
 
-    ws.send(JSON.stringify({type:"sync",balls:room.balls}));
-  },16);
+    room.players.forEach(p=>{
+      send(p,{type:"sync",balls:room.balls});
+    });
 
-  ws.on('close',()=>console.log("WS CLOSED"));
-  ws.on('error',()=>{});
-});
+    const moving=room.balls.some(b=>Math.abs(b.vx)>0.05||Math.abs(b.vy)>0.05);
+    if(!moving) room.moving=false;
+  });
+},16);
