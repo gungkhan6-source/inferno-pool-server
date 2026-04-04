@@ -10,31 +10,60 @@ const wss = new WebSocket.Server({ server });
 const rooms = new Map();
 let waitingRoom = null;
 
-const CW=740, CH=400, PAD=32, R=10, FRICTION=0.984, MIN_V=0.07, PR=22;
+const CW=740, CH=400, PAD=32, R=10, FRICTION=0.9835, MIN_V=0.07, PR=19;
 const POCKETS=[
   {x:PAD,y:PAD},{x:CW/2,y:PAD-6},{x:CW-PAD,y:PAD},
   {x:PAD,y:CH-PAD},{x:CW/2,y:CH-PAD+6},{x:CW-PAD,y:CH-PAD}
 ];
 
 function makeBalls(seed) {
+  // Mulberry32 PRNG — must match client exactly
   let s = seed;
-  function rand() { s=(s*1664525+1013904223)&0xffffffff; return (s>>>0)/0xffffffff; }
-  const order=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
-  for(let i=order.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
+  function rand() {
+    s |= 0; s = s + 0x6D2B79F5 | 0;
+    let t = Math.imul(s ^ s >>> 15, 1 | s);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+  // Element keys (same order as client)
+  const elKeys = ['fire','ice','poison','shadow'];
+
+  // Build solid + stripe type arrays (same as client makeBallsSeeded)
+  const solidT=[], stripeT=[];
+  for(let i=0;i<4;i++) solidT.push(elKeys[i%elKeys.length]);
+  solidT.push(elKeys[0]); solidT.push(elKeys[1]); solidT.push(elKeys[2]);
+  for(let i=0;i<4;i++) stripeT.push(elKeys[(i+1)%elKeys.length]);
+  stripeT.push(elKeys[3]); stripeT.push(elKeys[0]); stripeT.push(elKeys[1]);
+
+  // Seeded shuffle (same as client)
+  for(let i=solidT.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[solidT[i],solidT[j]]=[solidT[j],solidT[i]];}
+  for(let i=stripeT.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[stripeT[i],stripeT[j]]=[stripeT[j],stripeT[i]];}
+
+  // Build rack: 7 solid (id 1-7), 8ball (id 8), 7 stripe (id 9-15)
+  const rack2=[];
+  for(let i=0;i<7;i++) rack2.push({type:solidT[i],stripe:false,id:i+1});
+  rack2.push({type:'8ball',stripe:false,id:8});
+  for(let i=0;i<7;i++) rack2.push({type:stripeT[i],stripe:true,id:i+9});
+
+  // Shuffle non-eight, insert 8ball at position 4
+  const nonE=rack2.filter(b=>b.type!=='8ball');
+  for(let i=nonE.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[nonE[i],nonE[j]]=[nonE[j],nonE[i]];}
+  nonE.splice(4,0,rack2.find(b=>b.type==='8ball'));
+
+  // Position balls — same formula as client
   const balls=[];
-  const sx=CW*0.625, sy=CH/2;
-  const rdx=Math.sqrt(3)*R; // horizontal exact touch
-  const rdy=R*2;             // vertical exact touch
-  let orderIdx=0;
+  let ri2=0;
+  const sx2=CW*0.625, sy2=CH/2;
   for(let row=0;row<5;row++){
     for(let col=0;col<=row;col++){
-      const x=sx + row*rdx;
-      const y=sy + (col - row/2)*rdy;
-      const id=order[orderIdx++];
-      balls.push({id,x,y,vx:0,vy:0,sunk:false,stripe:id>8,type:id===8?'eight':'ball'});
+      const x=sx2+row*(R*2+1.2);
+      const y=sy2-row*(R+0.6)+col*(R*2+1.2);
+      const b=nonE[ri2++]; if(!b) continue;
+      balls.push({id:b.id,x,y,vx:0,vy:0,sunk:false,stripe:b.stripe,type:b.type==='8ball'?'eight':'ball'});
     }
   }
-  balls.unshift({id:0,x:CW*0.25,y:CH/2,vx:0,vy:0,sunk:false,type:'cue'});
+  // Cue ball — position must match client's makeCue()
+  balls.unshift({id:0,x:CW*0.26,y:CH/2,vx:0,vy:0,sunk:false,type:'cue'});
   return balls;
 }
 
@@ -136,7 +165,7 @@ function handleTurnEnd(room) {
   console.log('handleTurnEnd called, sunkThisShot=', room.sunkThisShot, 'cue.sunk=', room.balls.find(b=>b.id===0)?.sunk);
   const cue = room.balls.find(b=>b.id===0);
   if(cue && cue.sunk){
-    cue.sunk=false; cue.x=CW*0.25; cue.y=CH/2; cue.vx=0; cue.vy=0;
+    cue.sunk=false; cue.x=CW*0.26; cue.y=CH/2; cue.vx=0; cue.vy=0;
     room.turn=room.turn===0?1:0;
     room.inHand=true;
     room.sunkThisShot=[];
