@@ -3,31 +3,41 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const server = http.createServer((req,res)=>{
-  const file = fs.readFileSync(path.join(__dirname,"inferno-pool-test.html"));
-  res.writeHead(200,{"Content-Type":"text/html"});
-  res.end(file);
+// --- HTTP SERVER (serves HTML on :3000) ---
+const httpServer = http.createServer((req, res) => {
+  const filePath = path.join(__dirname, 'inferno-pool-test.html');
+  try {
+    const html = fs.readFileSync(filePath);
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(html);
+  } catch (e) {
+    res.writeHead(500);
+    res.end('Failed to load HTML');
+  }
 });
 
-const wss = new WebSocket.Server({ server });
+httpServer.listen(3000, () => {
+  console.log('HTTP: http://localhost:3000');
+});
+
+// --- WEBSOCKET SERVER (separate port :3001) ---
+const wss = new WebSocket.Server({ port: 3001 }, () => {
+  console.log('WS: ws://localhost:3001');
+});
 
 const rooms = new Set();
 
-const R = 10;
-const FRICTION = 0.985;
-const MIN_V = 0.05;
-
 function makeBalls(){
-  const balls=[];
-  balls.push({id:0,x:200,y:200,vx:0,vy:0,sunk:false});
-  let id=1;
+  const balls = [];
+  balls.push({ id:0, x:200, y:200, vx:0, vy:0, sunk:false });
+  let id = 1;
   for(let r=0;r<5;r++){
     for(let c=0;c<=r;c++){
       balls.push({
         id:id++,
-        x:450+r*22,
-        y:200-r*11+c*22,
-        vx:0,vy:0,sunk:false
+        x:450 + r*22,
+        y:200 - r*11 + c*22,
+        vx:0, vy:0, sunk:false
       });
     }
   }
@@ -35,83 +45,68 @@ function makeBalls(){
 }
 
 function createRoom(ws){
-  const fake = { readyState:1, send:()=>{} };
-
-  const room={
-    players:[ws,fake],
-    balls:makeBalls(),
-    moving:false
+  const room = {
+    ws,
+    balls: makeBalls(),
+    moving: false
   };
-
-  ws.room=room;
+  ws.room = room;
   rooms.add(room);
-
   return room;
 }
 
-function send(room,data){
-  const msg=JSON.stringify(data);
-
-  room.players.forEach(p=>{
-    try{
-      if(p.readyState===1){
-        p.send(msg);
-      }
-    }catch(e){}
-  });
+function send(ws, data){
+  try {
+    if (ws.readyState === 1) {
+      ws.send(JSON.stringify(data));
+    }
+  } catch (e) {
+    // ignore
+  }
 }
 
 function physStep(room){
-  room.balls.forEach(b=>{
-    if(b.sunk) return;
-
-    b.x+=b.vx;
-    b.y+=b.vy;
-
-    b.vx*=FRICTION;
-    b.vy*=FRICTION;
-
-    if(Math.abs(b.vx)<MIN_V) b.vx=0;
-    if(Math.abs(b.vy)<MIN_V) b.vy=0;
+  const balls = room.balls;
+  balls.forEach(b => {
+    if (b.sunk) return;
+    b.x += b.vx;
+    b.y += b.vy;
+    b.vx *= 0.985;
+    b.vy *= 0.985;
+    if (Math.abs(b.vx) < 0.05) b.vx = 0;
+    if (Math.abs(b.vy) < 0.05) b.vy = 0;
   });
 }
 
 function loop(){
-  rooms.forEach(room=>{
-    if(!room.moving) return;
-
+  rooms.forEach(room => {
+    if (!room.moving) return;
     physStep(room);
-
-    send(room,{type:"sync",balls:room.balls});
-
-    const moving=room.balls.some(b=>Math.abs(b.vx)>MIN_V||Math.abs(b.vy)>MIN_V);
-    if(!moving) room.moving=false;
+    send(room.ws, { type: 'sync', balls: room.balls });
+    const moving = room.balls.some(b => Math.abs(b.vx) > 0.05 || Math.abs(b.vy) > 0.05);
+    if (!moving) room.moving = false;
   });
 }
 
-setInterval(loop,16);
+setInterval(loop, 16);
 
-wss.on('connection',(ws)=>{
-  console.log("CLIENT CONNECTED");
+wss.on('connection', (ws) => {
+  console.log('WS CONNECTED');
+  const room = createRoom(ws);
+  send(ws, { type: 'init', balls: room.balls });
 
-  const room=createRoom(ws);
-  send(room,{type:"init",balls:room.balls});
-
-  ws.on('message',(msg)=>{
-    const data=JSON.parse(msg);
-
-    if(data.type==="shoot"){
-      const cue=room.balls[0];
-      cue.vx=data.vx*2;
-      cue.vy=data.vy*2;
-      room.moving=true;
-    }
+  ws.on('message', (msg) => {
+    try {
+      const data = JSON.parse(msg);
+      if (data.type === 'shoot') {
+        const cue = room.balls[0];
+        cue.vx = data.vx * 2;
+        cue.vy = data.vy * 2;
+        room.moving = true;
+      }
+    } catch (e) {}
   });
 
-  ws.on('close', ()=>{});
-  ws.on('error', ()=>{});
-});
-
-server.listen(3000,()=>{
-  console.log("SERVER READY http://localhost:3000");
+  ws.on('close', () => console.log('WS CLOSED'));
+  ws.on('error', () => {});
 });
