@@ -1,10 +1,16 @@
 const WebSocket = require('ws');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 
-const server = http.createServer();
+const server = http.createServer((req,res)=>{
+  const file = fs.readFileSync(path.join(__dirname,"inferno-pool-test.html"));
+  res.writeHead(200,{"Content-Type":"text/html"});
+  res.end(file);
+});
+
 const wss = new WebSocket.Server({ server });
 
-let waiting = null;
 const rooms = new Set();
 
 const R = 10;
@@ -14,7 +20,6 @@ const MIN_V = 0.05;
 function makeBalls(){
   const balls=[];
   balls.push({id:0,x:200,y:200,vx:0,vy:0,sunk:false});
-
   let id=1;
   for(let r=0;r<5;r++){
     for(let c=0;c<=r;c++){
@@ -29,31 +34,35 @@ function makeBalls(){
   return balls;
 }
 
-function createRoom(p1,p2){
+function createRoom(ws){
+  const fake = { readyState:1, send:()=>{} };
+
   const room={
-    players:[p1,p2],
+    players:[ws,fake],
     balls:makeBalls(),
-    moving:false,
-    firstShot:true,
-    fxQueue:[]
+    moving:false
   };
-  p1.room=room;
-  p2.room=room;
+
+  ws.room=room;
   rooms.add(room);
+
   return room;
 }
 
 function send(room,data){
   const msg=JSON.stringify(data);
+
   room.players.forEach(p=>{
-    if(p.readyState===1)p.send(msg);
+    try{
+      if(p.readyState===1){
+        p.send(msg);
+      }
+    }catch(e){}
   });
 }
 
 function physStep(room){
-  const balls=room.balls;
-
-  balls.forEach(b=>{
+  room.balls.forEach(b=>{
     if(b.sunk) return;
 
     b.x+=b.vx;
@@ -83,14 +92,14 @@ function loop(){
 setInterval(loop,16);
 
 wss.on('connection',(ws)=>{
-  // single player fallback (no black screen)
-  const fake = { readyState:1, send:()=>{} };
+  console.log("CLIENT CONNECTED");
 
-  const room=createRoom(ws,fake);
+  const room=createRoom(ws);
   send(room,{type:"init",balls:room.balls});
 
   ws.on('message',(msg)=>{
     const data=JSON.parse(msg);
+
     if(data.type==="shoot"){
       const cue=room.balls[0];
       cue.vx=data.vx*2;
@@ -98,8 +107,11 @@ wss.on('connection',(ws)=>{
       room.moving=true;
     }
   });
+
+  ws.on('close', ()=>{});
+  ws.on('error', ()=>{});
 });
 
 server.listen(3000,()=>{
-  console.log("SERVER READY 3000");
+  console.log("SERVER READY http://localhost:3000");
 });
