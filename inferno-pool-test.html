@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>LAST FIX</title>
+<title>FINAL TEST</title>
 </head>
 <body style="background:black;color:white;text-align:center">
 
@@ -11,30 +11,26 @@
 <script>
 const status=document.getElementById("status");
 
-// try both host formats
-let ws;
-
-try{
-  ws=new WebSocket("ws://127.0.0.1:3000");
-}catch(e){
-  ws=new WebSocket("ws://localhost:3000");
-}
+// FORCE correct WS
+const ws=new WebSocket("ws://127.0.0.1:3000");
 
 ws.onopen=()=>{
-  status.innerText="CONNECTED ✅";
+  status.innerText="CONNECTED";
 };
 
 ws.onmessage=(msg)=>{
-  status.innerText="SUCCESS DATA ✅";
+  const data=JSON.parse(msg.data);
+
+  if(data.type==="waiting") status.innerText="WAITING";
+  if(data.type==="match") status.innerText="MATCHED";
 };
 
-ws.onerror=(e)=>{
-  status.innerText="ERROR ❌";
-  console.log("ERR",e);
+ws.onerror=()=>{
+  status.innerText="ERROR";
 };
 
 ws.onclose=()=>{
-  status.innerText="CLOSED ❌";
+  status.innerText="CLOSED";
 };
 </script>
 

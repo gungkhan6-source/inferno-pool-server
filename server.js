@@ -10,13 +10,34 @@ const server = http.createServer((req,res)=>{
 
 const wss = new WebSocket.Server({ server });
 
-wss.on('connection',(ws,req)=>{
-  console.log("CONNECTED FROM:", req.socket.remoteAddress);
+let waiting = null;
 
-  ws.send(JSON.stringify({type:"connected"}));
+function makeBalls(){
+  return [{id:0,x:200,y:200,vx:0,vy:0,sunk:false}];
+}
 
-  ws.on('error',(e)=>console.log("WS ERROR:",e.message));
-  ws.on('close',()=>console.log("WS CLOSED"));
+function send(ws,data){
+  try{ ws.send(JSON.stringify(data)); }catch(e){}
+}
+
+wss.on('connection',(ws)=>{
+  console.log("CONNECTED");
+
+  if(waiting){
+    const p1 = waiting;
+    const p2 = ws;
+
+    send(p1,{type:"match"});
+    send(p2,{type:"match"});
+
+    waiting = null;
+  }else{
+    waiting = ws;
+    send(ws,{type:"waiting"});
+  }
+
+  ws.on('close',()=>console.log("CLOSED"));
+  ws.on('error',()=>console.log("ERROR"));
 });
 
-server.listen(3000,'0.0.0.0',()=>console.log("RUN http://127.0.0.1:3000"));
+server.listen(3000,()=>console.log("RUN http://127.0.0.1:3000"));
