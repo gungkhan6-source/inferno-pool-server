@@ -12,8 +12,8 @@ let waitingRoom = null;
 
 const CW=740, CH=400, PAD=32, R=10, FRICTION=0.9835, MIN_V=0.07, PR=19;
 const POCKETS=[
-  {x:PAD,y:PAD},{x:CW/2,y:PAD-6},{x:CW-PAD,y:PAD},
-  {x:PAD,y:CH-PAD},{x:CW/2,y:CH-PAD+6},{x:CW-PAD,y:CH-PAD}
+  {x:PAD+2,y:PAD+2,r:PR+2},{x:CW/2,y:PAD-4,r:PR},{x:CW-PAD-2,y:PAD+2,r:PR+2},
+  {x:PAD+2,y:CH-PAD-2,r:PR+2},{x:CW/2,y:CH-PAD+4,r:PR},{x:CW-PAD-2,y:CH-PAD-2,r:PR+2}
 ];
 
 function makeBalls(seed) {
@@ -84,7 +84,8 @@ function physStep(balls) {
       if(b.sunk) return;
       for(const p of POCKETS){
         const dx=b.x-p.x, dy=b.y-p.y;
-        if(Math.sqrt(dx*dx+dy*dy)<PR){
+        const pr=p.r||PR;
+        if(Math.sqrt(dx*dx+dy*dy)<pr){
           b.sunk=true; b.vx=0; b.vy=0;
           sunkIds.push(b.id);
           break;
@@ -263,6 +264,7 @@ function handleMessage(ws,msg) {
   switch(msg.type){
     case 'find_match': findMatch(ws,msg); break;
     case 'shot': handleShot(ws,msg); break;
+    case 'place_cue': handlePlaceCue(ws,msg); break;
     case 'client_sync': handleClientSync(ws,msg); break;
     case 'host_turn': handleHostTurn(ws,msg); break;
     case 'rematch_request': handleRematch(ws,msg); break;
@@ -303,9 +305,11 @@ function handleRematchAccept(ws,msg) {
   // New game - same players, new ball setup
   const newSeed=Math.floor(Math.random()*999999);
   room.balls=makeBalls(newSeed);
+  room.ballSeed=newSeed;
   room.turn=0; room.moving=false; room.inHand=false;
   room.sunkBalls=[]; room.sunkThisShot=[]; room.sunk0=[]; room.sunk1=[];
   room.assigned=null; room.shooter=0; room.syncCounter=0; room.shotCount=0;
+  room.finished=false;
   if(room.physInterval){clearInterval(room.physInterval);room.physInterval=null;}
   // Send game_start to both players
   send(room.host,{type:'game_start',slot:0,ballSeed:newSeed,hostNick:'Player 1',guestNick:'Player 2'});
@@ -341,12 +345,33 @@ function findMatch(ws,msg) {
   }
 }
 
+function handlePlaceCue(ws,msg) {
+  const room=rooms.get(ws.roomId);
+  if(!room) return;
+  if(ws.slot!==room.turn) return;
+  if(!room.inHand) return;
+  const cue=room.balls.find(b=>b.id===0);
+  if(!cue) return;
+  // Clamp to table bounds
+  cue.x=Math.max(PAD+R, Math.min(CW-PAD-R, msg.x||cue.x));
+  cue.y=Math.max(PAD+R, Math.min(CH-PAD-R, msg.y||cue.y));
+  cue.sunk=false;
+  room.inHand=false;
+  sendToRoom(room,{type:'cue_placed', x:cue.x, y:cue.y});
+  console.log('Cue placed at',cue.x,cue.y,'by slot',ws.slot);
+}
+
 function handleShot(ws,msg) {
   const room=rooms.get(ws.roomId);
-  if(!room||room.moving) return;
+  if(!room||room.moving||room.finished) return;
   if(ws.slot!==room.turn) return;
   const cue=room.balls.find(b=>b.id===0);
   if(!cue||cue.sunk) return;
+  // Accept cue position from client (for ball-in-hand fallback)
+  if(msg.cx!==undefined && msg.cy!==undefined){
+    cue.x=Math.max(PAD+R, Math.min(CW-PAD-R, msg.cx));
+    cue.y=Math.max(PAD+R, Math.min(CH-PAD-R, msg.cy));
+  }
   cue.vx=msg.vx; cue.vy=msg.vy;
   room.moving=true; room.sunkThisShot=[]; room.shooter=ws.slot;
   room.shotCount++;
