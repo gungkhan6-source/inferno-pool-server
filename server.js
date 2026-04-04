@@ -1,7 +1,3 @@
-// ======================================
-// 🔥 FULL WORKING SERVER (server.js)
-// ======================================
-
 const WebSocket = require('ws');
 const http = require('http');
 
@@ -16,22 +12,20 @@ const FRICTION = 0.985;
 const MIN_V = 0.05;
 
 function makeBalls(){
-  const balls = [];
-
+  const balls=[];
   balls.push({id:0,x:200,y:200,vx:0,vy:0,sunk:false});
 
   let id=1;
-  for(let row=0;row<5;row++){
-    for(let col=0;col<=row;col++){
+  for(let r=0;r<5;r++){
+    for(let c=0;c<=r;c++){
       balls.push({
         id:id++,
-        x:450 + row*22,
-        y:200 - row*11 + col*22,
+        x:450+r*22,
+        y:200-r*11+c*22,
         vx:0,vy:0,sunk:false
       });
     }
   }
-
   return balls;
 }
 
@@ -40,12 +34,11 @@ function createRoom(p1,p2){
     players:[p1,p2],
     balls:makeBalls(),
     moving:false,
-    firstShot:true
+    firstShot:true,
+    fxQueue:[]
   };
-
   p1.room=room;
   p2.room=room;
-
   rooms.add(room);
   return room;
 }
@@ -92,9 +85,27 @@ function physStep(room){
         a.vy-=p*ny;
         b.vx+=p*nx;
         b.vy+=p*ny;
+
+        if(Math.abs(p)>1){
+          room.fxQueue.push({type:"hit",x:a.x,y:a.y});
+        }
       }
     }
   }
+
+  balls.forEach(b=>{
+    if(b.sunk) return;
+
+    if(
+      (b.x<30&&b.y<30)||(b.x>710&&b.y<30)||
+      (b.x<30&&b.y>370)||(b.x>710&&b.y>370)
+    ){
+      b.sunk=true;
+      b.vx=0;b.vy=0;
+
+      room.fxQueue.push({type:"pocket",x:b.x,y:b.y});
+    }
+  });
 }
 
 function loop(){
@@ -105,6 +116,11 @@ function loop(){
 
     send(room,{type:"sync",balls:room.balls});
 
+    if(room.fxQueue.length){
+      send(room,{type:"fx",effects:room.fxQueue});
+      room.fxQueue=[];
+    }
+
     const moving=room.balls.some(b=>Math.abs(b.vx)>MIN_V||Math.abs(b.vy)>MIN_V);
     if(!moving) room.moving=false;
   });
@@ -113,12 +129,9 @@ function loop(){
 setInterval(loop,16);
 
 wss.on('connection',(ws)=>{
-
   if(waiting){
     const room=createRoom(waiting,ws);
-
     send(room,{type:"init",balls:room.balls});
-
     waiting=null;
   }else{
     waiting=ws;
@@ -133,7 +146,10 @@ wss.on('connection',(ws)=>{
       const cue=room.balls[0];
 
       let boost=1.5;
-      if(room.firstShot){boost=2.2;room.firstShot=false;}
+      if(room.firstShot){
+        boost=2.2;
+        room.firstShot=false;
+      }
 
       cue.vx=data.vx*boost;
       cue.vy=data.vy*boost;
@@ -146,27 +162,3 @@ wss.on('connection',(ws)=>{
 server.listen(3000,()=>{
   console.log("SERVER READY 3000");
 });
-
-
-// ======================================
-// 🔥 CLIENT ADD (HTML içine EKLE)
-// ======================================
-
-/*
-ws.onmessage = (msg)=>{
-  const data = JSON.parse(msg.data);
-
-  if(data.type === "init"){
-    balls = data.balls;
-    render();
-  }
-
-  if(data.type === "sync"){
-    balls = data.balls;
-    render();
-  }
-};
-*/
-
-// render başına ekle:
-// if(!balls || balls.length===0) return;
