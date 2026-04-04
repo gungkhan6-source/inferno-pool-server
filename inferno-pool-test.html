@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ULTRA FIX</title>
+<title>LAST FIX</title>
 </head>
 <body style="background:black;color:white;text-align:center">
 
@@ -11,19 +11,26 @@
 <script>
 const status=document.getElementById("status");
 
-const ws=new WebSocket("ws://127.0.0.1:3000");
+// try both host formats
+let ws;
+
+try{
+  ws=new WebSocket("ws://127.0.0.1:3000");
+}catch(e){
+  ws=new WebSocket("ws://localhost:3000");
+}
 
 ws.onopen=()=>{
   status.innerText="CONNECTED ✅";
 };
 
 ws.onmessage=(msg)=>{
-  const data=JSON.parse(msg.data);
-  status.innerText="DATA: "+data.type;
+  status.innerText="SUCCESS DATA ✅";
 };
 
-ws.onerror=()=>{
+ws.onerror=(e)=>{
   status.innerText="ERROR ❌";
+  console.log("ERR",e);
 };
 
 ws.onclose=()=>{

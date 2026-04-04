@@ -10,15 +10,13 @@ const server = http.createServer((req,res)=>{
 
 const wss = new WebSocket.Server({ server });
 
-wss.on('connection',(ws)=>{
-  console.log("CLIENT CONNECTED");
+wss.on('connection',(ws,req)=>{
+  console.log("CONNECTED FROM:", req.socket.remoteAddress);
 
-  ws.send(JSON.stringify({type:"hello"}));
+  ws.send(JSON.stringify({type:"connected"}));
 
-  ws.on('message',(msg)=>{
-    console.log("MSG:", msg.toString());
-    ws.send(JSON.stringify({type:"echo"}));
-  });
+  ws.on('error',(e)=>console.log("WS ERROR:",e.message));
+  ws.on('close',()=>console.log("WS CLOSED"));
 });
 
-server.listen(3000,()=>console.log("RUN http://127.0.0.1:3000"));
+server.listen(3000,'0.0.0.0',()=>console.log("RUN http://127.0.0.1:3000"));
