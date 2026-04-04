@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>INFERNO POOL ONLINE FIX</title>
+</head>
+<body style="background:black;color:white;text-align:center">
+
+<h2 id="status">READY</h2>
+<button onclick="startOnlineMode()">PLAY ONLINE</button>
+
+<script>
+let ws;
+const status = document.getElementById("status");
+
+function startOnlineMode(){
+    status.innerText = "CONNECTING...";
+
+    // 🔥 LOCAL SERVER
+    ws = new WebSocket("ws://127.0.0.1:3001");
+
+    ws.onopen = ()=>{
+        status.innerText = "CONNECTED";
+    };
+
+    ws.onmessage = (msg)=>{
+        const data = JSON.parse(msg.data);
+
+        if(data.type==="waiting") status.innerText="WAITING PLAYER...";
+        if(data.type==="match") status.innerText="MATCH FOUND!";
+    };
+
+    ws.onerror = ()=>{
+        status.innerText = "ERROR";
+    };
+
+    ws.onclose = ()=>{
+        status.innerText = "DISCONNECTED";
+    };
+}
+</script>
+
+</body>
+<script>
+let ws = null;
+
+function startOnlineMode(){
+
+    console.log("ONLINE MODE START");
+
+    const statusEl = document.getElementById("online-status");
+    if(statusEl) statusEl.innerText = "● CONNECTING";
+
+    // 🔥 LOCAL SERVER
+    ws = new WebSocket("ws://127.0.0.1:3001");
+
+    ws.onopen = ()=>{
+        console.log("CONNECTED");
+        if(statusEl) statusEl.innerText = "● CONNECTED";
+    };
+
+    ws.onmessage = (msg)=>{
+        const data = JSON.parse(msg.data);
+
+        console.log("SERVER:", data);
+
+        if(data.type==="waiting"){
+            if(statusEl) statusEl.innerText = "● WAITING PLAYER";
+        }
+
+        if(data.type==="match"){
+            if(statusEl) statusEl.innerText = "● MATCH FOUND";
+
+            // 🔥 BURADA OYUN BAŞLAT
+            startGame();
+        }
+    };
+
+    ws.onerror = (e)=>{
+        console.log("WS ERROR", e);
+        if(statusEl) statusEl.innerText = "● ERROR";
+    };
+
+    ws.onclose = ()=>{
+        console.log("WS CLOSED");
+        if(statusEl) statusEl.innerText = "● DISCONNECTED";
+    };
+}
+</script>
+</html>
