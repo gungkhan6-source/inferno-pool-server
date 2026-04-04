@@ -65,47 +65,6 @@ function physStep(room){
     if(Math.abs(b.vx)<MIN_V) b.vx=0;
     if(Math.abs(b.vy)<MIN_V) b.vy=0;
   });
-
-  for(let i=0;i<balls.length;i++){
-    for(let j=i+1;j<balls.length;j++){
-      const a=balls[i], b=balls[j];
-      if(a.sunk||b.sunk) continue;
-
-      const dx=b.x-a.x;
-      const dy=b.y-a.y;
-      const dist=Math.sqrt(dx*dx+dy*dy);
-
-      if(dist<R*2 && dist>0){
-        const nx=dx/dist;
-        const ny=dy/dist;
-
-        const p=(a.vx*nx+a.vy*ny - b.vx*nx - b.vy*ny);
-
-        a.vx-=p*nx;
-        a.vy-=p*ny;
-        b.vx+=p*nx;
-        b.vy+=p*ny;
-
-        if(Math.abs(p)>1){
-          room.fxQueue.push({type:"hit",x:a.x,y:a.y});
-        }
-      }
-    }
-  }
-
-  balls.forEach(b=>{
-    if(b.sunk) return;
-
-    if(
-      (b.x<30&&b.y<30)||(b.x>710&&b.y<30)||
-      (b.x<30&&b.y>370)||(b.x>710&&b.y>370)
-    ){
-      b.sunk=true;
-      b.vx=0;b.vy=0;
-
-      room.fxQueue.push({type:"pocket",x:b.x,y:b.y});
-    }
-  });
 }
 
 function loop(){
@@ -116,11 +75,6 @@ function loop(){
 
     send(room,{type:"sync",balls:room.balls});
 
-    if(room.fxQueue.length){
-      send(room,{type:"fx",effects:room.fxQueue});
-      room.fxQueue=[];
-    }
-
     const moving=room.balls.some(b=>Math.abs(b.vx)>MIN_V||Math.abs(b.vy)>MIN_V);
     if(!moving) room.moving=false;
   });
@@ -129,31 +83,18 @@ function loop(){
 setInterval(loop,16);
 
 wss.on('connection',(ws)=>{
-  if(waiting){
-    const room=createRoom(waiting,ws);
-    send(room,{type:"init",balls:room.balls});
-    waiting=null;
-  }else{
-    waiting=ws;
-  }
+  // single player fallback (no black screen)
+  const fake = { readyState:1, send:()=>{} };
+
+  const room=createRoom(ws,fake);
+  send(room,{type:"init",balls:room.balls});
 
   ws.on('message',(msg)=>{
     const data=JSON.parse(msg);
-    const room=ws.room;
-    if(!room) return;
-
     if(data.type==="shoot"){
       const cue=room.balls[0];
-
-      let boost=1.5;
-      if(room.firstShot){
-        boost=2.2;
-        room.firstShot=false;
-      }
-
-      cue.vx=data.vx*boost;
-      cue.vy=data.vy*boost;
-
+      cue.vx=data.vx*2;
+      cue.vy=data.vy*2;
       room.moving=true;
     }
   });

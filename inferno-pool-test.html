@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Inferno Test</title>
+<title>Inferno Fixed</title>
 <style>
 body{margin:0;background:black}
 canvas{display:block;margin:auto;background:#111}
@@ -19,33 +19,13 @@ const canvas=document.getElementById("c");
 const ctx=canvas.getContext("2d");
 
 let balls=[];
-let particles=[];
 
 ws.onmessage=(msg)=>{
   const data=JSON.parse(msg.data);
 
   if(data.type==="init") balls=data.balls;
   if(data.type==="sync") balls=data.balls;
-
-  if(data.type==="fx"){
-    data.effects.forEach(e=>{
-      if(e.type==="hit") spawnHit(e.x,e.y);
-      if(e.type==="pocket") spawnPocket(e.x,e.y);
-    });
-  }
 };
-
-function spawnHit(x,y){
-  for(let i=0;i<6;i++){
-    particles.push({x,y,vx:(Math.random()-0.5)*3,vy:(Math.random()-0.5)*3,life:20});
-  }
-}
-
-function spawnPocket(x,y){
-  for(let i=0;i<12;i++){
-    particles.push({x,y,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5,life:30});
-  }
-}
 
 function draw(){
   ctx.clearRect(0,0,740,400);
@@ -58,22 +38,12 @@ function draw(){
     ctx.fill();
   });
 
-  particles.forEach(p=>{
-    p.x+=p.vx;
-    p.y+=p.vy;
-    p.life--;
-    ctx.fillStyle="orange";
-    ctx.fillRect(p.x,p.y,3,3);
-  });
-
-  particles=particles.filter(p=>p.life>0);
-
   requestAnimationFrame(draw);
 }
 
 draw();
 
-window.onclick=()=>{
+canvas.onclick=()=>{
   ws.send(JSON.stringify({type:"shoot",vx:5,vy:2}));
 };
 </script>
