@@ -2,59 +2,60 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Inferno Pool STABLE</title>
+<title>Inferno FIX</title>
 <style>
 body{margin:0;background:black}
 canvas{display:block;margin:auto;background:#111}
+#dbg{position:fixed;top:10px;left:10px;color:lime;font-size:14px;}
 </style>
 </head>
 <body>
 
+<div id="dbg">LOADING...</div>
+
 <canvas id="c" width="740" height="400"></canvas>
 
 <script>
-// Connect to WS on port 3001 (separate from HTTP)
-const ws = new WebSocket("ws://localhost:3001");
+const dbg=document.getElementById("dbg");
 
-const canvas = document.getElementById("c");
-const ctx = canvas.getContext("2d");
+const ws=new WebSocket("ws://127.0.0.1:3001");
 
-let balls = [];
+const canvas=document.getElementById("c");
+const ctx=canvas.getContext("2d");
 
-ws.onopen = () => console.log("WS OPEN");
-ws.onerror = () => console.log("WS ERROR");
-ws.onclose = () => console.log("WS CLOSED");
+let balls=[];
 
-ws.onmessage = (msg) => {
-  try {
-    const data = JSON.parse(msg.data);
-    if (data.type === "init") balls = data.balls || [];
-    if (data.type === "sync") balls = data.balls || [];
-  } catch (e) {}
+ws.onopen=()=>dbg.innerText="WS CONNECTED";
+ws.onerror=()=>dbg.innerText="WS ERROR";
+ws.onclose=()=>dbg.innerText="WS CLOSED";
+
+ws.onmessage=(msg)=>{
+  dbg.innerText="DATA OK";
+
+  const data=JSON.parse(msg.data);
+
+  if(data.type==="init") balls=data.balls;
+  if(data.type==="sync") balls=data.balls;
 };
 
 function draw(){
   ctx.clearRect(0,0,740,400);
 
-  if (balls && balls.length) {
-    balls.forEach(b=>{
-      if (b.sunk) return;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, 10, 0, Math.PI*2);
-      ctx.fillStyle = "white";
-      ctx.fill();
-    });
-  }
+  balls.forEach(b=>{
+    if(b.sunk) return;
+    ctx.beginPath();
+    ctx.arc(b.x,b.y,10,0,Math.PI*2);
+    ctx.fillStyle="white";
+    ctx.fill();
+  });
 
   requestAnimationFrame(draw);
 }
 
 draw();
 
-canvas.onclick = () => {
-  try {
-    ws.send(JSON.stringify({ type: "shoot", vx: 5, vy: 2 }));
-  } catch (e) {}
+canvas.onclick=()=>{
+  ws.send(JSON.stringify({type:"shoot",vx:5,vy:2}));
 };
 </script>
 
