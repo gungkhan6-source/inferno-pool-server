@@ -2,35 +2,35 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>FINAL TEST</title>
+<title>FINAL READY</title>
 </head>
 <body style="background:black;color:white;text-align:center">
 
 <h2 id="status">CONNECTING...</h2>
 
 <script>
-const status=document.getElementById("status");
+const status = document.getElementById("status");
 
-// FORCE correct WS
-const ws=new WebSocket("ws://127.0.0.1:3001");
+// WS PORT 3001
+const ws = new WebSocket("ws://127.0.0.1:3001");
 
-ws.onopen=()=>{
-  status.innerText="CONNECTED";
+ws.onopen = ()=>{
+  status.innerText = "CONNECTED";
 };
 
-ws.onmessage=(msg)=>{
-  const data=JSON.parse(msg.data);
+ws.onmessage = (msg)=>{
+  const data = JSON.parse(msg.data);
 
   if(data.type==="waiting") status.innerText="WAITING";
   if(data.type==="match") status.innerText="MATCHED";
 };
 
-ws.onerror=()=>{
-  status.innerText="ERROR";
+ws.onerror = ()=>{
+  status.innerText = "ERROR";
 };
 
-ws.onclose=()=>{
-  status.innerText="CLOSED";
+ws.onclose = ()=>{
+  status.innerText = "CLOSED";
 };
 </script>
 

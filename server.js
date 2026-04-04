@@ -2,14 +2,17 @@ const WebSocket = require('ws');
 const http = require('http');
 const fs = require('fs');
 
-const server = http.createServer((req,res)=>{
+// HTTP SERVER
+http.createServer((req,res)=>{
   const html = fs.readFileSync("inferno-pool-test.html");
   res.writeHead(200,{"Content-Type":"text/html"});
   res.end(html);
-});
+}).listen(3000,()=>console.log("HTTP 3000 OK"));
 
-// ⚡ KRİTİK: ayrı ws server
-const wss = new WebSocket.Server({ port: 3001 });
+// WS SERVER
+const wss = new WebSocket.Server({ port: 3001 },()=>{
+  console.log("WS 3001 OK");
+});
 
 let waiting = null;
 
@@ -32,8 +35,4 @@ wss.on('connection',(ws)=>{
     waiting = ws;
     send(ws,{type:"waiting"});
   }
-});
-
-server.listen(3000,()=>{
-  console.log("HTTP OK http://127.0.0.1:3000");
 });
