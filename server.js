@@ -20,7 +20,7 @@ const httpServer = http.createServer((req, res) => {
 httpServer.listen(3000, () => console.log('HTTP: http://127.0.0.1:3000'));
 
 // WS RELAY SERVER — port 3001
-const wss = new WebSocket.Server({ port: 3001 }, () => console.log('WS: ws://127.0.0.1:3001'));
+const wss = new WebSocket.Server({ port: 3001 }, () => console.log('WS: wss://inferno-pool-server.onrender.com'));
 const rooms = new Map();
 let waitingRoom = null;
 
