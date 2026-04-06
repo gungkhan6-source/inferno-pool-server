@@ -1,8 +1,3 @@
-const WebSocket = require('ws');
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-
 const http = require("http");
 const WebSocket = require("ws");
 const fs = require("fs");
@@ -12,6 +7,7 @@ const path = require("path");
 const httpServer = http.createServer((req, res) => {
   let filePath = '.' + (req.url === '/' ? '/inferno-pool-test.html' : req.url);
   const ext = path.extname(filePath);
+
   const types = {
     '.html':'text/html',
     '.js':'application/javascript',
@@ -22,7 +18,7 @@ const httpServer = http.createServer((req, res) => {
 
   try {
     const data = fs.readFileSync(filePath);
-    res.writeHead(200, {'Content-Type': types[ext]||'text/html'});
+    res.writeHead(200, {'Content-Type': types[ext] || 'text/html'});
     res.end(data);
   } catch(e) {
     res.writeHead(404);
@@ -30,34 +26,7 @@ const httpServer = http.createServer((req, res) => {
   }
 });
 
-const http = require("http");
-const WebSocket = require("ws");
-const fs = require("fs");
-const path = require("path");
-
-// HTTP SERVER
-const httpServer = http.createServer((req, res) => {
-  let filePath = '.' + (req.url === '/' ? '/inferno-pool-test.html' : req.url);
-  const ext = path.extname(filePath);
-  const types = {
-    '.html':'text/html',
-    '.js':'application/javascript',
-    '.css':'text/css',
-    '.png':'image/png',
-    '.jpg':'image/jpeg'
-  };
-
-  try {
-    const data = fs.readFileSync(filePath);
-    res.writeHead(200, {'Content-Type': types[ext]||'text/html'});
-    res.end(data);
-  } catch(e) {
-    res.writeHead(404);
-    res.end('Not Found');
-  }
-});
-
-// 🔥 TEK WEBSOCKET (httpServer üstünde)
+// 🔥 WEBSOCKET (TEK)
 const wss = new WebSocket.Server({ server: httpServer });
 
 const rooms = new Map();
@@ -104,12 +73,12 @@ wss.on('connection', (ws) => {
   });
 });
 
-// MATCH SYSTEM (aynı kalıyor)
+// MATCH
 function findMatch(ws, msg) {
   if (waitingRoom && waitingRoom.host !== ws) {
     const room = waitingRoom;
-    room.guest = ws;
 
+    room.guest = ws;
     ws.roomId = room.id;
     ws.slot = 1;
 
@@ -122,10 +91,11 @@ function findMatch(ws, msg) {
     send(room.guest, {type:'game_start', slot:1, ballSeed:seed});
 
     console.log('MATCH', room.id);
+
   } else {
     const id = Math.random().toString(36).substr(2, 8);
 
-    waitingRoom = {id, host:ws, guest:null};
+    waitingRoom = { id, host: ws, guest: null };
 
     ws.roomId = id;
     ws.slot = 0;
@@ -136,6 +106,7 @@ function findMatch(ws, msg) {
   }
 }
 
+// RELAY
 function relay(ws, msg) {
   const room = rooms.get(ws.roomId);
   if (!room) return;
@@ -144,13 +115,14 @@ function relay(ws, msg) {
   if (other) send(other, msg);
 }
 
+// SEND
 function send(ws, data) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(data));
   }
 }
 
-// 🔥 TEK PORT
+// 🔥 PORT
 const PORT = process.env.PORT || 3000;
 
 httpServer.listen(PORT, () => {
