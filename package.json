@@ -1,11 +1,11 @@
 {
-  "name": "inferno-pool-server",
+  "name": "inferno-pool-remaster-v2",
   "version": "1.0.0",
-  "main": "server.js",
+  "main": "server-v4-stable.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server-v4-stable.js"
   },
   "dependencies": {
-    "ws": "^8.14.2"
+    "ws": "^8.18.0"
   }
 }

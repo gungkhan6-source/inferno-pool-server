@@ -13,7 +13,11 @@ const httpServer = http.createServer((req, res) => {
     '.js':'application/javascript',
     '.css':'text/css',
     '.png':'image/png',
-    '.jpg':'image/jpeg'
+    '.jpg':'image/jpeg',
+    '.jpeg':'image/jpeg',
+    '.json':'application/json',
+    '.wav':'audio/wav',
+    '.mp3':'audio/mpeg'
   };
 
   try {
