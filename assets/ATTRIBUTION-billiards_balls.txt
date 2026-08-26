@@ -1,0 +1,11 @@
+billiards_balls.glb
+===================
+
+3D Billiard Balls by Yanez Designs
+Source:  https://sketchfab.com/3d-models/billiard-balls-523ac862d2154a7e8c96b964fb7cb11f
+License: Creative Commons Attribution (CC BY)
+
+Adapted for InfernoPool (scale, orientation, rack layout ignored at render time).
+Adaptation does not remove the attribution requirement.
+
+Bu dosyayi GLB ile ayni klasorde tut. Ayrintilar: ../CREDITS.md
