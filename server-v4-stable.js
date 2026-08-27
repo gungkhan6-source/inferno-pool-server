@@ -5,7 +5,12 @@ const path = require("path");
 
 // HTTP SERVER
 const httpServer = http.createServer((req, res) => {
-  let filePath = '.' + (req.url === '/' ? '/inferno-pool-test.html' : req.url);
+  // req.url SORGU DIZESINI de icerir. Dogrudan kullanilirsa dosya yolu
+  // "./inferno-pool-test.html?v=2" olur ve bulunamaz -> 404. Portallar
+  // (CrazyGames, Yandex) oyunu genellikle ?utm_source= gibi parametrelerle
+  // actigi icin oyun hic yuklenmezdi. Yalnizca PATH kismini kullan.
+  const urlPath = req.url.split('?')[0].split('#')[0];
+  let filePath = '.' + (urlPath === '/' ? '/inferno-pool-test.html' : urlPath);
   const ext = path.extname(filePath);
 
   const types = {

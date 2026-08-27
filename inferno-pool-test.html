@@ -1068,7 +1068,104 @@ const CUE_IMGS={};
 let selectedSkin='cosmic_eclipse';
 Object.keys(ASSET_CUES).forEach(k=>{
   const img=new Image(); img.src=ASSET_CUES[k]; CUE_IMGS[k]=img;
+  // CUE VISUAL IMPROVEMENTS — yuklenince alfa kapsamini olc (bkz. asagi)
+  img.addEventListener('load', function(){ cueMeasureAlpha(k); });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// CUE VISUAL IMPROVEMENTS
+//
+// AMAC: mevcut istaka tasarimini AYNEN korumak, yalnizca render kalitesini
+// yukseltmek. Oranlar (cueLen=420, cueH=46), konum, animasyon, aim
+// hesaplari ve fizik DEGISMEZ. Bu blok tek parca; kaldirmak istenirse
+// buradaki kod ile drawCue() icindeki "CUE VISUAL IMPROVEMENTS" isaretli
+// birkac satiri geri almak yeterlidir.
+//
+// SORUN 1 — ORNEKLEME KALITESI
+// Kaynak gorseller 1536x1024; ekranda 420x46'lik kutuya ciziliyor, yani
+// dikeyde 6-17 kat kuculuyor (backing-store olcegine gore). Bu kadar buyuk
+// bir kuculme TEK gecisli tarayici filtresiyle yapildiginda aliasing
+// olusur: kenarlar kirilir, ahsap/karbon dokusu bulanir.
+// COZUM: her istaka BIR KEZ, kademeli (her adimda en fazla yariya inerek)
+// yuksek kaliteli bir offscreen canvas'a hazirlanir. Her karede o hazir
+// bitmap cizilir. Sonuc hem daha keskin hem DAHA HIZLI: kare basina
+// 1536x1024 yeniden ornekleme ortadan kalkar (mobilde belirgin kazanc).
+//
+// SORUN 2 — 'screen' KARISIMI
+// 8 gorselin 6'sinda gercek alfa kanali var; 2'sinde (opak arka planli)
+// yok. Onceden bu ikisinin koyu arka planini gizlemek icin TUM istakalara
+// globalCompositeOperation='screen' uygulaniyordu. 'screen' koyu tonlari
+// saydamlastirdigi icin alfasi dogru olan 6 istakanin golgeleri, kenar
+// cizgileri ve materyal karakteri siliniyor; solgun/plastik bir gorunum
+// olusuyordu.
+// COZUM: 'screen' yalnizca gercekten ihtiyaci olan gorsellerde kullanilir.
+// Karar tahminle degil, alfa kapsami OLCULEREK verilir.
+// ═══════════════════════════════════════════════════════════════════════
+const CUE_CACHE   = {};    // id -> {cv, screen}
+const CUE_SCREEN  = {};    // id -> bool ('screen' karisimi gerekli mi)
+// Onbellek boyutu: 420x46'nin 3.6 kati. Backing-store tavani (VIEW_MAX_BACK)
+// dunya->cihaz olceginde en fazla ~3.51 uretir; bu boyut onu upscale
+// olmadan karsilar. Tek istaka icin ~1 MB.
+const CUE_CACHE_W = 1512;
+const CUE_CACHE_H = 166;
+
+// Alfa kapsamini olc. Neredeyse tamamen opak bir gorselin koyu arka plani
+// vardir ve 'screen' olmadan cirkin bir dikdortgen olarak gorunur.
+function cueMeasureAlpha(id){
+  const img = CUE_IMGS[id];
+  if(!img || !img.naturalWidth){ return; }
+  try{
+    const s = 64;
+    const c = document.createElement('canvas'); c.width=s; c.height=s;
+    const g = c.getContext('2d', {willReadFrequently:true});
+    g.drawImage(img, 0, 0, s, s);
+    const d = g.getImageData(0,0,s,s).data;
+    let saydam = 0;
+    for(let i=3;i<d.length;i+=4){ if(d[i] < 16) saydam++; }
+    // %5'ten az saydam piksel -> gercek alfa yok -> 'screen' sart
+    CUE_SCREEN[id] = (saydam / (s*s)) < 0.05;
+  }catch(e){
+    CUE_SCREEN[id] = true;   // olculemezse mevcut (guvenli) davranisa don
+  }
+}
+
+// Kademeli yuksek kaliteli kuculme + onbellege alma.
+function buildCueCache(id){
+  const img = CUE_IMGS[id];
+  if(!img || !img.complete || !img.naturalWidth) return null;
+
+  let src = img, sw = img.naturalWidth, sh = img.naturalHeight;
+  // Her adimda en fazla yariya in: filtre penceresi dogru kalir, aliasing
+  // olusmaz. 1024 -> 512 -> 332 -> 166 gibi.
+  let guard = 0;
+  while((sw > CUE_CACHE_W*2 || sh > CUE_CACHE_H*2) && guard++ < 8){
+    const nw = Math.max(CUE_CACHE_W, Math.round(sw/2));
+    const nh = Math.max(CUE_CACHE_H, Math.round(sh/2));
+    const t = document.createElement('canvas'); t.width=nw; t.height=nh;
+    const tg = t.getContext('2d');
+    tg.imageSmoothingEnabled = true;
+    if('imageSmoothingQuality' in tg) tg.imageSmoothingQuality = 'high';
+    tg.drawImage(src, 0, 0, nw, nh);
+    src = t; sw = nw; sh = nh;
+  }
+
+  const cv = document.createElement('canvas');
+  cv.width = CUE_CACHE_W; cv.height = CUE_CACHE_H;
+  const g = cv.getContext('2d');
+  g.imageSmoothingEnabled = true;
+  if('imageSmoothingQuality' in g) g.imageSmoothingQuality = 'high';
+  g.drawImage(src, 0, 0, CUE_CACHE_W, CUE_CACHE_H);
+
+  if(CUE_SCREEN[id] === undefined) cueMeasureAlpha(id);
+
+  // Bellek siniri: oyunda ayni anda tek istaka cizilir. Vitrinde gezerken
+  // birikmesin diye en fazla 2 kayit tutulur (~2 MB tavan).
+  const anahtarlar = Object.keys(CUE_CACHE);
+  if(anahtarlar.length >= 2){ delete CUE_CACHE[anahtarlar[0]]; }
+
+  CUE_CACHE[id] = { cv: cv, screen: (CUE_SCREEN[id] !== false) };
+  return CUE_CACHE[id];
+}
 
 // ── Audio ──
 let AC=null;
@@ -1168,7 +1265,10 @@ function renderShop(){
     let btn=eq?'<div class="btn-eq">EQUIPPED</div>':
               owned?`<button class="btn-use" onclick="equipCue('${def.id}')">EQUIP</button>`:
               `<div class="price">💰${def.price}</div><button class="btn-buy"${P.coins>=def.price?'':' disabled'} onclick="buyCue('${def.id}',${def.price})">BUY</button>`;
-    div.innerHTML=`<img src="${ASSET_CUES[def.id]}" style="width:180px;height:44px;object-fit:contain;background:transparent;mix-blend-mode:screen">
+    // CUE VISUAL IMPROVEMENTS — vitrinde de 'screen' yalnizca gerekiyorsa.
+    // Alfasi dogru olan istakalar artik gercek renkleriyle gorunur.
+    const _blend = (CUE_SCREEN[def.id] === false) ? 'normal' : 'screen';
+    div.innerHTML=`<img src="${ASSET_CUES[def.id]}" style="width:180px;height:44px;object-fit:contain;background:transparent;mix-blend-mode:${_blend}">
 <div class="si-info">
   <div class="si-name">${def.emoji} ${def.name}</div>
   <div class="bars">
@@ -1817,6 +1917,17 @@ function drawCue(){
 
   actx.save();
 
+  // ── AIM VISUAL IMPROVEMENTS ──────────────────────────────────────────
+  // Yalnizca SUNUM. Aim hesaplari (findFirstBallHit, traceRayToWall,
+  // sapma normali, mesafeler, renk/legal karari) DEGISMEDI; cizgi
+  // uzunluklari, dash ritmi, saydamlik ve renkler de aynen korundu.
+  // Tek fark: kesik cizgilerin uclari yuvarlatildi. Duz uclu kisa dash'lar
+  // buyutuldugunde tirtikli kucuk dikdortgenler olarak gorunuyordu;
+  // yuvarlak uc, ayni cizgiyi daha temiz ve daha az "dijital" gosterir.
+  // Bu satir kaldirilirsa onceki gorunum birebir geri gelir.
+  actx.lineCap = 'round';
+  // ─────────────────────────────────────────────────────────────────────
+
   if(!hit){
     // No ball in path — trace to walls
     const wallPath=traceRayToWall(b.x,b.y,sdx,sdy,G.aimEx?400:(180+CUE_AIM*5));
@@ -1884,7 +1995,11 @@ function drawCue(){
       actx.save();
       actx.strokeStyle='rgba(255,40,40,0.9)';
       actx.lineWidth=2.5;
-      actx.shadowBlur=12; actx.shadowColor='#ff2200';
+      // AIM VISUAL IMPROVEMENTS — parlama daha kontrollu (12 -> 8).
+      // Isaret ayni netlikte okunur ama etrafa tasan hale kuculur;
+      // shadowBlur her cizimde blur maliyeti getirdigi icin mobilde de
+      // hafifler. Renk ve kalinlik degismedi.
+      actx.shadowBlur=8; actx.shadowColor='#ff2200';
       const xs=R*0.55;
       actx.beginPath(); actx.moveTo(bx-xs,by-xs); actx.lineTo(bx+xs,by+xs); actx.stroke();
       actx.beginPath(); actx.moveTo(bx+xs,by-xs); actx.lineTo(bx-xs,by+xs); actx.stroke();
@@ -1911,7 +2026,19 @@ function drawCue(){
   const startY=tipY+Math.sin(ang)*pullback;
   const cueLen=420, cueH=46;
   const img=CUE_IMGS[selectedSkin];
-  if(img&&img.complete&&img.naturalWidth>0){
+  // CUE VISUAL IMPROVEMENTS — onbelleklenmis, kademeli kuculmus bitmap.
+  // Geometri DEGISMEDI: ayni translate/rotate ve ayni 420x46 hedef kutu.
+  // Fark yalnizca kaynagin kalitesi ve karisim modunun secici olmasi.
+  const cueRec = CUE_CACHE[selectedSkin] || buildCueCache(selectedSkin);
+  if(cueRec){
+    actx.save();
+    actx.translate(startX,startY);
+    actx.rotate(ang);
+    if(cueRec.screen) actx.globalCompositeOperation='screen';
+    actx.drawImage(cueRec.cv,0,-cueH/2,cueLen,cueH);
+    actx.restore();
+  }else if(img&&img.complete&&img.naturalWidth>0){
+    // Onbellek henuz hazir degilse eski yol (davranis birebir korunur)
     actx.save();
     actx.translate(startX,startY);
     actx.rotate(ang);
@@ -1936,7 +2063,9 @@ function drawCue(){
     const ac=pf<0.4?'rgba(80,255,80,0.8)':pf<0.7?'rgba(255,200,0,0.8)':'rgba(255,50,0,0.8)';
     actx.save();
     actx.strokeStyle=ac; actx.lineWidth=3;
-    actx.shadowBlur=10; actx.shadowColor=ac;
+    // AIM VISUAL IMPROVEMENTS — guc yayinda parlama 10 -> 7.
+    // Yay ayni renk/kalinlikta; yalnizca hale daralir, okunurluk artar.
+    actx.shadowBlur=7; actx.shadowColor=ac;
     actx.beginPath();
     actx.arc(b.x,b.y,R+7,-Math.PI/2,-Math.PI/2+Math.PI*2*pf);
     actx.stroke();
