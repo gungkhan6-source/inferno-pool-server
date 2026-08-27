@@ -796,8 +796,14 @@ function setOnlineStatus(status) {
   e2.textContent = s.text; e2.style.color = s.color;
 }
 
-// Ping her 30sn
-setInterval(() => { if(WS&&WS.readyState===WebSocket.OPEN) wsSend({type:'ping'}); }, 30000);
+// Ping her 10sn.
+// Bu ping YALNIZCA "baglanti canli mi" sinyali degil; sunucunun kopma
+// tespitinin TEK guvenilir kaynagidir. Render/Cloudflare proxy'si
+// protokol seviyesi ping frame'lerini istemciye ILETMIYOR (olculdu: 50 sn'de
+// 0 frame) ve sunucuya kendi adina pong donuyor. Bu yuzden sunucu, canliligi
+// UYGULAMA seviyesi bu mesajdan ogreniyor (bkz. APP_PING_TIMEOUT).
+// 10 sn araligi, sunucudaki ~30 sn'lik esige 3 deneme toleransi birakir.
+setInterval(() => { if(WS&&WS.readyState===WebSocket.OPEN) wsSend({type:'ping'}); }, 10000);
 
 // ── Seeded Ball Layout (deterministic) ──
 function makeBallsSeeded(seed) {

@@ -74,25 +74,57 @@ let waitingRoom = null;
 // YAPISAL olarak imkansizdir; temizlenecek per-socket kaynak yoktur.
 // Interval yalnizca sunucu kapanirken temizlenir (asagida).
 // ═══════════════════════════════════════════════════════════════════
-const HEARTBEAT_INTERVAL = 15000;
+// ── UYGULAMA SEVIYESI HEARTBEAT (Render/Cloudflare icin ASIL yol) ──────
+// OLCULEN GERCEK: Render'in WebSocket proxy'si baglantiyi UCTAN UCA
+// tunellemiyor; iki ayri baglanti kuruyor:
+//     Telefon --WS#1-- [proxy] --WS#2-- Node
+// ws.ping() yalnizca WS#2 uzerinde gidiyor. Proxy kontrol frame'lerini
+// KENDISI sonlandiriyor: ping'i telefona iletmiyor (olcum: 50 sn'de 0
+// frame ulasti) ve sunucuya kendi adina pong donuyor. Sonuc: telefonun
+// verisi kesilse bile isAlive hep true kaliyor, terminate hic calismiyor.
+// Ayni kod yerelde (proxy'siz) kopmayi 19 sn'de yakaliyor.
+//
+// COZUM: Canliligi UYGULAMA mesajindan olc. Uygulama mesajlari proxy'yi
+// sorunsuz geciyor (find_match / game_start / relay hepsi calisiyor).
+// Istemci 10 saniyede bir {type:'ping'} yolluyor; 30 sn boyunca HICBIR
+// mesaj gelmezse (3 ping kacirildi) baglanti olu kabul edilir.
+//
+// NOT: protokol seviyesi ws.ping() KALDIRILMADI. Proxy'siz ortamlarda
+// (yerel, dogrudan baglanti, ileride farkli bir barindirma) daha hizli
+// tespit sagladigi icin yan yana calisiyorlar. Hangisi once yakalarsa
+// ayni terminate() -> close() -> opponent_left zincirini tetikler.
+const HEARTBEAT_INTERVAL = 5000;    // tarama periyodu
+const PROTO_PING_EVERY   = 3;       // 3 turda bir = 15 sn (onceki davranis korundu)
+const APP_PING_TIMEOUT   = 30000;   // uygulama mesajsizlik esigi
 
 function markAlive() {
-  // 'this' = ilgili WebSocket. Herhangi bir pong VEYA herhangi bir
-  // uygulama mesaji baglantinin canli oldugunu kanitlar.
+  // 'this' = ilgili WebSocket. Protokol pong'u geldi.
   this.isAlive = true;
 }
 
+let hbTick = 0;
 const heartbeatTimer = setInterval(() => {
+  hbTick++;
+  const simdi = Date.now();
+  const protoTuru = (hbTick % PROTO_PING_EVERY) === 0;
+
   wss.clients.forEach((ws) => {
-    if (ws.isAlive === false) {
-      // Onceki turda ping atildi, bu tura kadar pong GELMEDI -> OLU.
-      // terminate() mevcut 'close' handler'ini tetikler; oda temizligi
-      // ve opponent_left oradan, DEGISMEDEN akar.
-      console.log('DEAD', ws.id, '(heartbeat timeout)');
+    // 1) UYGULAMA SEVIYESI — proxy'yi gecer, Render'da ASIL calisan yol.
+    if (ws.lastAppMsg && (simdi - ws.lastAppMsg) > APP_PING_TIMEOUT) {
+      console.log('DEAD', ws.id, '(app timeout ' +
+                  Math.round((simdi - ws.lastAppMsg) / 1000) + 's)');
       return ws.terminate();
     }
-    ws.isAlive = false;
-    try { ws.ping(); } catch(e) {}
+
+    // 2) PROTOKOL SEVIYESI — proxy'siz ortamlarda daha hizli tespit.
+    if (protoTuru) {
+      if (ws.isAlive === false) {
+        console.log('DEAD', ws.id, '(protocol pong timeout)');
+        return ws.terminate();
+      }
+      ws.isAlive = false;
+      try { ws.ping(); } catch(e) {}
+    }
   });
 }, HEARTBEAT_INTERVAL);
 
@@ -107,12 +139,17 @@ wss.on('connection', (ws) => {
   // HEARTBEAT: yeni soket canli kabul edilir; pong geldikce yenilenir.
   ws.isAlive = true;
   ws.on('pong', markAlive);
+  // UYGULAMA HEARTBEAT: son uygulama mesaji zamani.
+  ws.lastAppMsg = Date.now();
 
   console.log('+', ws.id);
 
   ws.on('message', (raw) => {
     // HEARTBEAT: mesaj gelmesi de canlilik kanitidir (pong'a ek guvence).
     ws.isAlive = true;
+    // UYGULAMA HEARTBEAT: HERHANGI bir mesaj canliligi kanitlar; yalnizca
+    // 'ping' degil. Aktif oyunda relay/turn_end de sayaci tazeler.
+    ws.lastAppMsg = Date.now();
     try {
       const msg = JSON.parse(raw);
 
@@ -125,7 +162,8 @@ wss.on('connection', (ws) => {
           relay(ws, msg); break;
         case 'turn_end': turnEnd(ws, msg); break;
         case 'forfeit_turn': forfeitTurn(ws); break;
-        case 'ping': send(ws, {type:'pong'}); break;
+        // UYGULAMA HEARTBEAT: istemcinin 10 sn'lik ping'i canlilik kaynagi.
+        case 'ping': ws.lastAppMsg = Date.now(); send(ws, {type:'pong'}); break;
       }
 
     } catch(e) {}
