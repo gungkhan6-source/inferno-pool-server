@@ -40,14 +40,79 @@ const wss = new WebSocket.Server({ server: httpServer });
 const rooms = new Map();
 let waitingRoom = null;
 
+// ═══════════════════════════════════════════════════════════════════
+// HEARTBEAT — yarim-acik (half-open) baglanti tespiti
+//
+// SORUN: Mobil veri kapandiginda telefon TCP FIN/RST GONDERMEZ. Soket
+// sunucuda OPEN gorunmeye devam eder, ws.on('close') HIC tetiklenmez,
+// rakip 'opponent_left' alamaz ve ekrani donar. Isletim sisteminin TCP
+// keepalive'i devreye girene kadar (Linux varsayilani ~2 SAAT) sunucu
+// baglantiyi canli sanir.
+//
+// COZUM: Sunucu AKTIF olarak protokol seviyesi ping yollar; tarayicilar
+// buna OTOMATIK pong doner (istemci kodu degisikligi GEREKMEZ). Iki tur
+// ust uste pong gelmezse soket olu kabul edilip terminate edilir.
+// terminate() mevcut ws.on('close') akisini tetikler -> 'opponent_left'
+// DEGISMEDEN calisir.
+//
+// SURE SECIMI (HEARTBEAT_INTERVAL = 15000):
+//   * Tespit penceresi 15-30 sn arasindadir (bir turda ping atilir,
+//     bir sonraki turda cevap yoksa oldurulur).
+//   * 15 sn, mobil agdaki KISA dalgalanmalari (baz istasyonu gecisi,
+//     wifi<->hucresel handoff, tunel/asansor) elemek icin yeterince
+//     uzundur: bu kesintiler tipik olarak 1-5 sn surer ve TCP yeniden
+//     iletimi ile kendiliginden toparlanir, pong bir sonraki tura yetisir.
+//   * 30 sn ust siniri, oyunun 30 saniyelik shot clock'u ile ayni
+//     mertebededir; ekran "sonsuza kadar" donmaz.
+//   * Daha kisa bir sure (orn. 5 sn) saglam baglantilarda YANLIS
+//     kopma uretirdi; daha uzun bir sure (orn. 60 sn) donma hissini
+//     kabul edilemez kilardi.
+//
+// TIMER YONETIMI: Soket BASINA timer YOKTUR. Tum soketleri tarayan
+// TEK bir interval vardir. Bu sayede "ayni socket icin birden fazla
+// timer" ve "close sonrasi temizlenmeyen timer" sinifi hatalar
+// YAPISAL olarak imkansizdir; temizlenecek per-socket kaynak yoktur.
+// Interval yalnizca sunucu kapanirken temizlenir (asagida).
+// ═══════════════════════════════════════════════════════════════════
+const HEARTBEAT_INTERVAL = 15000;
+
+function markAlive() {
+  // 'this' = ilgili WebSocket. Herhangi bir pong VEYA herhangi bir
+  // uygulama mesaji baglantinin canli oldugunu kanitlar.
+  this.isAlive = true;
+}
+
+const heartbeatTimer = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) {
+      // Onceki turda ping atildi, bu tura kadar pong GELMEDI -> OLU.
+      // terminate() mevcut 'close' handler'ini tetikler; oda temizligi
+      // ve opponent_left oradan, DEGISMEDEN akar.
+      console.log('DEAD', ws.id, '(heartbeat timeout)');
+      return ws.terminate();
+    }
+    ws.isAlive = false;
+    try { ws.ping(); } catch(e) {}
+  });
+}, HEARTBEAT_INTERVAL);
+
+// Sunucu kapanirsa interval sizmasin (Render restart / SIGTERM).
+wss.on('close', () => { clearInterval(heartbeatTimer); });
+
 wss.on('connection', (ws) => {
   ws.id = Math.random().toString(36).substr(2, 8);
   ws.roomId = null;
   ws.slot = null;
 
+  // HEARTBEAT: yeni soket canli kabul edilir; pong geldikce yenilenir.
+  ws.isAlive = true;
+  ws.on('pong', markAlive);
+
   console.log('+', ws.id);
 
   ws.on('message', (raw) => {
+    // HEARTBEAT: mesaj gelmesi de canlilik kanitidir (pong'a ek guvence).
+    ws.isAlive = true;
     try {
       const msg = JSON.parse(raw);
 
