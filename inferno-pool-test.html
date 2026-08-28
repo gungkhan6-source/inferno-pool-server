@@ -1101,6 +1101,11 @@ Object.keys(ASSET_CUES).forEach(k=>{
 // COZUM: 'screen' yalnizca gercekten ihtiyaci olan gorsellerde kullanilir.
 // Karar tahminle degil, alfa kapsami OLCULEREK verilir.
 // ═══════════════════════════════════════════════════════════════════════
+// BOT CUE OWNERSHIP — ilk bot turunda henuz karar (G.botAimAng) yokken
+// kullanilan SABIT notr aci. Fare fallback'inin yerini alir; boylece
+// oyuncunun faresi bot istakasini hicbir anda etkilemez.
+const BOT_AIM_NOTR = 0;
+
 const CUE_CACHE   = {};    // id -> {cv, screen}
 const CUE_SCREEN  = {};    // id -> bool ('screen' karisimi gerekli mi)
 // Onbellek boyutu: 420x46'nin 3.6 kati. Backing-store tavani (VIEW_MAX_BACK)
@@ -1120,10 +1125,27 @@ function cueMeasureAlpha(id){
     const g = c.getContext('2d', {willReadFrequently:true});
     g.drawImage(img, 0, 0, s, s);
     const d = g.getImageData(0,0,s,s).data;
-    let saydam = 0;
-    for(let i=3;i<d.length;i+=4){ if(d[i] < 16) saydam++; }
-    // %5'ten az saydam piksel -> gercek alfa yok -> 'screen' sart
-    CUE_SCREEN[id] = (saydam / (s*s)) < 0.05;
+    let saydam = 0, sonuk = 0;
+    for(let i=3;i<d.length;i+=4){
+      const a = d[i];
+      if(a === 0) saydam++;
+      else if(a <= 25) sonuk++;   // "sonuk pus": gorunur ama cok zayif
+    }
+    const n = s * s;
+    // KOSUL 1 — gercek alfa yok (neredeyse hersey opak): koyu arka plani
+    // gizlemek icin 'screen' sart.
+    const alfaYok = ((saydam + sonuk) / n) < 0.05;
+    // KOSUL 2 — GHOST DUZELTMESI. Bazi gorsellerde istakanin cevresinde
+    // genis bir "sonuk pus" katmani var (alfa 1-25). 'screen' altinda bu
+    // pikseller koyu olduklari icin gorunmezdi; normal alfa kompozitinde
+    // ise istakanin yaninda ince, yari saydam bir HAYALET CIZGI olarak
+    // ciziliyorlar. Olcum bu ayrimi net veriyor (64x64 ornekleme):
+    //   ghost gorulen : dragon_bone %43.5 · emerald_serpent %49.4 · thunder_strike %29.6
+    //   ghost yok     : diger bes istaka %2.9 - %4.2
+    // Iki grup arasinda buyuk bir bosluk var; %10 esigi ortada guvenli durur
+    // ve tek bir istakayi yanlis siniflandirmaz.
+    const sonukPus = (sonuk / n) > 0.10;
+    CUE_SCREEN[id] = alfaYok || sonukPus;
   }catch(e){
     CUE_SCREEN[id] = true;   // olculemezse mevcut (guvenli) davranisa don
   }
@@ -1837,7 +1859,15 @@ function findFirstBallHit(ox,oy,dx,dy){
     if(perp<R*2){
       const backOff=Math.sqrt(Math.max(0,(R*2)**2-perp**2));
       const hitDist=dot-backOff;
-      if(hitDist>R+2&&(!best||hitDist<best.dist)){
+      // YAKIN HEDEF DUZELTMESI (BUG 4). Esik onceden "hitDist > R+2" (=12px)
+      // idi: beyaz top hedefe yaklastikca kat edilecek mesafe kuculur ve
+      // 12px'in altina dusunce isabet TAMAMEN reddedilirdi. Sonuc yalnizca
+      // kisa bir cizgi degil, YANLIS bilgiydi — onunde top varken sistem
+      // "yolda top yok" deyip duvara giden cizgiyi cizerdi.
+      // Artik temas noktasi onunde olan her hedef dogru raporlanir.
+      // NOT: bu fonksiyon TUM dosyada yalnizca drawCue() icinde cagriliyor;
+      // carpisma, hiz ve sürtunme hesaplari bunu kullanmaz.
+      if(hitDist>0&&(!best||hitDist<best.dist)){
         best={
           ball:b, hitX:ox+dx*hitDist, hitY:oy+dy*hitDist,
           dist:hitDist,
@@ -1905,7 +1935,32 @@ function drawCue(){
 
   const b=G.cue;
   let ang, pullback;
-  if(drag.active){
+  // ── BOT CUE OWNERSHIP ────────────────────────────────────────────────
+  // Botun sirasindayken istaka acisi OYUNCUNUN FARESINDEN gelmemeli.
+  // Onceden asagidaki 'else' dali kosulsuz calisiyordu; onDown/onUp bot
+  // turunu engelledigi icin atis yapilamiyordu ama fare hareketi yine de
+  // botun istakasini dondururdu (BUG 2) ve istaka botun gercek atis
+  // yonunu gostermezdi (BUG 3).
+  //
+  // TEK YON KAYNAGI: botShot() kararini uretirken G.botAimAng'i yaziyor ve
+  // gercek atis hizini AYNI degerden hesapliyor. Burada yalnizca cizim
+  // konvansiyonuna cevriliyor: olculdu ki istaka govdesi 'ang' yonunde
+  // uzaniyor ve top 'ang + PI' yonune gidiyor; dolayisiyla atis yonu
+  // botAimAng ise istaka acisi botAimAng + PI olmalidir.
+  //
+  // FARE FALLBACK'I YOK. Bot turunda oyuncunun faresi istaka acisini
+  // HICBIR asamada belirlemez:
+  //   * karar verildikten sonra  -> G.botAimAng + PI (gercek atis yonu)
+  //   * karar henuz yokken       -> BOT_AIM_NOTR (sabit, notr)
+  // Botun "dusunme" gecikmesinde (ilk tur haric) bir onceki atisin yonu
+  // korunur; her durumda deger SABITTIR, fareyle oynamaz.
+  const botTuru = (!G.onlineMode && G.mode==='bot' && G.turn===1);
+  if(botTuru){
+    ang = (typeof G.botAimAng === 'number' && isFinite(G.botAimAng))
+          ? G.botAimAng + Math.PI
+          : BOT_AIM_NOTR;
+    pullback = 0;
+  } else if(drag.active){
     ang=drag.angle; pullback=drag.power*0.85;
   }else{
     ang=Math.atan2(b.y-drag.mouseY,b.x-drag.mouseX); pullback=0;
@@ -1942,8 +1997,14 @@ function drawCue(){
       ? 'rgba(255,255,255,0.22)'
       : 'rgba(255,60,60,0.28)';
 
+    // YAKIN HEDEF — GORUNURLUK (yalnizca RENDER; geometri degismez).
+    // Cizgi gercek temas noktasinda biter, hedefin arkasina UZATILMAZ.
+    // Segment bir dash dongusunden (9+7=16px) kisaysa kesik desen hic
+    // gorunmeyebilir; bu durumda ayni cizgi DUZ olarak cizilir.
+    const segUz = Math.hypot(hit.hitX-(b.x+sdx*R), hit.hitY-(b.y+sdy*R));
     actx.strokeStyle=lineColor;
-    actx.lineWidth=1.5; actx.setLineDash([9,7]);
+    actx.lineWidth=1.5;
+    if(segUz >= 16) actx.setLineDash([9,7]); else actx.setLineDash([]);
     actx.beginPath();
     actx.moveTo(b.x+sdx*R, b.y+sdy*R);
     actx.lineTo(hit.hitX, hit.hitY);
@@ -2983,6 +3044,9 @@ function botShot(){
       if(d < nd){ nd = d; near = b; }
     }
     const ang = near ? Math.atan2(near.y-G.cue.y, near.x-G.cue.x) : rnd(0,Math.PI*2);
+    // BOT CUE OWNERSHIP — atis yonunu YAYIMLA (bkz. drawCue). Hiz asagida
+    // yine bu ayni 'ang' degerinden hesaplaniyor; TEK yon kaynagi.
+    G.botAimAng = ang;
     G.sunkThisShot=false;
     G.cue.vx=Math.cos(ang)*8; G.cue.vy=Math.sin(ang)*8;
     G.moving=true; G.shots[1]++; sfxCue(); return;
@@ -2992,6 +3056,10 @@ function botShot(){
   G._aiLast = decision.info;
 
   G.sunkThisShot=false;
+  // BOT CUE OWNERSHIP — TEK YON KAYNAGI. Gorsel istaka rotasyonu, yorunge
+  // ve gercek atis hizi ayni 'decision.shot.ang' degerinden turetilir;
+  // baska hicbir yerde bagimsiz bir aci hesaplanmaz.
+  G.botAimAng = decision.shot.ang;
   G.cue.vx=Math.cos(decision.shot.ang)*decision.shot.f;
   G.cue.vy=Math.sin(decision.shot.ang)*decision.shot.f;
   G.moving=true; G.shots[1]++; sfxCue();
