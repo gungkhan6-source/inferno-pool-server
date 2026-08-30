@@ -1106,6 +1106,39 @@ Object.keys(ASSET_CUES).forEach(k=>{
 // oyuncunun faresi bot istakasini hicbir anda etkilemez.
 const BOT_AIM_NOTR = 0;
 
+// ═══════════════════════════════════════════════════════════════════════
+// BOT AIM ROTATION
+// ═══════════════════════════════════════════════════════════════════════
+// SORUN: botShot() karari uretiyor ve AYNI senkron cagride G.cue.vx/vy ile
+// G.moving=true yaziyordu. loop() ise G.moving true iken drawCue()'yu hic
+// cagirmaz. Sonuc: istaka yeni aciyla TEK BIR KARE bile cizilmiyordu ->
+// oyuncuya "istaka aniden hazir oldu / isinlandi" gibi gorunuyordu.
+//
+// COZUM: karar ile atis arasina, oyuncununkiyle AYNI gorsel akis konur.
+// Asamalar (mevcut mimariye uygun, yeni sistem kurulmadan):
+//   BOT_THINKING     setTimeout(botShot, 800/1100/1400) beklemesi — DEGISMEDI
+//   BOT_AIMING       istaka mevcut acidan gercek vurus acisina DONER
+//   BOT_AIM_SETTLED  aci oturur, kisa hazirlik beklemesi
+//   BOT_PULLBACK     istaka geri cekilir (oyuncudaki drag.power karsiligi)
+//   BOT_SHOOT        botFire() gercek atisi yapar
+//
+// TEK YON KAYNAGI KORUNDU: botShot() yine G.botAimAng'i yazar (atis yonu);
+// hedef ISTAKA acisi ondan turetilir (botAimAng + PI, oyuncudaki
+// drag.angle ile ayni konvansiyon). Bagimsiz ikinci bir aci hesabi YOKTUR.
+// AI karari (aiDecide), atis hizi (shot.f), fizik ve carpisma DEGISMEDI —
+// botFire() eski botShot() satirlarini birebir calistirir.
+const BOT_AIM_HIZ    = 500;  // ms / PI radyan: donus suresi aciyla orantili
+const BOT_AIM_MIN_MS = 220;  // cok kucuk aci farkinda bile gorunur donus
+const BOT_AIM_MAX_MS = 620;  // 180 derecelik donuste bile bot yavaslamasin
+const BOT_SETTLE_MS  = 180;  // aci oturdu -> nisan alma hissi icin bekleme
+const BOT_PULL_MS    = 240;  // geri cekme suresi
+const BOT_PULL_GUC   = 42;   // gorsel geri cekme (oyuncunun drag.power olcegi)
+// cur: EKRANDA gorunen istaka acisi. Turler arasinda korunur ki bot bir
+// sonraki turda bulundugu acidan donmeye devam etsin (isinlanma olmasin).
+const BOT_AIM = { faz:'', cur:BOT_AIM_NOTR, basAci:BOT_AIM_NOTR,
+                  hedef:BOT_AIM_NOTR, bas:0, sure:0, guc:0, karar:null };
+let _botAimTimer = null;
+
 const CUE_CACHE   = {};    // id -> {cv, screen}
 const CUE_SCREEN  = {};    // id -> bool ('screen' karisimi gerekli mi)
 const CUE_HALO    = {};    // id -> bool (gorsele boyanmis PARLAK halo var mi)
@@ -2008,10 +2041,14 @@ function drawCue(){
   // korunur; her durumda deger SABITTIR, fareyle oynamaz.
   const botTuru = (!G.onlineMode && G.mode==='bot' && G.turn===1);
   if(botTuru){
-    ang = (typeof G.botAimAng === 'number' && isFinite(G.botAimAng))
-          ? G.botAimAng + Math.PI
-          : BOT_AIM_NOTR;
-    pullback = 0;
+    // BOT AIM ROTATION — istaka artik hedefe ISINLANMIYOR, DONEREK oturuyor.
+    // BOT_AIM.cur her karede botAimTick() tarafindan guncellenir; animasyon
+    // yokken son oturmus aciyi tutar, hic atis yapilmamissa BOT_AIM_NOTR'dir.
+    // Deger her zaman G.botAimAng'den turetilmistir (tek yon kaynagi) ve
+    // fareden HICBIR asamada etkilenmez.
+    ang = isFinite(BOT_AIM.cur) ? BOT_AIM.cur : BOT_AIM_NOTR;
+    // Geri cekme ifadesi oyuncununkiyle AYNI: drag.power*0.85 karsiligi.
+    pullback = BOT_AIM.guc * 0.85;
   } else if(drag.active){
     ang=drag.angle; pullback=drag.power*0.85;
   }else{
@@ -3061,11 +3098,87 @@ function aiDecide(){
   return {shot:shot, info:info, pick:pick};
 }
 
+// ── BOT AIM ROTATION ──────────────────────────────────────────────────
+// Iki aci arasindaki EN KISA isaretli fark (-PI, PI]. Bot masanin etrafinda
+// gereksiz yere uzun yoldan donmesin diye gerekli.
+function botAciFark(hedef, kaynak){
+  let d = (hedef - kaynak) % (Math.PI*2);
+  if(d >  Math.PI) d -= Math.PI*2;
+  if(d < -Math.PI) d += Math.PI*2;
+  return d;
+}
+// Karar alindiktan sonra gorsel akisi baslatir. ATIS YAPMAZ.
+function botAimBasla(shot){
+  if(!shot || !isFinite(shot.ang) || !isFinite(shot.f)){ botAimDur(); return; }
+  BOT_AIM.karar  = shot;
+  // Hedef ISTAKA acisi atis yonunden turetilir (oyuncudaki drag.angle ile
+  // ayni konvansiyon: drawCue zaten ang+PI ile atis yonunu geri uretir).
+  BOT_AIM.hedef  = shot.ang + Math.PI;
+  BOT_AIM.basAci = isFinite(BOT_AIM.cur) ? BOT_AIM.cur : BOT_AIM_NOTR;
+  const d = Math.abs(botAciFark(BOT_AIM.hedef, BOT_AIM.basAci));
+  BOT_AIM.sure = Math.max(BOT_AIM_MIN_MS,
+                 Math.min(BOT_AIM_MAX_MS, d / Math.PI * BOT_AIM_HIZ));
+  BOT_AIM.bas  = performance.now();
+  BOT_AIM.guc  = 0;
+  BOT_AIM.faz  = 'BOT_AIMING';
+  if(_botAimTimer) clearInterval(_botAimTimer);
+  _botAimTimer = setInterval(botAimTick, 16);
+}
+function botAimDur(){
+  if(_botAimTimer){ clearInterval(_botAimTimer); _botAimTimer=null; }
+  BOT_AIM.faz=''; BOT_AIM.guc=0; BOT_AIM.karar=null;
+}
+// 16 ms tick — startPhysTick() ile ayni desen. Yalnizca GORSEL durum
+// yurutur; top/fizik durumuna tek dokunusu son adimdaki botFire()'dir.
+function botAimTick(){
+  // Kosullardan biri bozulduysa (mac bitti, sira degisti, toplar hareket
+  // ediyor) animasyon sessizce iptal edilir; asili interval kalmaz.
+  if(G.onlineMode || G.phase!=='playing' || G.mode!=='bot' || G.turn!==1
+     || G.moving || !G.cue || G.cue.sunk){ botAimDur(); return; }
+  const t = performance.now();
+  if(BOT_AIM.faz==='BOT_AIMING'){
+    const k = BOT_AIM.sure>0 ? Math.min(1,(t-BOT_AIM.bas)/BOT_AIM.sure) : 1;
+    const e = k*k*(3-2*k);   // smoothstep: yumusak baslar, yumusak durur
+    BOT_AIM.cur = BOT_AIM.basAci + botAciFark(BOT_AIM.hedef, BOT_AIM.basAci)*e;
+    if(k>=1){ BOT_AIM.cur=BOT_AIM.hedef; BOT_AIM.faz='BOT_AIM_SETTLED'; BOT_AIM.bas=t; }
+    return;
+  }
+  if(BOT_AIM.faz==='BOT_AIM_SETTLED'){
+    if(t-BOT_AIM.bas>=BOT_SETTLE_MS){ BOT_AIM.faz='BOT_PULLBACK'; BOT_AIM.bas=t; }
+    return;
+  }
+  if(BOT_AIM.faz==='BOT_PULLBACK'){
+    const k = Math.min(1,(t-BOT_AIM.bas)/BOT_PULL_MS);
+    BOT_AIM.guc = BOT_PULL_GUC * (k*k*(3-2*k));
+    if(k>=1) BOT_AIM.faz='BOT_SHOOT';
+    return;
+  }
+  if(BOT_AIM.faz==='BOT_SHOOT'){
+    const shot = BOT_AIM.karar;
+    botAimDur();          // once temizle: botFire() G.moving=true yapiyor
+    botFire(shot);
+  }
+}
+// GERCEK ATIS. Govdesi eski botShot() sonundaki satirlarin BIREBIR aynisi;
+// hiz yine shot.ang / shot.f degerlerinden hesaplanir. Fizik degismedi.
+function botFire(shot){
+  if(!shot) return;
+  if(G.onlineMode || G.phase!=='playing' || G.turn!==1 || G.moving) return;
+  if(!G.cue || G.cue.sunk) return;
+  G.sunkThisShot=false;
+  G.cue.vx=Math.cos(shot.ang)*shot.f;
+  G.cue.vy=Math.sin(shot.ang)*shot.f;
+  G.moving=true; G.shots[1]++; sfxCue();
+}
+
 // ── BOT AI ──
 // Karar hatti: aiDecide() -> analitik eleme -> gercek fizik sandbox'i ->
 // skorlama -> seviyeye ozgu hata. Ayrintilar icin yukaridaki AI v2 blogu.
 function botShot(){
   if(G.onlineMode)return;              // ONLINE'DA ASLA CALISMAZ
+  // Zaten nisan aliyorsa ikinci bir karar uretme (birden fazla setTimeout
+  // yolu ayni tura denk gelebilir).
+  if(_botAimTimer) return;
   if(G.phase!=='playing')return;
   if(!G.cue||G.cue.sunk) return;
   if(G.onlineMode) return;
@@ -3099,22 +3212,23 @@ function botShot(){
     // BOT CUE OWNERSHIP — atis yonunu YAYIMLA (bkz. drawCue). Hiz asagida
     // yine bu ayni 'ang' degerinden hesaplaniyor; TEK yon kaynagi.
     G.botAimAng = ang;
-    G.sunkThisShot=false;
-    G.cue.vx=Math.cos(ang)*8; G.cue.vy=Math.sin(ang)*8;
-    G.moving=true; G.shots[1]++; sfxCue(); return;
+    // BOT AIM ROTATION — atis artik burada YAPILMAZ. Once istaka bu aciya
+    // doner (BOT_AIMING -> BOT_AIM_SETTLED -> BOT_PULLBACK), sonra
+    // botFire() eski satirlari birebir calistirir. Hiz yine f=8.
+    botAimBasla({ang:ang, f:8});
+    return;
   }
 
   if(window.AI_DEBUG) console.log('[AI]', JSON.stringify(decision.info));
   G._aiLast = decision.info;
 
-  G.sunkThisShot=false;
   // BOT CUE OWNERSHIP — TEK YON KAYNAGI. Gorsel istaka rotasyonu, yorunge
   // ve gercek atis hizi ayni 'decision.shot.ang' degerinden turetilir;
   // baska hicbir yerde bagimsiz bir aci hesaplanmaz.
   G.botAimAng = decision.shot.ang;
-  G.cue.vx=Math.cos(decision.shot.ang)*decision.shot.f;
-  G.cue.vy=Math.sin(decision.shot.ang)*decision.shot.f;
-  G.moving=true; G.shots[1]++; sfxCue();
+  // BOT AIM ROTATION — karar hazir; simdi istaka gercek vurus acisina DONER,
+  // oturur, geri cekilir ve ancak ondan sonra botFire() atisi yapar.
+  botAimBasla(decision.shot);
 }
 
 
