@@ -1108,6 +1108,15 @@ const BOT_AIM_NOTR = 0;
 
 const CUE_CACHE   = {};    // id -> {cv, screen}
 const CUE_SCREEN  = {};    // id -> bool ('screen' karisimi gerekli mi)
+const CUE_HALO    = {};    // id -> bool (gorsele boyanmis PARLAK halo var mi)
+// Parlak halo temizleme esigi. Bu alfanin ALTINDAKI pikseller onbellek
+// kurulurken SIFIRLANIR — yalnizca CUE_HALO[id] true olan istakalarda.
+// Deger 20/30/40/50/60/70/80 taranarak secildi. 60, uc sorunlu istakada
+// halo'yu %2.2-8.7'ye indirirken govde kaybini %<=2'de tutuyor ve 420x46
+// geometrisini degistirmiyor. 50 denendi ancak thunder_strike'ta gozle
+// secilen soluk bir bant birakiyordu. Temiz istakalar (CUE_HALO=false)
+// bu yoldan HIC gecmez; onbellekleri bit duzeyinde ayni kalir.
+const CUE_ALPHA_ESIK = 60;
 // Onbellek boyutu: 420x46'nin 3.6 kati. Backing-store tavani (VIEW_MAX_BACK)
 // dunya->cihaz olceginde en fazla ~3.51 uretir; bu boyut onu upscale
 // olmadan karsilar. Tek istaka icin ~1 MB.
@@ -1125,13 +1134,18 @@ function cueMeasureAlpha(id){
     const g = c.getContext('2d', {willReadFrequently:true});
     g.drawImage(img, 0, 0, s, s);
     const d = g.getImageData(0,0,s,s).data;
-    let saydam = 0, sonuk = 0;
+    let saydam = 0, sonuk = 0, sonukParlaklik = 0;
     for(let i=3;i<d.length;i+=4){
       const a = d[i];
       if(a === 0) saydam++;
-      else if(a <= 25) sonuk++;   // "sonuk pus": gorunur ama cok zayif
+      else if(a <= 25){
+        sonuk++;
+        // Sonuk pikselin PARLAKLIGI: halo'nun gorunur olup olmadigini belirler.
+        sonukParlaklik += 0.299*d[i-3] + 0.587*d[i-2] + 0.114*d[i-1];
+      }
     }
     const n = s * s;
+    const ortParlaklik = sonuk ? (sonukParlaklik / sonuk) : 0;
     // KOSUL 1 — gercek alfa yok (neredeyse hersey opak): koyu arka plani
     // gizlemek icin 'screen' sart.
     const alfaYok = ((saydam + sonuk) / n) < 0.05;
@@ -1146,8 +1160,21 @@ function cueMeasureAlpha(id){
     // ve tek bir istakayi yanlis siniflandirmaz.
     const sonukPus = (sonuk / n) > 0.10;
     CUE_SCREEN[id] = alfaYok || sonukPus;
+
+    // ── PARLAK HALO TESPITI ────────────────────────────────────────────
+    // Sonuk pus'un GORUNUR olmasi parlakligina baglidir:
+    //   * KOYU sonuk piksel -> 'screen' altinda kaybolur, sorun cikarmaz
+    //   * PARLAK sonuk piksel -> hem normal hem 'screen' karisimda zemini
+    //     aydinlatir; istakanin yaninda uzun, yari saydam bir IZ olarak
+    //     gorunur (oyuncunun bildirdigi sorun).
+    // Olcum iki grubu net ayiriyor (sonuk piksellerin ortalama parlakligi):
+    //   halo gorulen : dragon_bone 147 · emerald_serpent 194 · thunder_strike 210
+    //   halo yok     : neon_core 38 · cosmic_eclipse 40 (ve digerleri benzer)
+    // Aradaki bosluk cok genis; 100 esigi ortada guvenle durur.
+    CUE_HALO[id] = sonukPus && (ortParlaklik > 100);
   }catch(e){
     CUE_SCREEN[id] = true;   // olculemezse mevcut (guvenli) davranisa don
+    CUE_HALO[id]   = false;  // olculemezse gorseli OLDUGU GIBI birak
   }
 }
 
@@ -1156,7 +1183,32 @@ function buildCueCache(id){
   const img = CUE_IMGS[id];
   if(!img || !img.complete || !img.naturalWidth) return null;
 
+  // Olcum onbellekten ONCE hazir olmali: halo karari kucultmeyi etkiliyor.
+  if(CUE_SCREEN[id] === undefined) cueMeasureAlpha(id);
+
   let src = img, sw = img.naturalWidth, sh = img.naturalHeight;
+
+  // ── PARLAK HALO TEMIZLIGI ──────────────────────────────────────────
+  // Yalnizca CUE_HALO[id] true olan istakalarda calisir; temiz istakalar
+  // (neon_core, cosmic_eclipse, royal_diamond, golden_phoenix, frost_king)
+  // bu bloga HIC girmez ve bit duzeyinde ayni kalir.
+  // Esik TAM COZUNURLUKTE uygulanir: kucultmeden sonra uygulanirsa halo
+  // zaten komsu piksellere karismis olur ve temizlenemez.
+  // Yalnizca ALFA sifirlanir; renk kanallarina, boyuta ve geometriye
+  // dokunulmaz.
+  if(CUE_HALO[id]){
+    try{
+      const hc = document.createElement('canvas'); hc.width = sw; hc.height = sh;
+      const hg = hc.getContext('2d', {willReadFrequently:true});
+      hg.drawImage(img, 0, 0);
+      const hd = hg.getImageData(0, 0, sw, sh);
+      const ha = hd.data;
+      for(let i=3;i<ha.length;i+=4){ if(ha[i] < CUE_ALPHA_ESIK) ha[i] = 0; }
+      hg.putImageData(hd, 0, 0);
+      src = hc;
+    }catch(e){ src = img; }   // okunamazsa orijinal gorselle devam et
+  }
+
   // Her adimda en fazla yariya in: filtre penceresi dogru kalir, aliasing
   // olusmaz. 1024 -> 512 -> 332 -> 166 gibi.
   let guard = 0;
