@@ -485,6 +485,21 @@ font-family:sans-serif;
   50%{text-shadow:0 0 25px rgba(255,150,0,1);}
   100%{text-shadow:0 0 10px rgba(255,100,0,0.8);}
 }
+
+/* ── I18N FONT FALLBACK  [ASAMA 1] ───────────────────────────────────
+   Cinzel Decorative ve Rajdhani Kiril alfabesini kapsamaz; Rusca metin
+   bu fontlarla tarayicinin rastgele yedegine duser. Kural YALNIZCA
+   data-i18n nitelikli dugumlere ve yalnizca <html data-lang="ru">
+   durumunda uygulanir.
+   ASAMA 1'DE DOSYADA HIC data-i18n NITELIGI YOKTUR -> kural sifir
+   elemana eslesir, oyun gorunumu DEGISMEZ. Asama 2'de nitelikler
+   eklendikce kendiliginden devreye girer. */
+html[data-lang="ru"] [data-i18n],
+html[data-lang="ru"] [data-i18n-ph],
+html[data-lang="ru"] [data-i18n-title]{
+  font-family: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
 </style>
 
 <!-- LEADERBOARD SCREEN -->
@@ -1342,6 +1357,670 @@ function fadeShotAudioTail(ms){
   });
   return n;
 }
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// I18N — MERKEZI YERELLESTIRME (TR / EN / RU)          [ASAMA 1: ALTYAPI]
+// ═══════════════════════════════════════════════════════════════════════
+// Bu blok YALNIZCA altyapidir. Bu asamada oyunun HICBIR mevcut metni
+// t() cagrisina baglanmaz; ekranda gorunen her sey aynen eskisi gibi
+// kalir. Sozluk ve motor hazir bekler, Asama 2'de cagri yerleri tek tek
+// gecirilecektir.
+//
+// Anahtarlar gercek koddan cikarilan envanterle birebir eslesir; hayali
+// anahtar yoktur. Kaynak dil EN'dir: eksik ceviri once EN'e, o da yoksa
+// anahtarin kendisine duser — boylece eksik bir anahtar hicbir zaman bos
+// ekran uretmez.
+//
+// DOKUNULMAYANLAR: drawCue() icindeki 'CLICK TO PLACE' ve 'WRONG' ile
+// botShot() icindeki 'BOT FROZEN!' kritik render/karar fonksiyonlarinin
+// icinde oldugu icin ILK SURUMDE INGILIZCE BIRAKILIR. Karsiliklari
+// sozlukte hazir durur (game.clickToPlace, game.wrong, event.botFrozen)
+// ancak cagri yerleri DEGISTIRILMEZ.
+const I18N_DILLER = ['tr','en','ru'];
+const I18N_VARSAYILAN = 'en';
+const I18N_ANAHTAR = 'inferno_lang';
+
+const I18N = {
+
+en: {
+  // ── uygulama / giris ──
+  'app.title':'INFERNO POOL',
+  'app.tagline':'ELEMENTAL BILLIARDS',
+  'app.enter':'ENTER THE ARENA',
+  'app.connecting':'🔥 Connecting to Inferno Server...',
+  'app.skipOffline':'SKIP / OFFLINE PLAY',
+  // ── menu ──
+  'menu.twoPlayer':'2 PLAYER',
+  'menu.vsBot':'VS BOT',
+  'menu.easy':'EASY',
+  'menu.medium':'MEDIUM',
+  'menu.hard':'HARD',
+  'menu.best':'🏆 BEST',
+  'menu.local':'⚡ LOCAL',
+  'menu.shop':'🎁 SHOP',
+  'menu.invite':'⚔ INVITE FRIEND',
+  'menu.credits':'CREDITS',
+  'menu.playOnline':'🌐 PLAY ONLINE',
+  'menu.level':'LVL',
+  'menu.offline':'● OFFLINE',
+  // ── magaza ──
+  'shop.title':'🎁 CUE SHOP',
+  'shop.close':'✕ CLOSE',
+  'shop.equip':'EQUIP',
+  'shop.equipped':'EQUIPPED',
+  'shop.locked':'LOCKED',
+  'shop.buy':'BUY',
+  'shop.purchased':'PURCHASED!',
+  'shop.notEnoughCoins':'NOT ENOUGH COINS',
+  'shop.lockedBuy':'LOCKED! Buy in SHOP',
+  // ── element adlari ──
+  'elem.fire':'FIRE',
+  'elem.ice':'ICE',
+  'elem.poison':'POISON',
+  'elem.shadow':'SHADOW',
+  // ── oyun ekrani ──
+  'game.menu':'◀ MENU',
+  'game.player1':'PLAYER 1',
+  'game.player2':'PLAYER 2',
+  'game.turn':'TURN',
+  'game.foul':'FOUL',
+  'game.drag':'DRAG',
+  'game.power':'POWER',
+  'game.shoot':'SHOOT',
+  'game.time':'TIME',
+  'game.aim':'AIM',
+  'game.yourTurn':'YOUR TURN',
+  'game.opponentTurn':'OPPONENT TURN',
+  'game.botThinking':'BOT THINKING',
+  'game.playerTurn':'P{n} TURN',
+  'game.you':'YOU',
+  'game.bot':'🤖 BOT',
+  'game.dragToAim':'DRAG TO AIM',
+  'game.powerByDistance':'POWER BY DISTANCE',
+  'game.shootRelease':'RELEASE TO SHOOT',
+  // drawCue() icinde — Asama 1'de BAGLANMAZ
+  'game.clickToPlace':'CLICK TO PLACE',
+  'game.wrong':'WRONG',
+  // ── oyun ici olaylar ──
+  'event.cueBallSunk':'CUE BALL SUNK — BALL IN HAND',
+  'event.wrongBall':'WRONG BALL — TURN PASSES',
+  'event.eightPotted':'🔥 8-Ball Potted — Victory!',
+  'event.eightScratch':'💀 8-Ball + Scratch — Loss!',
+  'event.eightEarly':'💀 8-Ball too early — Forfeit!',
+  'event.opponentFrozen':'OPPONENT FROZEN!',
+  // botShot() icinde — Asama 1'de BAGLANMAZ
+  'event.botFrozen':'BOT FROZEN!',
+  'event.levelUp':'LEVEL UP!',
+  'event.unlocked':'UNLOCKED!',
+  'event.stripe':'STRIPE',
+  'event.solid':'SOLID',
+  // ── mac sonu ──
+  'over.victory':'VICTORY!',
+  'over.defeat':'DEFEAT',
+  'over.gameOver':'Game over',
+  'over.balls':'BALLS',
+  'over.shots':'SHOTS',
+  'over.acc':'ACC',
+  'over.coins':'COINS',
+  'over.xp':'XP',
+  'over.newHighScore':'🏆 NEW HIGH SCORE!',
+  'over.playAgain':'PLAY AGAIN',
+  'over.rematch':'🔄 REMATCH',
+  'over.menu':'MENU',
+  'over.leaderboard':'🏆 LB',
+  'over.exit':'EXIT',
+  'over.youWin':'🏆 YOU WIN!',
+  'over.youLose':'💀 YOU LOSE!',
+  'over.botWins':'BOT WINS! 🤖',
+  'over.playerWins':'PLAYER {n} WINS! 🔥',
+  'over.rematchOffer':'You can offer a rematch to opponent',
+  'over.rematchSent':'Rematch offer sent...',
+  // ── cevrimici / eslesme ──
+  'online.matchmaking':'🌐 MATCHMAKING',
+  'online.searching':'Searching for opponent...',
+  'online.cancel':'CANCEL',
+  'online.waiting':'Waiting for opponent…',
+  'online.matchFound':'MATCH FOUND',
+  'online.opponentLeft':'Opponent left the game!',
+  'online.rematchRequest':'Opponent wants a rematch!',
+  'online.accept':'Accept',
+  'online.declined':'Opponent declined the rematch',
+  'online.connectingServer':'Connecting to game server…',
+  'online.connectingShort':'Connecting to server...',
+  'online.disconnected':'Connection lost!',
+  'online.statusOffline':'● OFFLINE',
+  'online.statusConnecting':'◉ CONNECTING...',
+  'online.statusWaiting':'◎ WAITING...',
+  'online.statusOnline':'● ONLINE',
+  'online.statusSearching':'◉ SEARCHING...',
+  // ── arkadas daveti ──
+  'invite.title':'⚔ INVITE FRIEND',
+  'invite.sendLink':'Send this link to your friend:',
+  'invite.sendLinkShort':'Send the link to your friend!',
+  'invite.waiting':'Waiting for your friend...',
+  'invite.copy':'📋 COPY',
+  'invite.copied':'✓ Link copied!',
+  'invite.cancel':'✕ CANCEL',
+  // ── siralama ──
+  'lb.title':'🏆 LEADERBOARD',
+  'lb.close':'✕ CLOSE',
+  // ── katkida bulunanlar ──
+  'credits.title':'CREDITS',
+  'credits.balls':'3D BILLIARD BALLS',
+  'credits.by':'by',
+  'credits.source':'Source:',
+  'credits.license':'License: Creative Commons Attribution (CC BY)',
+  'credits.rendering':'RENDERING',
+  'credits.close':'CLOSE',
+  // ── sunucu uyandirma ──
+  'server.waking':'Waking up Inferno server...',
+  'server.ready':'Inferno server is ready!',
+  // ── ayarlar / dil ──
+  'settings.title':'SETTINGS',
+  'settings.language':'Language',
+  'settings.langTr':'Türkçe',
+  'settings.langEn':'English',
+  'settings.langRu':'Русский',
+  // ── ortak ──
+  'common.close':'CLOSE',
+  'common.cancel':'CANCEL',
+  'common.ok':'OK',
+  'common.yes':'YES',
+  'common.no':'NO',
+  // ── CHAT (Asama 3-5'te kullanilacak, sozlukte simdiden hazir) ──
+  'chat.title':'🔥 INFERNO POOL COMMUNITY',
+  'chat.open':'💬 CHAT',
+  'chat.welcome':'WELCOME TO INFERNO POOL',
+  'chat.chooseNick':'Choose your nickname',
+  'chat.enterNickname':'ENTER NICKNAME',
+  'chat.enterChat':'ENTER CHAT',
+  'chat.send':'SEND',
+  'chat.messagePlaceholder':'Message...',
+  'chat.rooms':'ROOMS',
+  'chat.globalChat':'GLOBAL CHAT',
+  'chat.roomGlobal':'🌎 GLOBAL',
+  'chat.roomTr':'🇹🇷 TURKISH',
+  'chat.roomEn':'🇬🇧 ENGLISH',
+  'chat.roomRu':'🇷🇺 RUSSIAN',
+  'chat.createRoom':'CREATE ROOM',
+  'chat.joinRoom':'JOIN ROOM',
+  'chat.leaveRoom':'LEAVE ROOM',
+  'chat.roomName':'Room name',
+  'chat.password':'Password',
+  'chat.passwordOptional':'Password (optional)',
+  'chat.public':'PUBLIC',
+  'chat.private':'PRIVATE',
+  'chat.onlinePlayers':'ONLINE PLAYERS',
+  'chat.report':'Report',
+  'chat.block':'Block',
+  'chat.mute':'Mute',
+  'chat.unblock':'Unblock',
+  'chat.blocked':'Blocked',
+  'chat.reported':'Reported. Thank you.',
+  'chat.connecting':'Connecting to chat...',
+  'chat.disconnected':'Chat disconnected',
+  'chat.reconnecting':'Reconnecting...',
+  'chat.historyNote':'Chat history is not stored.',
+  'chat.userJoined':'{nick} joined',
+  'chat.userLeft':'{nick} left',
+  'chat.errNickShort':'Nickname must be 3-16 characters',
+  'chat.errNickChars':'Only letters, numbers and underscore',
+  'chat.errNickTaken':'That nickname is already in use',
+  'chat.errNickBad':'That nickname is not allowed',
+  'chat.errTooFast':'Slow down — too many messages',
+  'chat.errTooLong':'Message is too long',
+  'chat.errEmpty':'Message is empty',
+  'chat.errRoomFull':'This room is full',
+  'chat.errRoomName':'Invalid room name',
+  'chat.errPassword':'Wrong password',
+  'chat.muted':'You are muted for {n} seconds'
+},
+
+tr: {
+  'app.title':'INFERNO POOL',
+  'app.tagline':'ELEMENTAL BİLARDO',
+  'app.enter':'ARENAYA GİR',
+  'app.connecting':'🔥 Inferno sunucusuna bağlanılıyor...',
+  'app.skipOffline':'GEÇ / ÇEVRİMDIŞI OYNA',
+  'menu.twoPlayer':'2 OYUNCU',
+  'menu.vsBot':'BOTA KARŞI',
+  'menu.easy':'KOLAY',
+  'menu.medium':'ORTA',
+  'menu.hard':'ZOR',
+  'menu.best':'🏆 EN İYİ',
+  'menu.local':'⚡ YEREL',
+  'menu.shop':'🎁 MAĞAZA',
+  'menu.invite':'⚔ ARKADAŞ DAVET ET',
+  'menu.credits':'EMEĞİ GEÇENLER',
+  'menu.playOnline':'🌐 ÇEVRİMİÇİ OYNA',
+  'menu.level':'SVY',
+  'menu.offline':'● ÇEVRİMDIŞI',
+  'shop.title':'🎁 ISTAKA MAĞAZASI',
+  'shop.close':'✕ KAPAT',
+  'shop.equip':'KUŞAN',
+  'shop.equipped':'KUŞANILDI',
+  'shop.locked':'KİLİTLİ',
+  'shop.buy':'SATIN AL',
+  'shop.purchased':'SATIN ALINDI!',
+  'shop.notEnoughCoins':'YETERSİZ ALTIN',
+  'shop.lockedBuy':'KİLİTLİ! MAĞAZA’dan satın al',
+  'elem.fire':'ATEŞ',
+  'elem.ice':'BUZ',
+  'elem.poison':'ZEHİR',
+  'elem.shadow':'GÖLGE',
+  'game.menu':'◀ MENÜ',
+  'game.player1':'OYUNCU 1',
+  'game.player2':'OYUNCU 2',
+  'game.turn':'SIRA',
+  'game.foul':'FAUL',
+  'game.drag':'SÜRÜKLE',
+  'game.power':'GÜÇ',
+  'game.shoot':'VUR',
+  'game.time':'SÜRE',
+  'game.aim':'NİŞAN',
+  'game.yourTurn':'SIRA SENDE',
+  'game.opponentTurn':'RAKİBİN SIRASI',
+  'game.botThinking':'BOT DÜŞÜNÜYOR',
+  'game.playerTurn':'O{n} SIRASI',
+  'game.you':'SEN',
+  'game.bot':'🤖 BOT',
+  'game.dragToAim':'NİŞAN İÇİN SÜRÜKLE',
+  'game.powerByDistance':'MESAFEYE GÖRE GÜÇ',
+  'game.shootRelease':'VURMAK İÇİN BIRAK',
+  'game.clickToPlace':'YERLEŞTİRMEK İÇİN TIKLA',
+  'game.wrong':'YANLIŞ',
+  'event.cueBallSunk':'BEYAZ TOP DÜŞTÜ — TOP ELDE',
+  'event.wrongBall':'YANLIŞ TOP — SIRA GEÇTİ',
+  'event.eightPotted':'🔥 8 Numara cebe — Zafer!',
+  'event.eightScratch':'💀 8 Numara + faul — Kayıp!',
+  'event.eightEarly':'💀 8 Numara çok erken — Kayıp!',
+  'event.opponentFrozen':'RAKİP DONDU!',
+  'event.botFrozen':'BOT DONDU!',
+  'event.levelUp':'SEVİYE ATLADIN!',
+  'event.unlocked':'AÇILDI!',
+  'event.stripe':'ÇİZGİLİ',
+  'event.solid':'DÜZ',
+  'over.victory':'ZAFER!',
+  'over.defeat':'YENİLGİ',
+  'over.gameOver':'Oyun bitti',
+  'over.balls':'TOPLAR',
+  'over.shots':'ATIŞ',
+  'over.acc':'İSABET',
+  'over.coins':'ALTIN',
+  'over.xp':'XP',
+  'over.newHighScore':'🏆 YENİ REKOR!',
+  'over.playAgain':'TEKRAR OYNA',
+  'over.rematch':'🔄 REVANŞ',
+  'over.menu':'MENÜ',
+  'over.leaderboard':'🏆 SIRALAMA',
+  'over.exit':'ÇIKIŞ',
+  'over.youWin':'🏆 KAZANDIN!',
+  'over.youLose':'💀 KAYBETTİN!',
+  'over.botWins':'BOT KAZANDI! 🤖',
+  'over.playerWins':'OYUNCU {n} KAZANDI! 🔥',
+  'over.rematchOffer':'Rakibine revanş teklif edebilirsin',
+  'over.rematchSent':'Revanş teklifi gönderildi...',
+  'online.matchmaking':'🌐 EŞLEŞTİRME',
+  'online.searching':'Rakip aranıyor...',
+  'online.cancel':'İPTAL',
+  'online.waiting':'Rakip bekleniyor…',
+  'online.matchFound':'EŞLEŞME BULUNDU',
+  'online.opponentLeft':'Rakip oyundan ayrıldı!',
+  'online.rematchRequest':'Rakip revanş istiyor!',
+  'online.accept':'Kabul et',
+  'online.declined':'Rakip revanşı reddetti',
+  'online.connectingServer':'Oyun sunucusuna bağlanılıyor…',
+  'online.connectingShort':'Sunucuya bağlanılıyor...',
+  'online.disconnected':'Bağlantı kesildi!',
+  'online.statusOffline':'● ÇEVRİMDIŞI',
+  'online.statusConnecting':'◉ BAĞLANIYOR...',
+  'online.statusWaiting':'◎ BEKLENİYOR...',
+  'online.statusOnline':'● ÇEVRİMİÇİ',
+  'online.statusSearching':'◉ ARANIYOR...',
+  'invite.title':'⚔ ARKADAŞ DAVET ET',
+  'invite.sendLink':'Bu bağlantıyı arkadaşına gönder:',
+  'invite.sendLinkShort':'Bağlantıyı arkadaşına gönder!',
+  'invite.waiting':'Arkadaşın bekleniyor...',
+  'invite.copy':'📋 KOPYALA',
+  'invite.copied':'✓ Bağlantı kopyalandı!',
+  'invite.cancel':'✕ İPTAL',
+  'lb.title':'🏆 SIRALAMA',
+  'lb.close':'✕ KAPAT',
+  'credits.title':'EMEĞİ GEÇENLER',
+  'credits.balls':'3D BİLARDO TOPLARI',
+  'credits.by':'yapan',
+  'credits.source':'Kaynak:',
+  'credits.license':'Lisans: Creative Commons Attribution (CC BY)',
+  'credits.rendering':'RENDER',
+  'credits.close':'KAPAT',
+  'server.waking':'Inferno sunucusu uyandırılıyor...',
+  'server.ready':'Inferno sunucusu hazır!',
+  'settings.title':'AYARLAR',
+  'settings.language':'Dil',
+  'settings.langTr':'Türkçe',
+  'settings.langEn':'English',
+  'settings.langRu':'Русский',
+  'common.close':'KAPAT',
+  'common.cancel':'İPTAL',
+  'common.ok':'TAMAM',
+  'common.yes':'EVET',
+  'common.no':'HAYIR',
+  'chat.title':'🔥 INFERNO POOL TOPLULUĞU',
+  'chat.open':'💬 SOHBET',
+  'chat.welcome':'INFERNO POOL’A HOŞ GELDİN',
+  'chat.chooseNick':'Takma adını seç',
+  'chat.enterNickname':'TAKMA AD GİR',
+  'chat.enterChat':'SOHBETE GİR',
+  'chat.send':'GÖNDER',
+  'chat.messagePlaceholder':'Mesaj...',
+  'chat.rooms':'ODALAR',
+  'chat.globalChat':'GENEL SOHBET',
+  'chat.roomGlobal':'🌎 GLOBAL',
+  'chat.roomTr':'🇹🇷 TÜRKÇE',
+  'chat.roomEn':'🇬🇧 İNGİLİZCE',
+  'chat.roomRu':'🇷🇺 RUSÇA',
+  'chat.createRoom':'ODA OLUŞTUR',
+  'chat.joinRoom':'ODAYA KATIL',
+  'chat.leaveRoom':'ODADAN ÇIK',
+  'chat.roomName':'Oda adı',
+  'chat.password':'Parola',
+  'chat.passwordOptional':'Parola (isteğe bağlı)',
+  'chat.public':'HERKESE AÇIK',
+  'chat.private':'ÖZEL',
+  'chat.onlinePlayers':'ÇEVRİMİÇİ OYUNCU',
+  'chat.report':'Bildir',
+  'chat.block':'Engelle',
+  'chat.mute':'Sustur',
+  'chat.unblock':'Engeli kaldır',
+  'chat.blocked':'Engellendi',
+  'chat.reported':'Bildirildi. Teşekkürler.',
+  'chat.connecting':'Sohbete bağlanılıyor...',
+  'chat.disconnected':'Sohbet bağlantısı kesildi',
+  'chat.reconnecting':'Yeniden bağlanılıyor...',
+  'chat.historyNote':'Sohbet geçmişi saklanmaz.',
+  'chat.userJoined':'{nick} katıldı',
+  'chat.userLeft':'{nick} ayrıldı',
+  'chat.errNickShort':'Takma ad 3-16 karakter olmalı',
+  'chat.errNickChars':'Yalnızca harf, rakam ve alt çizgi',
+  'chat.errNickTaken':'Bu takma ad kullanımda',
+  'chat.errNickBad':'Bu takma ada izin verilmiyor',
+  'chat.errTooFast':'Yavaş — çok fazla mesaj',
+  'chat.errTooLong':'Mesaj çok uzun',
+  'chat.errEmpty':'Mesaj boş',
+  'chat.errRoomFull':'Bu oda dolu',
+  'chat.errRoomName':'Geçersiz oda adı',
+  'chat.errPassword':'Parola yanlış',
+  'chat.muted':'{n} saniye susturuldun'
+},
+
+ru: {
+  'app.title':'INFERNO POOL',
+  'app.tagline':'ЭЛЕМЕНТАЛЬНЫЙ БИЛЬЯРД',
+  'app.enter':'ВОЙТИ НА АРЕНУ',
+  'app.connecting':'🔥 Подключение к серверу Inferno...',
+  'app.skipOffline':'ПРОПУСТИТЬ / ОФЛАЙН',
+  'menu.twoPlayer':'2 ИГРОКА',
+  'menu.vsBot':'ПРОТИВ БОТА',
+  'menu.easy':'ЛЕГКО',
+  'menu.medium':'СРЕДНЕ',
+  'menu.hard':'СЛОЖНО',
+  'menu.best':'🏆 РЕКОРД',
+  'menu.local':'⚡ ЛОКАЛЬНО',
+  'menu.shop':'🎁 МАГАЗИН',
+  'menu.invite':'⚔ ПРИГЛАСИТЬ ДРУГА',
+  'menu.credits':'АВТОРЫ',
+  'menu.playOnline':'🌐 ИГРАТЬ ОНЛАЙН',
+  'menu.level':'УР',
+  'menu.offline':'● ОФЛАЙН',
+  'shop.title':'🎁 МАГАЗИН КИЁВ',
+  'shop.close':'✕ ЗАКРЫТЬ',
+  'shop.equip':'ЭКИПИРОВАТЬ',
+  'shop.equipped':'ЭКИПИРОВАН',
+  'shop.locked':'ЗАБЛОКИРОВАНО',
+  'shop.buy':'КУПИТЬ',
+  'shop.purchased':'КУПЛЕНО!',
+  'shop.notEnoughCoins':'НЕДОСТАТОЧНО МОНЕТ',
+  'shop.lockedBuy':'ЗАБЛОКИРОВАНО! Купите в МАГАЗИНЕ',
+  'elem.fire':'ОГОНЬ',
+  'elem.ice':'ЛЁД',
+  'elem.poison':'ЯД',
+  'elem.shadow':'ТЕНЬ',
+  'game.menu':'◀ МЕНЮ',
+  'game.player1':'ИГРОК 1',
+  'game.player2':'ИГРОК 2',
+  'game.turn':'ХОД',
+  'game.foul':'ФОЛ',
+  'game.drag':'ТЯНИ',
+  'game.power':'СИЛА',
+  'game.shoot':'УДАР',
+  'game.time':'ВРЕМЯ',
+  'game.aim':'ПРИЦЕЛ',
+  'game.yourTurn':'ВАШ ХОД',
+  'game.opponentTurn':'ХОД СОПЕРНИКА',
+  'game.botThinking':'БОТ ДУМАЕТ',
+  'game.playerTurn':'ХОД ИГРОКА {n}',
+  'game.you':'ВЫ',
+  'game.bot':'🤖 БОТ',
+  'game.dragToAim':'ТЯНИТЕ ДЛЯ ПРИЦЕЛА',
+  'game.powerByDistance':'СИЛА ПО РАССТОЯНИЮ',
+  'game.shootRelease':'ОТПУСТИТЕ ДЛЯ УДАРА',
+  'game.clickToPlace':'НАЖМИТЕ, ЧТОБЫ ПОСТАВИТЬ',
+  'game.wrong':'НЕ ТОТ',
+  'event.cueBallSunk':'БИТОК УПАЛ — МЯЧ В РУКЕ',
+  'event.wrongBall':'НЕ ТОТ ШАР — ХОД ПЕРЕХОДИТ',
+  'event.eightPotted':'🔥 Восьмёрка забита — Победа!',
+  'event.eightScratch':'💀 Восьмёрка + фол — Поражение!',
+  'event.eightEarly':'💀 Восьмёрка слишком рано — Поражение!',
+  'event.opponentFrozen':'СОПЕРНИК ЗАМОРОЖЕН!',
+  'event.botFrozen':'БОТ ЗАМОРОЖЕН!',
+  'event.levelUp':'НОВЫЙ УРОВЕНЬ!',
+  'event.unlocked':'ОТКРЫТО!',
+  'event.stripe':'ПОЛОСАТЫЕ',
+  'event.solid':'СПЛОШНЫЕ',
+  'over.victory':'ПОБЕДА!',
+  'over.defeat':'ПОРАЖЕНИЕ',
+  'over.gameOver':'Игра окончена',
+  'over.balls':'ШАРЫ',
+  'over.shots':'УДАРЫ',
+  'over.acc':'ТОЧН',
+  'over.coins':'МОНЕТЫ',
+  'over.xp':'ОПЫТ',
+  'over.newHighScore':'🏆 НОВЫЙ РЕКОРД!',
+  'over.playAgain':'ИГРАТЬ СНОВА',
+  'over.rematch':'🔄 РЕВАНШ',
+  'over.menu':'МЕНЮ',
+  'over.leaderboard':'🏆 ТАБЛИЦА',
+  'over.exit':'ВЫХОД',
+  'over.youWin':'🏆 ВЫ ВЫИГРАЛИ!',
+  'over.youLose':'💀 ВЫ ПРОИГРАЛИ!',
+  'over.botWins':'БОТ ВЫИГРАЛ! 🤖',
+  'over.playerWins':'ИГРОК {n} ВЫИГРАЛ! 🔥',
+  'over.rematchOffer':'Вы можете предложить сопернику реванш',
+  'over.rematchSent':'Предложение реванша отправлено...',
+  'online.matchmaking':'🌐 ПОИСК ИГРЫ',
+  'online.searching':'Поиск соперника...',
+  'online.cancel':'ОТМЕНА',
+  'online.waiting':'Ожидание соперника…',
+  'online.matchFound':'СОПЕРНИК НАЙДЕН',
+  'online.opponentLeft':'Соперник покинул игру!',
+  'online.rematchRequest':'Соперник хочет реванш!',
+  'online.accept':'Принять',
+  'online.declined':'Соперник отклонил реванш',
+  'online.connectingServer':'Подключение к игровому серверу…',
+  'online.connectingShort':'Подключение к серверу...',
+  'online.disconnected':'Соединение потеряно!',
+  'online.statusOffline':'● ОФЛАЙН',
+  'online.statusConnecting':'◉ ПОДКЛЮЧЕНИЕ...',
+  'online.statusWaiting':'◎ ОЖИДАНИЕ...',
+  'online.statusOnline':'● ОНЛАЙН',
+  'online.statusSearching':'◉ ПОИСК...',
+  'invite.title':'⚔ ПРИГЛАСИТЬ ДРУГА',
+  'invite.sendLink':'Отправьте эту ссылку другу:',
+  'invite.sendLinkShort':'Отправьте ссылку другу!',
+  'invite.waiting':'Ожидание друга...',
+  'invite.copy':'📋 КОПИРОВАТЬ',
+  'invite.copied':'✓ Ссылка скопирована!',
+  'invite.cancel':'✕ ОТМЕНА',
+  'lb.title':'🏆 ТАБЛИЦА ЛИДЕРОВ',
+  'lb.close':'✕ ЗАКРЫТЬ',
+  'credits.title':'АВТОРЫ',
+  'credits.balls':'3D БИЛЬЯРДНЫЕ ШАРЫ',
+  'credits.by':'автор',
+  'credits.source':'Источник:',
+  'credits.license':'Лицензия: Creative Commons Attribution (CC BY)',
+  'credits.rendering':'РЕНДЕРИНГ',
+  'credits.close':'ЗАКРЫТЬ',
+  'server.waking':'Пробуждение сервера Inferno...',
+  'server.ready':'Сервер Inferno готов!',
+  'settings.title':'НАСТРОЙКИ',
+  'settings.language':'Язык',
+  'settings.langTr':'Türkçe',
+  'settings.langEn':'English',
+  'settings.langRu':'Русский',
+  'common.close':'ЗАКРЫТЬ',
+  'common.cancel':'ОТМЕНА',
+  'common.ok':'ОК',
+  'common.yes':'ДА',
+  'common.no':'НЕТ',
+  'chat.title':'🔥 СООБЩЕСТВО INFERNO POOL',
+  'chat.open':'💬 ЧАТ',
+  'chat.welcome':'ДОБРО ПОЖАЛОВАТЬ В INFERNO POOL',
+  'chat.chooseNick':'Выберите никнейм',
+  'chat.enterNickname':'ВВЕДИТЕ НИКНЕЙМ',
+  'chat.enterChat':'ВОЙТИ В ЧАТ',
+  'chat.send':'ОТПРАВИТЬ',
+  'chat.messagePlaceholder':'Сообщение...',
+  'chat.rooms':'КОМНАТЫ',
+  'chat.globalChat':'ОБЩИЙ ЧАТ',
+  'chat.roomGlobal':'🌎 ГЛОБАЛЬНЫЙ',
+  'chat.roomTr':'🇹🇷 ТУРЕЦКИЙ',
+  'chat.roomEn':'🇬🇧 АНГЛИЙСКИЙ',
+  'chat.roomRu':'🇷🇺 РУССКИЙ',
+  'chat.createRoom':'СОЗДАТЬ КОМНАТУ',
+  'chat.joinRoom':'ВОЙТИ В КОМНАТУ',
+  'chat.leaveRoom':'ПОКИНУТЬ КОМНАТУ',
+  'chat.roomName':'Название комнаты',
+  'chat.password':'Пароль',
+  'chat.passwordOptional':'Пароль (необязательно)',
+  'chat.public':'ОТКРЫТАЯ',
+  'chat.private':'ЗАКРЫТАЯ',
+  'chat.onlinePlayers':'ИГРОКОВ ОНЛАЙН',
+  'chat.report':'Пожаловаться',
+  'chat.block':'Заблокировать',
+  'chat.mute':'Заглушить',
+  'chat.unblock':'Разблокировать',
+  'chat.blocked':'Заблокирован',
+  'chat.reported':'Жалоба отправлена. Спасибо.',
+  'chat.connecting':'Подключение к чату...',
+  'chat.disconnected':'Чат отключён',
+  'chat.reconnecting':'Переподключение...',
+  'chat.historyNote':'История чата не сохраняется.',
+  'chat.userJoined':'{nick} присоединился',
+  'chat.userLeft':'{nick} вышел',
+  'chat.errNickShort':'Никнейм должен быть 3-16 символов',
+  'chat.errNickChars':'Только буквы, цифры и подчёркивание',
+  'chat.errNickTaken':'Этот никнейм уже занят',
+  'chat.errNickBad':'Такой никнейм не разрешён',
+  'chat.errTooFast':'Слишком быстро — много сообщений',
+  'chat.errTooLong':'Сообщение слишком длинное',
+  'chat.errEmpty':'Сообщение пустое',
+  'chat.errRoomFull':'Комната заполнена',
+  'chat.errRoomName':'Недопустимое название комнаты',
+  'chat.errPassword':'Неверный пароль',
+  'chat.muted':'Вы заглушены на {n} секунд'
+}
+
+};
+
+// ── Dil secimi ────────────────────────────────────────────────────────
+// Sira: 1) kaydedilmis inferno_lang  2) navigator.language  3) 'en'
+function i18nOnerilenDil(){
+  try{
+    const kayitli = localStorage.getItem(I18N_ANAHTAR);
+    if(kayitli && I18N_DILLER.indexOf(kayitli) >= 0) return kayitli;
+  }catch(e){}
+  let n = '';
+  try{ n = (navigator.language || (navigator.languages && navigator.languages[0]) || ''); }catch(e){}
+  n = String(n).toLowerCase();
+  for(let i=0;i<I18N_DILLER.length;i++){
+    if(n.indexOf(I18N_DILLER[i]) === 0) return I18N_DILLER[i];
+  }
+  return I18N_VARSAYILAN;
+}
+
+let LANG = i18nOnerilenDil();
+
+function getLang(){ return LANG; }
+
+// ── t() — tek merkezi ceviri fonksiyonu ───────────────────────────────
+// Dusme zinciri: secili dil -> EN -> anahtarin kendisi.
+// {ad} yer tutuculari ikinci parametreden doldurulur: t('over.playerWins',{n:2})
+function t(anahtar, degiskenler){
+  let s = null;
+  const d = I18N[LANG];
+  if(d && Object.prototype.hasOwnProperty.call(d, anahtar)) s = d[anahtar];
+  if(s == null && I18N.en && Object.prototype.hasOwnProperty.call(I18N.en, anahtar)) s = I18N.en[anahtar];
+  if(s == null) s = anahtar;
+  if(degiskenler){
+    s = String(s).replace(/\{(\w+)\}/g, function(tam, ad){
+      return Object.prototype.hasOwnProperty.call(degiskenler, ad) ? String(degiskenler[ad]) : tam;
+    });
+  }
+  return s;
+}
+
+// ── Dil degistir ──────────────────────────────────────────────────────
+function setLang(kod){
+  if(I18N_DILLER.indexOf(kod) < 0) return false;
+  LANG = kod;
+  try{ localStorage.setItem(I18N_ANAHTAR, kod); }catch(e){}
+  try{ document.documentElement.setAttribute('data-lang', kod); }catch(e){}
+  i18nUygula();
+  return true;
+}
+
+// ── DOM'a uygula ──────────────────────────────────────────────────────
+// data-i18n / data-i18n-ph / data-i18n-title nitelikli dugumleri gunceller.
+// ASAMA 1'DE BU NITELIKLERDEN HIC YOKTUR: fonksiyon calisir, 0 dugum bulur,
+// hicbir sey degistirmez. Asama 2'de nitelikler eklendikce devreye girer.
+// Metin DAIMA textContent ile yazilir — innerHTML kullanilmaz (XSS).
+function i18nUygula(kok){
+  const k = kok || document;
+  try{
+    k.querySelectorAll('[data-i18n]').forEach(function(e){
+      e.textContent = t(e.getAttribute('data-i18n'));
+    });
+    k.querySelectorAll('[data-i18n-ph]').forEach(function(e){
+      e.setAttribute('placeholder', t(e.getAttribute('data-i18n-ph')));
+    });
+    k.querySelectorAll('[data-i18n-title]').forEach(function(e){
+      e.setAttribute('title', t(e.getAttribute('data-i18n-title')));
+    });
+  }catch(e){}
+}
+
+// ── Gelistirici denetimi ──────────────────────────────────────────────
+// Sozlukleri karsilastirir: eksik/fazla anahtarlari ve bos degerleri bulur.
+// Uretimde hicbir sey cagirmaz; konsoldan i18nDenetle() ile calistirilir.
+function i18nDenetle(){
+  const enAnahtar = Object.keys(I18N.en);
+  const rapor = { toplam: enAnahtar.length, diller: {} };
+  I18N_DILLER.forEach(function(d){
+    const k = Object.keys(I18N[d] || {});
+    const eksik = enAnahtar.filter(function(a){ return !(a in (I18N[d]||{})); });
+    const fazla = k.filter(function(a){ return enAnahtar.indexOf(a) < 0; });
+    const bos   = k.filter(function(a){ return !String(I18N[d][a] || '').trim(); });
+    rapor.diller[d] = { anahtar: k.length, eksik: eksik, fazla: fazla, bos: bos };
+  });
+  return rapor;
+}
+
+// ── Baslangic ─────────────────────────────────────────────────────────
+// Yalnizca <html data-lang="..."> niteligini yazar. Hicbir metin
+// degistirilmez; data-i18n nitelikli dugum bulunmadigi icin i18nUygula()
+// bu asamada sifir dugum isler.
+try{ document.documentElement.setAttribute('data-lang', LANG); }catch(e){}
 
 
 // ── Profile (localStorage) ──
