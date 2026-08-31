@@ -338,3 +338,340 @@ const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
   console.log("Server running on port " + PORT);
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// CHAT V1 — SUNUCU MODULU                              [ASAMA 3, APPEND-ONLY]
+// ═══════════════════════════════════════════════════════════════════════
+// Bu blok dosyanin SONUNA eklenmistir; yukaridaki hicbir satir
+// degistirilmemistir. Oyun tarafiyla tek temas noktasi wss nesnesidir ve
+// o da yalnizca YENI dinleyiciler eklemek icin kullanilir.
+//
+// NEDEN AYRI DINLEYICI:
+//   wss / ws birer EventEmitter'dir; ayni olaya birden fazla dinleyici
+//   kaydedilebilir. Boylece mevcut wss.on('connection') blogu, onun
+//   icindeki ws.on('message') switch'i ve ws.on('close') akisi HIC
+//   degistirilmeden chat kendi dinleyicilerini ekler.
+//
+// NEDEN GUVENLI:
+//   * Mevcut router'daki switch(msg.type) bir 'default' dali TASIMAZ;
+//     tanimadigi tipleri sessizce yutar. 'chat_' ile baslayan mesajlar
+//     oradan zararsiz gecer. (Bu, canli sunucuda olculerek dogrulandi.)
+//   * Chat dinleyicisi ILK IS olarak tipi kontrol eder ve 'chat_' ile
+//     baslamayan HER mesaji aninda birakir; oyun mesajlarina dokunmaz.
+//   * Chat, oyunun rooms/waitingRoom/ws.roomId/ws.slot alanlarini ne
+//     okur ne yazar. Kendi durumunu ayri Map'lerde tutar.
+//   * Heartbeat'e dokunulmadi: mevcut ws.on('message') dinleyicisi HER
+//     mesajda ws.isAlive/ws.lastAppMsg'i tazeledigi icin chat mesajlari
+//     da soketi canli tutar. chat_ping ayrica uygulama seviyesinde
+//     yanitlanir.
+
+// ── Sinirlar (Render Free: 512 MB RAM, ~0.1 CPU) ──────────────────────
+const CHAT_ODA_KAPASITE   = 250;    // oda basina kullanici tavani
+const CHAT_GECMIS_MAX     = 100;    // oda basina saklanan mesaj
+const CHAT_RAPOR_MAX      = 200;    // bellekteki rapor halka tamponu
+const CHAT_MESAJ_MAX      = 250;    // karakter
+const CHAT_NICK_MIN       = 3;
+const CHAT_NICK_MAX       = 16;
+const CHAT_NICK_DESEN     = /^[A-Za-z0-9_]+$/;
+const CHAT_HIZ_MS         = 1000;   // en az 1 sn arayla mesaj
+const CHAT_PENCERE_MS     = 10000;  // 10 sn penceresi
+const CHAT_PENCERE_MAX    = 6;      // pencerede en fazla 6 mesaj
+const CHAT_MUTE_MS        = 30000;  // asilirsa 30 sn susturma
+const CHAT_TEKRAR_MAX     = 3;      // ayni metin arka arkaya en fazla 2 kez
+const CHAT_TEMEL_ODA      = 'global';
+
+// Kufur listesi. Sunucu tarafinda uygulanir; mesaj DUSURULMEZ, eslesme
+// maskelenir. Liste kasitli olarak kisa tutuldu; genisletmek icin tek yer.
+const CHAT_KUFUR = [
+  'fuck','shit','bitch','asshole','bastard','cunt','dick','pussy','whore','slut',
+  'nigger','faggot','retard',
+  'amk','aq','orospu','piç','pic','yarrak','yarak','sikeyim','siktir','gavat',
+  'oc','anasini','ananı','ananin',
+  'блядь','блять','сука','хуй','пизда','ебать','ёбан','мудак','пидор'
+];
+
+// ── Durum (RAM tabanli; deploy/restart sonrasi sifirlanir) ────────────
+const chatRooms   = new Map();   // odaId -> { id, mesajlar:[], uyeler:Set<ws> }
+const chatUsers   = new Map();   // ws    -> { nick, nickAlt, oda, sonMs, pencere:[], muteBitis, sonMetin, tekrar }
+const chatReports = [];          // en fazla CHAT_RAPOR_MAX kayit
+
+// ── ChatStore — TEK depolama arayuzu ─────────────────────────────────
+// Bugun Map/dizi tabanli bellek uygulamasi. Ileride Redis/Postgres'e
+// gecerken YALNIZCA bu dort fonksiyonun govdesi degisir; chat mantigi
+// dokunulmadan kalir.
+const ChatStore = {
+  getRoom(odaId){
+    let o = chatRooms.get(odaId);
+    if(!o){ o = { id: odaId, mesajlar: [], uyeler: new Set() }; chatRooms.set(odaId, o); }
+    return o;
+  },
+  addMessage(odaId, mesaj){
+    const o = ChatStore.getRoom(odaId);
+    o.mesajlar.push(mesaj);
+    // Halka tampon: oda basina yalnizca son CHAT_GECMIS_MAX mesaj.
+    if(o.mesajlar.length > CHAT_GECMIS_MAX){
+      o.mesajlar.splice(0, o.mesajlar.length - CHAT_GECMIS_MAX);
+    }
+    return mesaj;
+  },
+  getUsers(odaId){
+    const o = chatRooms.get(odaId);
+    if(!o) return [];
+    const liste = [];
+    o.uyeler.forEach(function(s){
+      const u = chatUsers.get(s);
+      if(u && u.nick) liste.push(u.nick);
+    });
+    return liste;
+  },
+  addReport(rapor){
+    chatReports.push(rapor);
+    if(chatReports.length > CHAT_RAPOR_MAX){
+      chatReports.splice(0, chatReports.length - CHAT_RAPOR_MAX);
+    }
+    return rapor;
+  }
+};
+
+// ── Yardimcilar ───────────────────────────────────────────────────────
+function chatGonder(ws, veri){
+  // Oyun tarafindaki send() ile bilerek AYNI islevde ama AYRI fonksiyon:
+  // chat ile oyun arasinda kod baglantisi kalmasin.
+  if(ws && ws.readyState === WebSocket.OPEN){
+    try{ ws.send(JSON.stringify(veri)); }catch(e){}
+  }
+}
+function chatHata(ws, kod, ek){
+  const p = { type:'chat_error', code: kod };
+  if(ek) p.detail = ek;
+  chatGonder(ws, p);
+}
+// Oda adi gecerli mi: 'global' veya tasma odalari 'global-2', 'global-3'...
+function chatOdaGecerli(id){
+  if(typeof id !== 'string') return false;
+  if(id === CHAT_TEMEL_ODA) return true;
+  return /^global-([2-9]|[1-9][0-9])$/.test(id);
+}
+// Kapasite dolduysa bir sonraki tasma odasini bul/uret.
+function chatOdaBul(){
+  let ad = CHAT_TEMEL_ODA;
+  for(let i = 1; i <= 20; i++){
+    const o = ChatStore.getRoom(ad);
+    if(o.uyeler.size < CHAT_ODA_KAPASITE) return ad;
+    ad = CHAT_TEMEL_ODA + '-' + (i + 1);
+  }
+  return null;   // tum odalar dolu
+}
+// Kontrol karakterlerini temizle, bosluklari sadelestir, kirp.
+function chatNormalize(s){
+  if(typeof s !== 'string') return '';
+  // Kontrol karakterlerini at. CR / LF / TAB HARIC tutulur; onlar bir
+  // alt satirda BOSLUGA cevrilir ki "a" + LF + "b" sonucu "ab" degil
+  // "a b" olsun.
+  let t = s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '');
+  t = t.replace(/[\r\n\t]+/g, ' ');
+  t = t.replace(/\s{2,}/g, ' ');
+  return t.trim();
+}
+// Kufur maskesi: eslesen harfleri *** yapar, mesaji DUSURMEZ.
+function chatKufurMaskele(s){
+  let t = s;
+  for(let i = 0; i < CHAT_KUFUR.length; i++){
+    const k = CHAT_KUFUR[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    t = t.replace(new RegExp(k, 'gi'), function(m){ return '*'.repeat(Math.min(m.length, 3)); });
+  }
+  return t;
+}
+function chatKufurIceriyor(s){
+  const d = String(s).toLowerCase();
+  for(let i = 0; i < CHAT_KUFUR.length; i++){
+    if(d.indexOf(CHAT_KUFUR[i].toLowerCase()) !== -1) return true;
+  }
+  return false;
+}
+// Nickname dogrulama. ISTEMCIYE GUVENILMEZ; her kural sunucuda.
+function chatNickDogrula(ham, oda){
+  const n = chatNormalize(ham);
+  if(n.length < CHAT_NICK_MIN || n.length > CHAT_NICK_MAX) return { hata:'nick_length' };
+  if(!CHAT_NICK_DESEN.test(n)) return { hata:'nick_chars' };
+  if(chatKufurIceriyor(n)) return { hata:'nick_forbidden' };
+  const alt = n.toLowerCase();
+  const o = chatRooms.get(oda);
+  if(o){
+    let cakisma = false;
+    o.uyeler.forEach(function(s){
+      const u = chatUsers.get(s);
+      if(u && u.nickAlt === alt) cakisma = true;
+    });
+    if(cakisma) return { hata:'nick_taken' };
+  }
+  return { nick: n, nickAlt: alt };
+}
+// Yalnizca ILGILI odadaki soketlere yayin (O(N), N = oda uyesi).
+function chatYayinla(odaId, veri, haricWs){
+  const o = chatRooms.get(odaId);
+  if(!o) return 0;
+  let n = 0;
+  o.uyeler.forEach(function(s){
+    if(s === haricWs) return;
+    chatGonder(s, veri); n++;
+  });
+  return n;
+}
+function chatKullaniciListesiYayinla(odaId){
+  chatYayinla(odaId, { type:'chat_users', room: odaId, users: ChatStore.getUsers(odaId) });
+}
+// Odadan cikar, nickname rezervasyonunu birak, listeyi tazele.
+function chatOdadanCikar(ws, bildir){
+  const u = chatUsers.get(ws);
+  if(!u) return null;
+  const odaId = u.oda;
+  const o = chatRooms.get(odaId);
+  if(o) o.uyeler.delete(ws);
+  chatUsers.delete(ws);            // nickname rezervasyonu serbest
+  if(odaId && bildir !== false){
+    chatYayinla(odaId, { type:'chat_leave', room: odaId, nick: u.nick });
+    chatKullaniciListesiYayinla(odaId);
+  }
+  return u;
+}
+// Hiz siniri. Donen deger: null = gecebilir, aksi halde hata kodu.
+function chatHizKontrol(u, simdi){
+  if(u.muteBitis && simdi < u.muteBitis){
+    return { hata:'muted', kalan: Math.ceil((u.muteBitis - simdi) / 1000) };
+  }
+  if(u.sonMs && (simdi - u.sonMs) < CHAT_HIZ_MS) return { hata:'too_fast' };
+  u.pencere = u.pencere.filter(function(t){ return simdi - t < CHAT_PENCERE_MS; });
+  if(u.pencere.length >= CHAT_PENCERE_MAX){
+    u.muteBitis = simdi + CHAT_MUTE_MS;
+    return { hata:'muted', kalan: Math.ceil(CHAT_MUTE_MS / 1000) };
+  }
+  return null;
+}
+
+// ── Mesaj isleyicileri ────────────────────────────────────────────────
+function chatKatil(ws, msg){
+  if(chatUsers.has(ws)) chatOdadanCikar(ws, true);   // yeniden katilim
+  let istenen = (msg && typeof msg.room === 'string') ? msg.room : CHAT_TEMEL_ODA;
+  if(!chatOdaGecerli(istenen)) return chatHata(ws, 'room_invalid');
+  // Istenen oda doluysa tasma odasina yonlendir.
+  let oda = istenen;
+  if(ChatStore.getRoom(oda).uyeler.size >= CHAT_ODA_KAPASITE){
+    oda = chatOdaBul();
+    if(!oda) return chatHata(ws, 'room_full');
+  }
+  const d = chatNickDogrula(msg && msg.nick, oda);
+  if(d.hata) return chatHata(ws, d.hata);
+
+  const o = ChatStore.getRoom(oda);
+  o.uyeler.add(ws);
+  chatUsers.set(ws, { nick:d.nick, nickAlt:d.nickAlt, oda:oda,
+                      sonMs:0, pencere:[], muteBitis:0, sonMetin:'', tekrar:0 });
+
+  chatGonder(ws, { type:'chat_join', ok:true, room:oda, nick:d.nick,
+                   capacity:CHAT_ODA_KAPASITE, count:o.uyeler.size });
+  chatGonder(ws, { type:'chat_history', room:oda, messages:o.mesajlar.slice() });
+  chatGonder(ws, { type:'chat_users', room:oda, users:ChatStore.getUsers(oda) });
+  chatYayinla(oda, { type:'chat_join', room:oda, nick:d.nick }, ws);
+  chatKullaniciListesiYayinla(oda);
+}
+
+function chatAyril(ws){
+  const u = chatOdadanCikar(ws, true);
+  chatGonder(ws, { type:'chat_leave', ok:true, room: u ? u.oda : null });
+}
+
+function chatMesaj(ws, msg){
+  const u = chatUsers.get(ws);
+  if(!u) return chatHata(ws, 'not_joined');
+  const simdi = Date.now();
+
+  const hiz = chatHizKontrol(u, simdi);
+  if(hiz) return chatHata(ws, hiz.hata, hiz.kalan);
+
+  let metin = chatNormalize(msg && msg.text);
+  if(!metin) return chatHata(ws, 'empty');
+  if(metin.length > CHAT_MESAJ_MAX) return chatHata(ws, 'too_long');
+
+  // Ayni metnin arka arkaya tekrari.
+  if(metin === u.sonMetin){
+    u.tekrar++;
+    if(u.tekrar >= CHAT_TEKRAR_MAX) return chatHata(ws, 'duplicate');
+  } else {
+    u.sonMetin = metin; u.tekrar = 1;
+  }
+
+  u.sonMs = simdi;
+  u.pencere.push(simdi);
+
+  // Kufur maskesi mesaji dusurmez.
+  metin = chatKufurMaskele(metin);
+
+  // NOT: metin duz metindir; hicbir yerde HTML olarak yorumlanmaz.
+  // Istemci tarafinda da textContent ile yazilacak, innerHTML ile DEGIL.
+  const kayit = { nick:u.nick, text:metin, ts:simdi, room:u.oda };
+  ChatStore.addMessage(u.oda, kayit);
+  chatYayinla(u.oda, { type:'chat_message', room:u.oda, nick:kayit.nick,
+                       text:kayit.text, ts:kayit.ts });
+}
+
+function chatRapor(ws, msg){
+  const u = chatUsers.get(ws);
+  if(!u) return chatHata(ws, 'not_joined');
+  ChatStore.addReport({
+    timestamp: Date.now(),
+    reporter:  u.nick,
+    reported:  chatNormalize(msg && msg.nick).slice(0, CHAT_NICK_MAX),
+    message:   chatNormalize(msg && msg.text).slice(0, CHAT_MESAJ_MAX),
+    room:      u.oda
+  });
+  console.log('CHAT REPORT', u.nick, '->', (msg && msg.nick) || '?', 'room', u.oda);
+  chatGonder(ws, { type:'chat_report', ok:true });
+}
+
+// BLOCK sunucuda TUTULMAZ; istemci tarafinda localStorage ile yapilacak.
+// Bu isleyici yalnizca protokolu tamamlar ve onay doner.
+function chatBlokBildirimi(ws, msg){
+  const u = chatUsers.get(ws);
+  if(!u) return chatHata(ws, 'not_joined');
+  chatGonder(ws, { type:'chat_block_notice', ok:true,
+                   nick: chatNormalize(msg && msg.nick).slice(0, CHAT_NICK_MAX),
+                   note: 'client_side_only' });
+}
+
+// ── Yonlendirici ──────────────────────────────────────────────────────
+// 'chat_' ile baslamayan HER mesaj aninda birakilir: oyun trafigi bu
+// fonksiyondan hicbir sekilde etkilenmez.
+function chatYonlendir(ws, ham){
+  let msg;
+  try{ msg = JSON.parse(ham); }catch(e){ return; }
+  if(!msg || typeof msg.type !== 'string') return;
+  if(msg.type.lastIndexOf('chat_', 0) !== 0) return;   // OYUN MESAJI -> DOKUNMA
+
+  switch(msg.type){
+    case 'chat_join':          chatKatil(ws, msg); break;
+    case 'chat_leave':         chatAyril(ws); break;
+    case 'chat_message':       chatMesaj(ws, msg); break;
+    case 'chat_report':        chatRapor(ws, msg); break;
+    case 'chat_block_notice':  chatBlokBildirimi(ws, msg); break;
+    // Uygulama seviyesi chat heartbeat. Mevcut heartbeat blogu
+    // DEGISTIRILMEDI; zaten her mesaj ws.lastAppMsg'i tazeliyor.
+    case 'chat_ping':          chatGonder(ws, { type:'chat_pong', ts: Date.now() }); break;
+    // Bilinmeyen chat_* tipleri kontrollu reddedilir (sessiz degil).
+    default:                   chatHata(ws, 'unknown_type', msg.type);
+  }
+}
+
+// ── Baglanti kancalari — MEVCUT BLOK DEGISTIRILMEDI ──────────────────
+// wss bir EventEmitter oldugu icin ikinci bir 'connection' dinleyicisi
+// eklenebilir; mevcut dinleyici aynen calismaya devam eder.
+wss.on('connection', function(ws){
+  ws.on('message', function(ham){ chatYonlendir(ws, ham); });
+  // Ikinci bir 'close' dinleyicisi: oyun tarafindaki close blogunun
+  // erken 'return'u bunu ETKILEMEZ, listener'lar bagimsizdir.
+  ws.on('close', function(){ chatOdadanCikar(ws, true); });
+  ws.on('error', function(){ chatOdadanCikar(ws, true); });
+});
+
+console.log('Chat V1 module loaded (rooms cap ' + CHAT_ODA_KAPASITE +
+            ', history ' + CHAT_GECMIS_MAX + ', reports ' + CHAT_RAPOR_MAX + ')');
