@@ -643,19 +643,14 @@ async function initCrazyGames() {
   } catch (e) {}
 }
 async function showMidrollAd() {
-  // [ASAMA 5.1] Reklam artik TEK KAPIDAN gecer: AD.showMidgame().
-  // Cagri noktasi (endGame -> dogal gecis) DEGISMEDI. AD katmani hazir
-  // degilse eski yol aynen korunur; her iki yolda da hata yutulur ve
-  // oyun akisi kilitlenmez.
+  // [ASAMA 5.2] TEK GERCEK REKLAM YOLU: AD.showMidgame().
+  // Eski dogrudan SDK cagrisi KALDIRILDI; ayni reklam icin ikinci bir
+  // istek olusmaz. Cagri noktasi (endGame -> dogal gecis) DEGISMEDI.
+  // AD.showMidgame asla reject etmez, bu yuzden oyun akisi beklemez.
   try {
     if (typeof AD !== 'undefined' && AD && typeof AD.showMidgame === 'function') {
       await AD.showMidgame({ kaynak: 'match_over' });
-      return;
     }
-  } catch (e) {}
-  try {
-    if (!cgReady) return;
-    await CG_SDK.ad.requestAd('midgame');
   } catch (e) {}
 }
 function cgGameplayStart() {
@@ -4631,28 +4626,105 @@ const AD = {
 // Portal adlari YALNIZCA bu blokta gecer. Chat V1 ve oyun kodu bunlari
 // gormez; tek temas noktasi AD.* fonksiyonlaridir.
 //
-// NOT: Bu asamada HICBIR YENI SDK EKLENMEDI. Asagidaki adapter, sayfada
-// ZATEN var olan portal SDK'sinin (initCrazyGames/CG_SDK) hazir olup
-// olmadigina bakar; SDK yoksa sessizce kullanilamaz doner.
+// NOT: Bu asamada da HICBIR YENI SDK EKLENMEDI. Asagidaki adapter, sayfada
+// ZATEN var olan portal SDK'sinin (initCrazyGames/CG_SDK) uzerine oturur.
+// init() akisi, gameplayStart/gameplayStop davranisi DEGISTIRILMEDI.
+
+// ── REKLAM SIRASINDA OYUN DURUMU [ASAMA 5.2] ──────────────────────────
+// adStarted -> ses susar, suren nisan/surukleme iptal edilir, bayrak acilir.
+// adFinished / adError -> her sey geri gelir. Iki fonksiyon da IDEMPOTENT;
+// SDK ayni geri cagrimi birden fazla kez tetiklerse durum bozulmaz.
+let _adAcik = false;          // reklam ekranda mi
+let _adOncekiMute = null;     // kullanicinin KENDI ses tercihi
+function adReklamAcikMi(){ return _adAcik === true; }
+function _adDuraklat(){
+  if(_adAcik) return;
+  _adAcik = true;
+  try{
+    _adOncekiMute = G_muted;              // kullanici tercihi saklanir
+    G_muted = true;                        // reklam sirasinda oyun sessiz
+    _activeAudio.forEach(function(n){ try{ n.pause(); n.currentTime = 0; }catch(e){} });
+    _activeAudio = [];
+    if(AC) try{ AC.suspend(); }catch(e){}
+  }catch(e){}
+  // Suren nisan/atis girisimi iptal: reklam kapaninca kazara atis olmasin.
+  try{ if(typeof drag !== 'undefined' && drag){ drag.active = false; drag.power = 0; } }catch(e){}
+}
+function _adDevam(){
+  if(!_adAcik) return;
+  _adAcik = false;
+  try{
+    // Kullanicinin KENDI sessiz tercihi neyse ona donulur.
+    G_muted = (_adOncekiMute === true);
+    if(!G_muted && AC) try{ AC.resume(); }catch(e){}
+  }catch(e){}
+  _adOncekiMute = null;
+}
+
+// Reklam turu -> SDK cagrisi. TEK yardimci; midgame ve rewarded ayni
+// yasam dongusunu paylasir. ASLA reject etmez, HER ZAMAN tek kez cozer.
+const AD_CG_ZAMAN_ASIMI = 45000;   // SDK hic geri cagrim yapmazsa emniyet
+function _cgReklamIste(tur){
+  return new Promise(function(cozumle){
+    let bitti = false, zamanlayici = null;
+    function bitir(sonuc){
+      if(bitti) return;
+      bitti = true;
+      if(zamanlayici){ clearTimeout(zamanlayici); zamanlayici = null; }
+      _adDevam();
+      cozumle(sonuc);
+    }
+    let ad;
+    try{ ad = CG_SDK.ad; }
+    catch(e){
+      // Domain yetkili degilse SDK burada istisna firlatir (Render gibi).
+      return cozumle({ shown:false, reason:'unavailable' });
+    }
+    if(!ad || typeof ad.requestAd !== 'function'){
+      return cozumle({ shown:false, reason:'unavailable' });
+    }
+    zamanlayici = setTimeout(function(){ bitir({ shown:false, reason:'timeout' }); }, AD_CG_ZAMAN_ASIMI);
+    try{
+      ad.requestAd(tur, {
+        adStarted:  function(){ _adDuraklat(); },
+        adFinished: function(){ bitir({ shown:true,  reason:'ok' }); },
+        // unfilled / adblock / cooldown gibi TUM durumlar buraya duser.
+        adError:    function(hata){
+          let kod = 'error';
+          try{
+            if(typeof hata === 'string') kod = hata;
+            else if(hata && typeof hata.code === 'string') kod = hata.code;
+            else if(hata && typeof hata.message === 'string') kod = hata.message;
+          }catch(e){}
+          bitir({ shown:false, reason: String(kod).slice(0, 40) });
+        }
+      });
+    }catch(e){
+      bitir({ shown:false, reason:'unavailable' });
+    }
+  });
+}
+
 AD.register('crazygames', {
+  // Basic Launch'ta reklamlar kapali olabilir; yetkisiz domainde SDK
+  // 'ad' erisiminde istisna firlatir. Iki durumda da FALSE doneriz ve
+  // AD katmani { shown:false, reason:'unavailable' } uretir.
   isAvailable: function(){
-    // Basic Launch'ta reklamlar KAPALI olabilir; o durumda cgReady false
-    // kalir ve akis reklamsiz devam eder.
-    try{ return (typeof cgReady !== 'undefined') && cgReady === true &&
-                (typeof CG_SDK !== 'undefined') && !!CG_SDK; }catch(e){ return false; }
+    try{
+      if(typeof cgReady === 'undefined' || cgReady !== true) return false;
+      if(typeof CG_SDK === 'undefined' || !CG_SDK) return false;
+      const a = CG_SDK.ad;
+      return !!(a && typeof a.requestAd === 'function');
+    }catch(e){ return false; }
   },
-  showMidgame: function(){
-    try{ return Promise.resolve(CG_SDK.ad.requestAd('midgame'))
-      .then(function(){ return { shown:true, reason:'ok' }; })
-      .catch(function(){ return { shown:false, reason:'error' }; }); }
-    catch(e){ return Promise.resolve({ shown:false, reason:'error' }); }
-  },
-  showRewarded: function(){
-    try{ return Promise.resolve(CG_SDK.ad.requestAd('rewarded'))
-      .then(function(){ return { shown:true, reason:'ok' }; })
-      .catch(function(){ return { shown:false, reason:'error' }; }); }
-    catch(e){ return Promise.resolve({ shown:false, reason:'error' }); }
-  }
+  // Duraklatma/devam adStarted-adFinished uzerinden yurur; bu kancalar
+  // yalnizca emniyet icindir (idempotent).
+  beforeAd: function(){ return Promise.resolve(); },
+  afterAd:  function(){ _adDevam(); return Promise.resolve(); },
+  showMidgame:  function(){ return _cgReklamIste('midgame'); },
+  // Rewarded YALNIZCA AD.showRewarded uzerinden, kullanici acikca
+  // istediginde cagrilir; odul yalnizca adFinished geldiyse verilir.
+  showRewarded: function(){ return _cgReklamIste('rewarded'); }
 });
 
 // Asagidakiler ISKELET adapterlerdir: SDK YUKLEMEZ, cagri YAPMAZ.
