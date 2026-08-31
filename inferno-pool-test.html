@@ -60,6 +60,22 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dk);font-famil
 .mode-icon{font-size:1.6rem;margin-bottom:3px;}
 .mode-name{font-size:0.68rem;letter-spacing:2px;font-weight:700;color:var(--em);}
 .diff-row{display:flex;gap:7px;margin-bottom:12px;}
+/* [ASAMA 2.1] Dil secici. Gorsel dil mevcut .diff-btn satirindan
+   (EASY/MEDIUM/HARD) alindi: ayni flex:1 uclu duzen, ayni turuncu vurgu,
+   ayni .sel secili durumu. Boylece menu tasarimi degismez ve genislik
+   davranisi zaten kanitlanmis bir duzenle ayni olur.
+   min-width:0 + overflow:hidden: dar mobil ekranda buton satirinin
+   disina TASMA olmasini engeller. */
+.lang-row{display:flex;gap:7px;margin-top:1px;}
+.lang-btn{flex:1;min-width:0;padding:6px 2px;border-radius:5px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.55rem;font-weight:700;
+  letter-spacing:1px;text-transform:uppercase;
+  border:1px solid rgba(255,100,0,0.18);background:transparent;
+  color:rgba(255,255,255,0.45);transition:all 0.2s;
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  white-space:nowrap;overflow:hidden;}
+.lang-btn:hover,.lang-btn.sel{background:rgba(255,100,0,0.18);border-color:var(--em);color:#fff;}
+.lang-bayrak{font-size:0.78rem;line-height:1;flex:none;}
 .diff-btn{flex:1;padding:7px;border-radius:5px;cursor:pointer;font-size:0.6rem;font-weight:700;
   letter-spacing:2px;border:1px solid rgba(255,100,0,0.18);background:transparent;
   color:rgba(255,255,255,0.45);transition:all 0.2s;}
@@ -311,6 +327,14 @@ font-family:sans-serif;
       </div>
       <button id="menu-challenge" onclick="var r='INF-'+Math.random().toString(36).substr(2,6).toUpperCase();var m=document.getElementById('screen-challenge');var l=document.getElementById('invite-link');var s=document.getElementById('invite-status');if(m)m.style.display='flex';if(l)l.textContent=location.href.split('?')[0]+'?room='+r;if(s)s.textContent='Send the link to your friend!';setTimeout(function(){if(window.onChallengeModalOpen)onChallengeModalOpen(r);},200);" style="width:100%;padding:11px;font-family:'Cinzel Decorative',serif;font-size:0.75rem;letter-spacing:2px;background:linear-gradient(135deg,#550099,#330066);border:1px solid rgba(150,0,255,0.4);color:#fff;border-radius:6px;cursor:pointer;box-shadow:0 0 14px rgba(100,0,255,0.3);margin-bottom:8px;transition:all 0.2s;" data-i18n="menu.invite">⚔ INVITE FRIEND</button>
       <button id="menu-credits" onclick="document.getElementById('screen-credits').style.display='flex'" style="width:100%;padding:7px;font-family:'Rajdhani',sans-serif;font-size:0.62rem;letter-spacing:2px;background:transparent;border:1px solid rgba(255,136,0,0.22);color:rgba(255,200,140,0.75);border-radius:6px;cursor:pointer;" data-i18n="menu.credits">CREDITS</button>
+      <!-- [ASAMA 2.1] Dil secici. Etiketler data-i18n ile bagli oldugu icin
+           i18nUygula() hem metni yazar hem Kiril icin .i18n-kiril sinifini
+           kendisi atar; ayri bir font mantigi gerekmez. -->
+      <div class="lang-row" id="lang-row">
+        <button class="lang-btn" type="button" data-lang-sec="tr"><span class="lang-bayrak">🇹🇷</span><span data-i18n="settings.langTr">Türkçe</span></button>
+        <button class="lang-btn" type="button" data-lang-sec="en"><span class="lang-bayrak">🇬🇧</span><span data-i18n="settings.langEn">English</span></button>
+        <button class="lang-btn" type="button" data-lang-sec="ru"><span class="lang-bayrak">🇷🇺</span><span data-i18n="settings.langRu">Русский</span></button>
+      </div>
       <button id="menu-online" onclick="startOnlineMode()" data-i18n="menu.playOnline">🌐 PLAY ONLINE</button>
     </div>
   </div>
@@ -819,6 +843,7 @@ function setOnlineStatus(status) {
     waiting:{text:t('online.statusWaiting'),color:'#ff8800'},
     playing:{text:t('online.statusOnline'),color:'#00ff88'}
   };
+  _sonOnlineDurum = status || 'idle';
   const s = m[status]||m.idle;
   e2.textContent = s.text; e2.style.color = s.color;
   i18nKirilSinifi(e2, s.text);   // dinamik metin: sinifi elle ata
@@ -929,6 +954,7 @@ function setOnlineStatus(status) {
     waiting:   {text:t('online.statusWaiting'),   color:'#ff8800'},
     playing:   {text:t('online.statusOnline'),    color:'#00ff88'},
   };
+  _sonOnlineDurum = status || 'idle';
   const s = map[status] || map.idle;
   el2.textContent = s.text;
   el2.style.color = s.color;
@@ -2026,6 +2052,11 @@ function setLang(kod){
 // ASAMA 1'DE BU NITELIKLERDEN HIC YOKTUR: fonksiyon calisir, 0 dugum bulur,
 // hicbir sey degistirmez. Asama 2'de nitelikler eklendikce devreye girer.
 // Metin DAIMA textContent ile yazilir — innerHTML kullanilmaz (XSS).
+// [ASAMA 2.1] Dil degisince menudeki cevrimici durum metnini AYNI durumla
+// yeniden yazabilmek icin son deger saklanir. Aksi halde dil degistirince
+// 'searching' durumundaki oyuncu yanlislikla 'idle' metnine duserdi.
+let _sonOnlineDurum = 'idle';
+
 // Metinde Kiril harf var mi? Varsa elemana .i18n-kiril sinifini koyar.
 // Oyunun basliklarinda kullanilan Cinzel Decorative ve Rajdhani Kiril
 // glifi TASIMAZ (olculdu); bu sinif yalnizca gerekli oldugunda devreye
@@ -2054,6 +2085,37 @@ function i18nUygula(kok){
   }catch(e){}
 }
 
+// ── Dil secici  [ASAMA 2.1] ───────────────────────────────
+// Ana menudeki uc butonu mevcut altyapiya baglar. YENI bir yerellestirme
+// sistemi kurulmaz: yalnizca setLang() / getLang() / i18nUygula() cagrilir.
+// Kalicilik setLang() icindeki localStorage['inferno_lang'] ile saglanir;
+// varsayilan dil mantigi (i18nOnerilenDil) DEGISTIRILMEDI.
+function i18nSeciciIsaretle(){
+  const kok = document.getElementById('lang-row');
+  if(!kok) return;
+  const simdiki = getLang();
+  kok.querySelectorAll('[data-lang-sec]').forEach(function(b){
+    b.classList.toggle('sel', b.getAttribute('data-lang-sec') === simdiki);
+  });
+}
+function i18nSeciciKur(){
+  const kok = document.getElementById('lang-row');
+  if(!kok) return;
+  kok.querySelectorAll('[data-lang-sec]').forEach(function(b){
+    b.addEventListener('click', function(){
+      const kod = b.getAttribute('data-lang-sec');
+      // setLang zaten: dogrular -> localStorage'a yazar -> data-lang ->
+      // i18nUygula() (bagli dugumler + .i18n-kiril sinifi). Sayfa YENILENMEZ.
+      if(!setLang(kod)) return;
+      // data-i18n TASIMAYAN iki dinamik menu metnini elle tazele.
+      try{ refreshMenu(); }catch(e){}
+      try{ setOnlineStatus(_sonOnlineDurum); }catch(e){}
+      i18nSeciciIsaretle();
+    });
+  });
+  i18nSeciciIsaretle();
+}
+
 // ── Gelistirici denetimi ──────────────────────────────────────────────
 // Sozlukleri karsilastirir: eksik/fazla anahtarlari ve bos degerleri bulur.
 // Uretimde hicbir sey cagirmaz; konsoldan i18nDenetle() ile calistirilir.
@@ -2078,6 +2140,7 @@ function i18nDenetle(){
 // SONRA calisir (body 248, screen-menu 287, script 516).
 try{ document.documentElement.setAttribute('data-lang', LANG); }catch(e){}
 try{ i18nUygula(); }catch(e){}
+try{ i18nSeciciKur(); }catch(e){}
 
 
 // ── Profile (localStorage) ──
