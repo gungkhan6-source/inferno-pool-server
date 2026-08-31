@@ -327,6 +327,10 @@ font-family:sans-serif;
       </div>
       <button id="menu-challenge" onclick="var r='INF-'+Math.random().toString(36).substr(2,6).toUpperCase();var m=document.getElementById('screen-challenge');var l=document.getElementById('invite-link');var s=document.getElementById('invite-status');if(m)m.style.display='flex';if(l)l.textContent=location.href.split('?')[0]+'?room='+r;if(s)s.textContent='Send the link to your friend!';setTimeout(function(){if(window.onChallengeModalOpen)onChallengeModalOpen(r);},200);" style="width:100%;padding:11px;font-family:'Cinzel Decorative',serif;font-size:0.75rem;letter-spacing:2px;background:linear-gradient(135deg,#550099,#330066);border:1px solid rgba(150,0,255,0.4);color:#fff;border-radius:6px;cursor:pointer;box-shadow:0 0 14px rgba(100,0,255,0.3);margin-bottom:8px;transition:all 0.2s;" data-i18n="menu.invite">⚔ INVITE FRIEND</button>
       <button id="menu-credits" onclick="document.getElementById('screen-credits').style.display='flex'" style="width:100%;padding:7px;font-family:'Rajdhani',sans-serif;font-size:0.62rem;letter-spacing:2px;background:transparent;border:1px solid rgba(255,136,0,0.22);color:rgba(255,200,140,0.75);border-radius:6px;cursor:pointer;" data-i18n="menu.credits">CREDITS</button>
+        <!-- [ASAMA 4] Chat butonu. screen-menu ICINDE oldugu icin yalnizca
+             menu ekrani aktifken gorunur; mac sirasinda DOM'da gorunmez.
+             chatAc() ayrica G.phase kontrolu yapar (menu / over). -->
+        <button id="menu-chat" type="button" style="width:100%;padding:9px;font-family:'Cinzel Decorative',serif;font-size:0.68rem;letter-spacing:2px;background:linear-gradient(135deg,#0a5c3a,#063d26);border:1px solid rgba(0,255,136,0.28);color:#dff5e8;border-radius:6px;cursor:pointer;box-shadow:0 0 12px rgba(0,200,120,0.18);" data-i18n="chat.open">💬 CHAT</button>
       <!-- [ASAMA 2.1] Dil secici. Etiketler data-i18n ile bagli oldugu icin
            i18nUygula() hem metni yazar hem Kiril icin .i18n-kiril sinifini
            kendisi atar; ayri bir font mantigi gerekmez. -->
@@ -531,6 +535,84 @@ font-family:sans-serif;
    Kiril iceren metinler yedek fonta duser; Latin basliklar dokunulmaz. */
 .i18n-kiril{
   font-family: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+}
+
+
+/* ═══ CHAT V1 — OVERLAY  [ASAMA 4] ═════════════════════════════════════
+   Chat bir OVERLAY'dir: screen-credits / screen-challenge ile ayni desen
+   (position:fixed + display:none/flex + kendi z-index'i). showScreen()
+   kullanilmaz, G.phase'e DOKUNULMAZ, oyun ekranina gecis yapilmaz.
+   Renkler mevcut temadan (--dk/--em/--gd/--pn) alinir. */
+#screen-chat{position:fixed;inset:0;z-index:80;display:none;
+  align-items:center;justify-content:center;background:rgba(4,0,10,0.9);}
+.chat-kutu{width:min(760px,94vw);height:min(560px,88vh);display:flex;flex-direction:column;
+  background:var(--pn);border:1px solid rgba(255,136,0,0.28);border-radius:10px;
+  box-shadow:0 0 40px rgba(255,68,0,0.18);overflow:hidden;}
+.chat-ust{display:flex;align-items:center;gap:10px;padding:10px 12px;
+  border-bottom:1px solid rgba(255,136,0,0.18);flex:none;}
+.chat-baslik{font-family:'Cinzel Decorative',serif;font-size:0.78rem;letter-spacing:1.5px;
+  color:var(--gd);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.chat-sayac{font-family:'Rajdhani',sans-serif;font-size:0.62rem;letter-spacing:1px;
+  color:rgba(255,255,255,0.45);white-space:nowrap;flex:none;}
+.chat-kapat{flex:none;padding:5px 10px;border-radius:5px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.66rem;letter-spacing:1px;
+  background:rgba(180,0,0,0.15);border:1px solid rgba(255,50,50,0.3);color:rgba(255,150,150,0.85);}
+.chat-govde{flex:1;display:flex;min-height:0;}
+.chat-yan{width:150px;flex:none;display:flex;flex-direction:column;
+  border-right:1px solid rgba(255,136,0,0.14);min-height:0;}
+.chat-yan-baslik{padding:7px 10px;font-family:'Rajdhani',sans-serif;font-size:0.56rem;
+  letter-spacing:1.6px;color:rgba(255,200,140,0.6);text-transform:uppercase;flex:none;}
+.chat-oda-listesi{flex:none;padding:0 8px 6px;}
+.chat-oda{width:100%;text-align:left;padding:6px 8px;margin-bottom:4px;border-radius:5px;
+  cursor:pointer;font-family:'Rajdhani',sans-serif;font-size:0.62rem;letter-spacing:1px;
+  background:transparent;border:1px solid rgba(255,100,0,0.16);color:rgba(255,255,255,0.5);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.chat-oda:hover,.chat-oda.sel{background:rgba(255,100,0,0.18);border-color:var(--em);color:#fff;}
+.chat-kullanicilar{flex:1;overflow-y:auto;padding:0 8px 8px;min-height:0;}
+.chat-kullanici{font-family:'Rajdhani',sans-serif;font-size:0.6rem;padding:3px 6px;
+  color:rgba(255,255,255,0.45);border-radius:4px;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.chat-kullanici:hover{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.8);}
+.chat-sag{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;}
+.chat-akis{flex:1;overflow-y:auto;padding:10px 12px;min-height:0;}
+.chat-satir{margin-bottom:7px;font-family:'Rajdhani',sans-serif;font-size:0.72rem;
+  line-height:1.35;word-break:break-word;overflow-wrap:anywhere;}
+.chat-nick{color:var(--em);font-weight:700;margin-right:5px;}
+.chat-metin{color:rgba(255,255,255,0.82);}
+.chat-sistem{color:rgba(255,255,255,0.34);font-style:italic;font-size:0.66rem;}
+.chat-hata{color:#ff7766;}
+.chat-arac{margin-left:6px;font-size:0.58rem;color:rgba(255,255,255,0.28);cursor:pointer;}
+.chat-arac:hover{color:var(--gd);}
+.chat-alt{display:flex;gap:7px;padding:9px 12px;border-top:1px solid rgba(255,136,0,0.18);flex:none;}
+.chat-giris{flex:1;min-width:0;padding:8px 10px;border-radius:5px;
+  background:rgba(0,0,0,0.35);border:1px solid rgba(255,136,0,0.22);color:#fff;
+  font-family:'Rajdhani',sans-serif;font-size:0.72rem;outline:none;}
+.chat-giris:focus{border-color:var(--em);}
+.chat-yolla{flex:none;padding:8px 16px;border-radius:5px;cursor:pointer;
+  font-family:'Cinzel Decorative',serif;font-size:0.64rem;letter-spacing:1.5px;
+  background:linear-gradient(135deg,var(--fr),#aa2200);border:1px solid rgba(255,136,0,0.4);color:#fff;}
+.chat-yolla:disabled{opacity:0.45;cursor:default;}
+/* Nickname paneli */
+.chat-nick-panel{flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:12px;padding:24px;text-align:center;}
+.chat-hos{font-family:'Cinzel Decorative',serif;font-size:0.9rem;letter-spacing:2px;color:var(--gd);}
+.chat-nick-alt{font-family:'Rajdhani',sans-serif;font-size:0.72rem;color:rgba(255,255,255,0.5);}
+.chat-nick-giris{width:min(280px,80%);padding:10px 12px;border-radius:6px;text-align:center;
+  background:rgba(0,0,0,0.35);border:1px solid rgba(255,136,0,0.25);color:#fff;
+  font-family:'Rajdhani',sans-serif;font-size:0.86rem;letter-spacing:1px;outline:none;}
+.chat-nick-giris:focus{border-color:var(--em);}
+.chat-nick-btn{padding:9px 22px;border-radius:6px;cursor:pointer;
+  font-family:'Cinzel Decorative',serif;font-size:0.7rem;letter-spacing:2px;
+  background:linear-gradient(135deg,var(--fr),#aa2200);border:1px solid rgba(255,136,0,0.4);color:#fff;}
+.chat-not{font-family:'Rajdhani',sans-serif;font-size:0.58rem;color:rgba(255,255,255,0.3);}
+/* Mobil: yan panel gizlenir, oda listesi yatay seride tasinir */
+@media (max-width:560px){
+  .chat-kutu{width:100vw;height:100vh;border-radius:0;border:none;}
+  .chat-yan{width:110px;}
+  .chat-yan-baslik{font-size:0.5rem;letter-spacing:1px;}
+  .chat-oda,.chat-kullanici{font-size:0.56rem;}
+  .chat-satir{font-size:0.68rem;}
+  .chat-yolla{padding:8px 12px;font-size:0.58rem;}
 }
 
 </style>
@@ -1615,7 +1697,10 @@ en: {
   'chat.errRoomFull':'This room is full',
   'chat.errRoomName':'Invalid room name',
   'chat.errPassword':'Wrong password',
-  'chat.muted':'You are muted for {n} seconds'
+  'chat.muted':'You are muted for {n} seconds',
+  'chat.errDuplicate':'Do not repeat the same message',
+  'chat.errNotJoined':'You are not in a room',
+  'chat.errGeneric':'Chat error'
 },
 
 tr: {
@@ -1792,7 +1877,10 @@ tr: {
   'chat.errRoomFull':'Bu oda dolu',
   'chat.errRoomName':'Geçersiz oda adı',
   'chat.errPassword':'Parola yanlış',
-  'chat.muted':'{n} saniye susturuldun'
+  'chat.muted':'{n} saniye susturuldun',
+  'chat.errDuplicate':'Aynı mesajı tekrarlama',
+  'chat.errNotJoined':'Bir odada değilsin',
+  'chat.errGeneric':'Sohbet hatası'
 },
 
 ru: {
@@ -1969,7 +2057,10 @@ ru: {
   'chat.errRoomFull':'Комната заполнена',
   'chat.errRoomName':'Недопустимое название комнаты',
   'chat.errPassword':'Неверный пароль',
-  'chat.muted':'Вы заглушены на {n} секунд'
+  'chat.muted':'Вы заглушены на {n} секунд',
+  'chat.errDuplicate':'Не повторяйте одно и то же сообщение',
+  'chat.errNotJoined':'Вы не в комнате',
+  'chat.errGeneric':'Ошибка чата'
 }
 
 };
@@ -4375,9 +4466,459 @@ function loop(){
 }
 loop();
 
+
+// ═══════════════════════════════════════════════════════════════════════
+// REKLAM ADAPTERI — ISKELET                            [ASAMA 4]
+// ═══════════════════════════════════════════════════════════════════════
+// Bu asamada GERCEK reklam SDK'si YOKTUR. Yalnizca chat akisinin ileride
+// baglanacagi sozlesme tanimlanir. Chat kodu bu arayuz disinda hicbir
+// reklam ayrintisi bilmez ve hicbir platform/SDK adi gecmez.
+//
+// Platform tespiti TEK YERDE: AD.platform(). Varsayilan 'web'. Bir portal
+// icin farkli davranis gerektiginde AD.register(id, uygulama) ile adapter
+// takilir; chat kodu degismez.
+const AD = {
+  _pl: null,
+  _adapterler: { web: {} },
+  // Tespit tek nokta. Disaridan window.INFERNO_PLATFORM ile gecersiz
+  // kilinabilir; boylece portal katmani chat koduna sizmaz.
+  platform: function(){
+    if(this._pl) return this._pl;
+    let p = 'web';
+    try{
+      if(typeof window.INFERNO_PLATFORM === 'string' && window.INFERNO_PLATFORM) {
+        p = window.INFERNO_PLATFORM;
+      }
+    }catch(e){}
+    this._pl = p;
+    return p;
+  },
+  register: function(id, uygulama){ if(id) this._adapterler[id] = uygulama || {}; },
+  _aktif: function(){ return this._adapterler[this.platform()] || this._adapterler.web; },
+  // Reklam gosterilebilir mi? Ilk surumde HER ZAMAN false.
+  isAvailable: function(){
+    const a = this._aktif();
+    return typeof a.isAvailable === 'function' ? !!a.isAvailable() : false;
+  },
+  // Chat'e girmeden ONCE. Ilk surumde aninda cozulur -> reklam yok,
+  // akis beklemez. Adapter takildiginda Promise gercekten beklenir.
+  beforeEnterChat: function(){
+    const a = this._aktif();
+    try{
+      if(typeof a.beforeEnterChat === 'function') return Promise.resolve(a.beforeEnterChat());
+    }catch(e){}
+    return Promise.resolve();
+  },
+  // Reklam kapandiktan SONRA.
+  afterChatAd: function(){
+    const a = this._aktif();
+    try{
+      if(typeof a.afterChatAd === 'function') return Promise.resolve(a.afterChatAd());
+    }catch(e){}
+    return Promise.resolve();
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// CHAT V1 — ISTEMCI                                    [ASAMA 4]
+// ═══════════════════════════════════════════════════════════════════════
+// OYUN WS'INE HIC DOKUNULMAZ. Ayri bir WebSocket nesnesi (CHAT_WS), ayri
+// reconnect, ayri 10 sn uygulama ping'i. wsConnect/wsSend/handleWsMsg ve
+// online akisin tamami degistirilmemistir. CHAT_WS kapanmasi G.phase'i
+// DEGISTIRMEZ; chat baglanamazsa oyun calismaya devam eder.
+const CHAT_EKRAN_MAX   = 100;      // DOM'da tutulan en fazla mesaj
+const CHAT_PING_MS     = 10000;    // uygulama seviyesi chat ping
+const CHAT_YENIDEN_MS  = 3000;     // yeniden baglanma araligi
+const CHAT_BLOK_ANAHTAR = 'inferno_chat_block';
+const CHAT_MUTE_ANAHTAR = 'inferno_chat_mute';
+// Istemci ON dogrulamasi YALNIZCA kullanici deneyimi icindir; asil
+// dogrulama sunucudadir ve sunucu karari her zaman uygulanir.
+const CHAT_NICK_ON_DESEN = /^[A-Za-z0-9_]{3,16}$/;
+
+// Sunucu hata kodu -> i18n anahtari
+const CHAT_HATA_ANAHTAR = {
+  nick_length:'chat.errNickShort', nick_chars:'chat.errNickChars',
+  nick_forbidden:'chat.errNickBad', nick_taken:'chat.errNickTaken',
+  room_invalid:'chat.errRoomName', room_full:'chat.errRoomFull',
+  not_joined:'chat.errNotJoined',  muted:'chat.muted',
+  too_fast:'chat.errTooFast',      empty:'chat.errEmpty',
+  too_long:'chat.errTooLong',      duplicate:'chat.errDuplicate',
+  unknown_type:'chat.errGeneric'
+};
+
+let CHAT_WS = null;
+let _chatPing = null, _chatYeniden = null;
+let _chatKapaniyor = false;          // kullanici kapatti -> reconnect deneme
+const CHAT = { nick:'', oda:'global', acik:false, bagli:false, sayac:0 };
+
+// ── Engelleme / susturma: YALNIZCA istemci tarafinda ─────────────────
+// Sunucuya blok listesi GONDERILMEZ (chat_block_notice yalnizca protokolu
+// tamamlar, sunucu saklamaz).
+function chatListeOku(anahtar){
+  try{ const d = localStorage.getItem(anahtar); return d ? JSON.parse(d) : {}; }
+  catch(e){ return {}; }
+}
+function chatListeYaz(anahtar, o){
+  try{ localStorage.setItem(anahtar, JSON.stringify(o)); }catch(e){}
+}
+function chatEngelli(nick){
+  const b = chatListeOku(CHAT_BLOK_ANAHTAR);
+  if(b[String(nick).toLowerCase()]) return true;
+  const m = chatListeOku(CHAT_MUTE_ANAHTAR);
+  const bit = m[String(nick).toLowerCase()];
+  return !!(bit && Date.now() < bit);      // mute suresi gecince kendiliginden duser
+}
+function chatEngelleAc(nick){
+  const b = chatListeOku(CHAT_BLOK_ANAHTAR); const k = String(nick).toLowerCase();
+  if(b[k]) delete b[k]; else b[k] = 1;
+  chatListeYaz(CHAT_BLOK_ANAHTAR, b);
+  chatAkisTazele();
+  try{ chatWsGonder({ type:'chat_block_notice', nick: nick }); }catch(e){}
+}
+function chatSustur(nick, sn){
+  const m = chatListeOku(CHAT_MUTE_ANAHTAR);
+  m[String(nick).toLowerCase()] = Date.now() + (sn || 600) * 1000;
+  chatListeYaz(CHAT_MUTE_ANAHTAR, m);
+  chatAkisTazele();
+}
+
+// ── Cizim — DAIMA createTextNode / textContent, ASLA innerHTML ───────
+function chatAkisEleman(){ return document.getElementById('chat-akis'); }
+function chatKirp(){
+  const a = chatAkisEleman(); if(!a) return;
+  while(a.childElementCount > CHAT_EKRAN_MAX) a.removeChild(a.firstChild);
+}
+function chatSistemYaz(anahtar, degiskenler){
+  const a = chatAkisEleman(); if(!a) return;
+  const d = document.createElement('div');
+  d.className = 'chat-satir chat-sistem';
+  d.appendChild(document.createTextNode(t(anahtar, degiskenler)));
+  a.appendChild(d); chatKirp(); a.scrollTop = a.scrollHeight;
+}
+function chatHataYaz(kod, ek){
+  const a = chatAkisEleman(); if(!a) return;
+  const anahtar = CHAT_HATA_ANAHTAR[kod] || 'chat.errGeneric';
+  const d = document.createElement('div');
+  d.className = 'chat-satir chat-hata';
+  d.appendChild(document.createTextNode(t(anahtar, { n: ek })));
+  a.appendChild(d); chatKirp(); a.scrollTop = a.scrollHeight;
+}
+// Tek mesaj satiri. nick ve metin KULLANICI VERISIDIR: yalnizca metin
+// dugumu olarak eklenir, hicbir kosulda HTML olarak yorumlanmaz.
+function chatMesajYaz(nick, metin, ts){
+  if(chatEngelli(nick)) return;               // engellinin mesaji GOSTERILMEZ
+  const a = chatAkisEleman(); if(!a) return;
+  const d = document.createElement('div');
+  d.className = 'chat-satir';
+  d.setAttribute('data-nick', String(nick));
+  const n = document.createElement('span');
+  n.className = 'chat-nick';
+  n.appendChild(document.createTextNode(String(nick) + ':'));
+  const m = document.createElement('span');
+  m.className = 'chat-metin';
+  m.appendChild(document.createTextNode(String(metin)));
+  d.appendChild(n); d.appendChild(m);
+  if(nick !== CHAT.nick){
+    const r = document.createElement('span');
+    r.className = 'chat-arac'; r.textContent = '⚑';
+    r.title = t('chat.report');
+    r.onclick = function(){ chatWsGonder({type:'chat_report', nick:nick, text:metin});
+                            chatSistemYaz('chat.reported'); };
+    const b = document.createElement('span');
+    b.className = 'chat-arac'; b.textContent = '⊘';
+    b.title = t('chat.block');
+    b.onclick = function(){ chatEngelleAc(nick); };
+    d.appendChild(r); d.appendChild(b);
+  }
+  a.appendChild(d); chatKirp();
+  a.scrollTop = a.scrollHeight;
+}
+// Engelleme degisince akisi yeniden suz.
+function chatAkisTazele(){
+  const a = chatAkisEleman(); if(!a) return;
+  const cocuklar = Array.prototype.slice.call(a.children);
+  cocuklar.forEach(function(c){
+    const n = c.getAttribute && c.getAttribute('data-nick');
+    if(n) c.style.display = chatEngelli(n) ? 'none' : '';
+  });
+}
+function chatKullanicilariCiz(liste){
+  const k = document.getElementById('chat-kullanicilar'); if(!k) return;
+  while(k.firstChild) k.removeChild(k.firstChild);
+  (liste || []).forEach(function(nick){
+    const d = document.createElement('div');
+    d.className = 'chat-kullanici';
+    d.appendChild(document.createTextNode(String(nick)));   // metin dugumu
+    d.title = t('chat.block');
+    d.onclick = function(){ if(nick !== CHAT.nick) chatEngelleAc(nick); };
+    k.appendChild(d);
+  });
+  // Yalnizca SAYI yazilir; 'ONLINE PLAYERS' etiketi data-i18n ile bagli
+  // oldugu icin dil degisince i18nUygula() onu kendisi tazeler.
+  const s = document.getElementById('chat-sayi');
+  if(s) s.textContent = String(liste ? liste.length : 0);
+}
+function chatOdalariCiz(){
+  const kok = document.getElementById('chat-oda-listesi'); if(!kok) return;
+  while(kok.firstChild) kok.removeChild(kok.firstChild);
+  // Sunucudaki oda yapisina uyar: 'global' ve tasma odalari.
+  // TR/EN/RU ayri oda YOKTUR; dil secimi sohbet dilini sinirlamaz.
+  const odalar = ['global'];
+  if(CHAT.oda && odalar.indexOf(CHAT.oda) < 0) odalar.push(CHAT.oda);
+  odalar.forEach(function(id){
+    const b = document.createElement('button');
+    b.className = 'chat-oda' + (id === CHAT.oda ? ' sel' : '');
+    b.type = 'button';
+    b.appendChild(document.createTextNode(id === 'global' ? t('chat.roomGlobal') : id));
+    b.onclick = function(){ chatOdayaGec(id); };
+    kok.appendChild(b);
+  });
+}
+function chatOdayaGec(id){
+  if(!CHAT.bagli || id === CHAT.oda) return;
+  chatWsGonder({ type:'chat_join', nick: CHAT.nick, room: id });
+}
+
+// ── CHAT_WS — oyun soketinden TAMAMEN ayri ───────────────────────────
+function chatWsGonder(veri){
+  if(CHAT_WS && CHAT_WS.readyState === WebSocket.OPEN){
+    try{ CHAT_WS.send(JSON.stringify(veri)); }catch(e){}
+    return true;
+  }
+  return false;
+}
+function chatPingBaslat(){
+  chatPingDurdur();
+  // Sunucudaki APP_PING_TIMEOUT 30 sn'dir; sessiz chat soketi bu sureden
+  // sonra terminate edilir. 10 sn'lik ping bunu onler.
+  _chatPing = setInterval(function(){ chatWsGonder({ type:'chat_ping' }); }, CHAT_PING_MS);
+}
+function chatPingDurdur(){ if(_chatPing){ clearInterval(_chatPing); _chatPing = null; } }
+
+function chatBaglan(){
+  if(CHAT_WS && (CHAT_WS.readyState === WebSocket.OPEN || CHAT_WS.readyState === WebSocket.CONNECTING)) return;
+  chatSistemYaz('chat.connecting');
+  try{ CHAT_WS = new WebSocket(WS_URL); }catch(e){ chatYenidenPlanla(); return; }
+  CHAT_WS.onopen = function(){
+    CHAT.bagli = true;
+    chatPingBaslat();
+    chatWsGonder({ type:'chat_join', nick: CHAT.nick, room: CHAT.oda });
+  };
+  CHAT_WS.onmessage = function(e){
+    let m; try{ m = JSON.parse(e.data); }catch(x){ return; }
+    chatMsgIsle(m);
+  };
+  CHAT_WS.onerror = function(){ /* onclose zaten devreye girer */ };
+  CHAT_WS.onclose = function(){
+    CHAT.bagli = false;
+    chatPingDurdur();
+    // KRITIK: burada G.phase'e, showScreen'e veya oyun WS'ine HIC
+    // dokunulmaz. Chat kopmasi oyunu etkilemez.
+    if(_chatKapaniyor) return;
+    if(CHAT.acik){ chatSistemYaz('chat.reconnecting'); chatYenidenPlanla(); }
+  };
+}
+function chatYenidenPlanla(){
+  if(_chatYeniden || !CHAT.acik || _chatKapaniyor) return;
+  _chatYeniden = setTimeout(function(){ _chatYeniden = null; chatBaglan(); }, CHAT_YENIDEN_MS);
+}
+function chatBaglantiKapat(){
+  _chatKapaniyor = true;
+  chatPingDurdur();
+  if(_chatYeniden){ clearTimeout(_chatYeniden); _chatYeniden = null; }
+  try{ if(CHAT_WS && CHAT_WS.readyState === WebSocket.OPEN) chatWsGonder({type:'chat_leave'}); }catch(e){}
+  try{ if(CHAT_WS) CHAT_WS.close(); }catch(e){}
+  CHAT_WS = null; CHAT.bagli = false;
+  _chatKapaniyor = false;
+}
+
+// ── Gelen mesajlar ────────────────────────────────────────────────────
+function chatMsgIsle(m){
+  if(!m || typeof m.type !== 'string') return;
+  switch(m.type){
+    case 'chat_join':
+      if(m.ok){
+        CHAT.nick = m.nick || CHAT.nick;
+        CHAT.oda  = m.room || CHAT.oda;
+        chatOdalariCiz();
+        chatPaneliAc();
+      } else if(m.nick){
+        chatSistemYaz('chat.userJoined', { nick: m.nick });
+      }
+      break;
+    case 'chat_history': {
+      const a = chatAkisEleman();
+      if(a){ while(a.firstChild) a.removeChild(a.firstChild); }
+      (m.messages || []).slice(-CHAT_EKRAN_MAX).forEach(function(x){
+        chatMesajYaz(x.nick, x.text, x.ts);
+      });
+      break;
+    }
+    case 'chat_users':
+      chatKullanicilariCiz(m.users);
+      break;
+    case 'chat_message':
+      chatMesajYaz(m.nick, m.text, m.ts);
+      break;
+    case 'chat_leave':
+      if(!m.ok && m.nick) chatSistemYaz('chat.userLeft', { nick: m.nick });
+      break;
+    case 'chat_error':
+      if(document.getElementById('chat-govde').style.display === 'none'){
+        const h = document.getElementById('chat-nick-hata');
+        if(h) h.textContent = t(CHAT_HATA_ANAHTAR[m.code] || 'chat.errGeneric', { n: m.detail });
+      } else {
+        chatHataYaz(m.code, m.detail);
+      }
+      break;
+    case 'chat_pong':
+    case 'chat_report':
+    case 'chat_block_notice':
+      break;
+  }
+}
+
+// ── Panel gecisleri ───────────────────────────────────────────────────
+function chatPaneliAc(){
+  const n = document.getElementById('chat-nick-panel');
+  const g = document.getElementById('chat-govde');
+  if(n) n.style.display = 'none';
+  if(g) g.style.display = 'flex';
+  const gi = document.getElementById('chat-giris');
+  if(gi) gi.focus();
+}
+function chatNickPaneliAc(){
+  const n = document.getElementById('chat-nick-panel');
+  const g = document.getElementById('chat-govde');
+  if(n) n.style.display = 'flex';
+  if(g) g.style.display = 'none';
+}
+
+// ── Acilis / kapanis ──────────────────────────────────────────────────
+// Chat YALNIZCA menude veya mac sonunda acilir. G.phase yalnizca OKUNUR.
+function chatAcilabilir(){
+  try{ return G.phase === 'menu' || G.phase === 'over'; }catch(e){ return false; }
+}
+function chatAc(){
+  if(!chatAcilabilir()) return;
+  // Reklam kancasi: ilk surumde aninda cozulur (SDK yok).
+  AD.beforeEnterChat().then(function(){
+    return AD.afterChatAd();
+  }).catch(function(){}).then(function(){
+    const o = document.getElementById('screen-chat');
+    if(!o) return;
+    o.style.display = 'flex';
+    CHAT.acik = true;
+    i18nUygula(o);                     // overlay metinlerini secili dile getir
+    const kayitli = (function(){ try{ return localStorage.getItem('inferno_chat_nick') || ''; }catch(e){ return ''; } })();
+    const gi = document.getElementById('chat-nick-giris');
+    if(gi && kayitli) gi.value = kayitli;
+    chatNickPaneliAc();
+    if(gi) gi.focus();
+  });
+}
+function chatKapat(){
+  const o = document.getElementById('screen-chat');
+  if(o) o.style.display = 'none';
+  CHAT.acik = false;
+  chatBaglantiKapat();
+  // G.phase, showScreen ve oyun durumu DEGISMEZ.
+}
+
+// ── Nickname gonderimi ────────────────────────────────────────────────
+function chatNickGonder(){
+  const gi = document.getElementById('chat-nick-giris');
+  const h  = document.getElementById('chat-nick-hata');
+  if(!gi) return;
+  const ham = (gi.value || '').trim();
+  if(h) h.textContent = '';
+  // ON dogrulama yalnizca kullanici deneyimi icin; sunucu yine dogrular.
+  if(!CHAT_NICK_ON_DESEN.test(ham)){
+    if(h) h.textContent = ham.length < 3 || ham.length > 16
+      ? t('chat.errNickShort') : t('chat.errNickChars');
+    return;
+  }
+  CHAT.nick = ham;
+  try{ localStorage.setItem('inferno_chat_nick', ham); }catch(e){}
+  chatBaglan();
+}
+
+// ── Mesaj gonderimi ───────────────────────────────────────────────────
+function chatMesajGonder(){
+  const gi = document.getElementById('chat-giris');
+  if(!gi) return;
+  const metin = (gi.value || '').trim();
+  if(!metin) return;
+  if(!chatWsGonder({ type:'chat_message', text: metin })) return;
+  gi.value = '';
+}
+
+// ── Baglama ───────────────────────────────────────────────────────────
+function chatKur(){
+  const btn = document.getElementById('menu-chat');
+  if(btn) btn.onclick = chatAc;
+  const kapat = document.getElementById('chat-kapat');
+  if(kapat) kapat.onclick = chatKapat;
+  const nb = document.getElementById('chat-nick-btn');
+  if(nb) nb.onclick = chatNickGonder;
+  const ng = document.getElementById('chat-nick-giris');
+  if(ng) ng.onkeydown = function(e){ if(e.key === 'Enter') chatNickGonder(); };
+  const yolla = document.getElementById('chat-yolla');
+  if(yolla) yolla.onclick = chatMesajGonder;
+  const gi = document.getElementById('chat-giris');
+  if(gi) gi.onkeydown = function(e){ if(e.key === 'Enter') chatMesajGonder(); };
+}
+try{ chatKur(); }catch(e){}
+
 </script>
 
 <!-- CREDITS / ATTRIBUTION -->
+
+<!-- ═══ CHAT V1 OVERLAY  [ASAMA 4] ═══════════════════════════════════
+     screen-credits / screen-challenge ile AYNI desen: position:fixed +
+     display:none/flex. showScreen() ile YONETILMEZ, G.phase'e dokunmaz.
+     Tum metinler data-i18n ile bagli; sabit Ingilizce metin yoktur.
+     Mesaj ve nickname'ler JS tarafinda YALNIZCA createTextNode ile
+     yazilir; bu blokta hicbir kullanici verisi yoktur. -->
+<div id="screen-chat">
+  <div class="chat-kutu">
+    <div class="chat-ust">
+      <div class="chat-baslik" data-i18n="chat.title">INFERNO POOL COMMUNITY</div>
+      <div class="chat-sayac"><span data-i18n="chat.onlinePlayers">ONLINE PLAYERS</span>: <span id="chat-sayi">0</span></div>
+      <button class="chat-kapat" type="button" id="chat-kapat" data-i18n="common.close">CLOSE</button>
+    </div>
+
+    <!-- 1) Nickname paneli -->
+    <div class="chat-nick-panel" id="chat-nick-panel">
+      <div class="chat-hos" data-i18n="chat.welcome">WELCOME TO INFERNO POOL</div>
+      <div class="chat-nick-alt" data-i18n="chat.chooseNick">Choose your nickname</div>
+      <input class="chat-nick-giris" id="chat-nick-giris" type="text" maxlength="16"
+             autocomplete="off" spellcheck="false" data-i18n-ph="chat.enterNickname">
+      <div class="chat-nick-alt chat-hata" id="chat-nick-hata"></div>
+      <button class="chat-nick-btn" type="button" id="chat-nick-btn" data-i18n="chat.enterChat">ENTER CHAT</button>
+      <div class="chat-not" data-i18n="chat.historyNote">Chat history is not stored.</div>
+    </div>
+
+    <!-- 2) Sohbet paneli -->
+    <div class="chat-govde" id="chat-govde" style="display:none">
+      <div class="chat-yan">
+        <div class="chat-yan-baslik" data-i18n="chat.rooms">ROOMS</div>
+        <div class="chat-oda-listesi" id="chat-oda-listesi"></div>
+        <div class="chat-yan-baslik" data-i18n="chat.onlinePlayers">ONLINE PLAYERS</div>
+        <div class="chat-kullanicilar" id="chat-kullanicilar"></div>
+      </div>
+      <div class="chat-sag">
+        <div class="chat-akis" id="chat-akis"></div>
+        <div class="chat-alt">
+          <input class="chat-giris" id="chat-giris" type="text" maxlength="250"
+                 autocomplete="off" data-i18n-ph="chat.messagePlaceholder">
+          <button class="chat-yolla" type="button" id="chat-yolla" data-i18n="chat.send">SEND</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="screen-credits" style="position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(4,0,10,0.88);">
   <div style="max-width:420px;width:88%;background:var(--pn);border:1px solid rgba(255,136,0,0.3);border-radius:10px;padding:20px;box-shadow:0 0 40px rgba(255,80,0,0.25);">
     <div style="font-family:'Cinzel Decorative',serif;font-size:0.95rem;letter-spacing:3px;color:var(--gd);margin-bottom:14px;">CREDITS</div>
