@@ -4529,6 +4529,10 @@ const AD = {
 const CHAT_EKRAN_MAX   = 100;      // DOM'da tutulan en fazla mesaj
 const CHAT_PING_MS     = 10000;    // uygulama seviyesi chat ping
 const CHAT_YENIDEN_MS  = 3000;     // yeniden baglanma araligi
+// Yeniden katilim: eski kaydin sunucudan dusmesi olcumlerde ~6-12 sn surdu
+// (Render/Cloudflare kapanma gecikmesi). 8 x 2.5 sn = 20 sn pencere.
+const CHAT_KATIL_MS    = 2500;     // yeniden katilim denemeleri arasi
+const CHAT_KATIL_MAX   = 8;        // en fazla yeniden katilim denemesi
 const CHAT_BLOK_ANAHTAR = 'inferno_chat_block';
 const CHAT_MUTE_ANAHTAR = 'inferno_chat_mute';
 // Istemci ON dogrulamasi YALNIZCA kullanici deneyimi icindir; asil
@@ -4613,7 +4617,15 @@ const CHAT_HATA_ANAHTAR = {
 let CHAT_WS = null;
 let _chatPing = null, _chatYeniden = null;
 let _chatKapaniyor = false;          // kullanici kapatti -> reconnect deneme
-const CHAT = { nick:'', oda:'global', acik:false, bagli:false, sayac:0 };
+// YENIDEN KATILIM (reconnect race): soket koptugunda sunucudaki eski kayit
+// proxy gecikmesi yuzunden hemen silinmez; yeni soketin chat_join'i
+// 'nick_taken' yiyebilir. O durumda katilim SINIRLI sayida yeniden denenir.
+let _chatKatilTimer = null;          // yeniden katilim zamanlayicisi
+let _chatKatilDeneme = 0;            // ardisik yeniden katilim denemesi
+// bagli = soket OPEN;  katildi = sunucu chat_join ok:true dedi.
+// Ikisi AYRIDIR: soket acikken odada olmamak mumkundur (not_joined).
+const CHAT = { nick:'', oda:'global', acik:false, bagli:false, sayac:0,
+               katildi:false, katildiOnce:false };
 
 // ── Engelleme / susturma: YALNIZCA istemci tarafinda ─────────────────
 // Sunucuya blok listesi GONDERILMEZ (chat_block_notice yalnizca protokolu
@@ -4759,13 +4771,49 @@ function chatPingBaslat(){
 }
 function chatPingDurdur(){ if(_chatPing){ clearInterval(_chatPing); _chatPing = null; } }
 
+function chatKatilimDurdur(){
+  if(_chatKatilTimer){ clearTimeout(_chatKatilTimer); _chatKatilTimer = null; }
+}
+// Yalnizca ZATEN bir kez basariyla katilmis kullanici icin calisir; ilk
+// giristeki gercek nick_taken hatasi aynen kullaniciya gosterilir.
+// Sonsuz dongu yok: en fazla CHAT_KATIL_MAX deneme yapilir.
+function chatYenidenKatil(){
+  if(!CHAT.acik || _chatKapaniyor) return false;
+  if(!CHAT.katildiOnce || CHAT.katildi || !CHAT.nick) return false;
+  if(_chatKatilTimer) return true;                    // deneme zaten kuyrukta
+  if(_chatKatilDeneme >= CHAT_KATIL_MAX){
+    // Vazgec: kullaniciya anlamli durum goster, nick panelini geri ac.
+    chatKatilimDurdur();
+    chatNickPaneliAc();
+    const h = document.getElementById('chat-nick-hata');
+    if(h) h.textContent = t('chat.errNickTaken');
+    return true;
+  }
+  _chatKatilDeneme++;
+  _chatKatilTimer = setTimeout(function(){
+    _chatKatilTimer = null;
+    if(!CHAT.acik || _chatKapaniyor || CHAT.katildi) return;
+    // chat_join YALNIZCA acik sokette gonderilir; soket kapaliysa
+    // yeniden baglanma akisi (chatYenidenPlanla) zaten devrededir.
+    if(!CHAT_WS || CHAT_WS.readyState !== WebSocket.OPEN) return;
+    chatSistemYaz('chat.reconnecting');
+    chatWsGonder({ type:'chat_join', nick: CHAT.nick, room: CHAT.oda });
+  }, CHAT_KATIL_MS);
+  return true;
+}
+
 function chatBaglan(){
   if(CHAT_WS && (CHAT_WS.readyState === WebSocket.OPEN || CHAT_WS.readyState === WebSocket.CONNECTING)) return;
   chatSistemYaz('chat.connecting');
   try{ CHAT_WS = new WebSocket(WS_URL); }catch(e){ chatYenidenPlanla(); return; }
   CHAT_WS.onopen = function(){
-    CHAT.bagli = true;
+    CHAT.bagli = true;               // soket acik
+    CHAT.katildi = false;            // ...ama HENUZ odaya girmedik
+    _chatKatilDeneme = 0;
+    chatKatilimDurdur();             // eski zamanlayici birakilmaz
     chatPingBaslat();
+    // Nickname YENI soket uzerinden tekrar gonderilir; oda bilgisi
+    // CHAT.oda'da saklidir ve kopmada korunur.
     chatWsGonder({ type:'chat_join', nick: CHAT.nick, room: CHAT.oda });
   };
   CHAT_WS.onmessage = function(e){
@@ -4775,6 +4823,8 @@ function chatBaglan(){
   CHAT_WS.onerror = function(){ /* onclose zaten devreye girer */ };
   CHAT_WS.onclose = function(){
     CHAT.bagli = false;
+    CHAT.katildi = false;
+    chatKatilimDurdur();             // eski sokete ait deneme iptal
     chatPingDurdur();
     // KRITIK: burada G.phase'e, showScreen'e veya oyun WS'ine HIC
     // dokunulmaz. Chat kopmasi oyunu etkilemez.
@@ -4789,6 +4839,10 @@ function chatYenidenPlanla(){
 function chatBaglantiKapat(){
   _chatKapaniyor = true;
   chatPingDurdur();
+  chatKatilimDurdur();
+  _chatKatilDeneme = 0;
+  CHAT.katildi = false;
+  CHAT.katildiOnce = false;          // sonraki acilis YENI bir ilk giristir
   if(_chatYeniden){ clearTimeout(_chatYeniden); _chatYeniden = null; }
   try{ if(CHAT_WS && CHAT_WS.readyState === WebSocket.OPEN) chatWsGonder({type:'chat_leave'}); }catch(e){}
   try{ if(CHAT_WS) CHAT_WS.close(); }catch(e){}
@@ -4802,6 +4856,10 @@ function chatMsgIsle(m){
   switch(m.type){
     case 'chat_join':
       if(m.ok){
+        CHAT.katildi = true;         // sunucu odaya aldi
+        CHAT.katildiOnce = true;
+        _chatKatilDeneme = 0;
+        chatKatilimDurdur();
         CHAT.nick = m.nick || CHAT.nick;
         CHAT.oda  = m.room || CHAT.oda;
         chatOdalariCiz();
@@ -4828,6 +4886,13 @@ function chatMsgIsle(m){
       if(!m.ok && m.nick) chatSistemYaz('chat.userLeft', { nick: m.nick });
       break;
     case 'chat_error':
+      // RECONNECT RACE: kopma sonrasi acilan yeni soketin chat_join'i,
+      // eski kayit henuz silinmedigi icin nick_taken alabilir; mesaj
+      // gonderilirse not_joined doner. Her ikisinde de katilim yeniden
+      // denenir (sinirli). Ilk giristeki gercek nick_taken bu yola
+      // GIRMEZ: katildiOnce false oldugu icin chatYenidenKatil() reddeder.
+      if((m.code === 'nick_taken' || m.code === 'not_joined') &&
+         chatYenidenKatil()) break;
       if(document.getElementById('chat-govde').style.display === 'none'){
         const h = document.getElementById('chat-nick-hata');
         if(h) h.textContent = t(CHAT_HATA_ANAHTAR[m.code] || 'chat.errGeneric', { n: m.detail });
