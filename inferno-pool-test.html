@@ -4727,13 +4727,121 @@ AD.register('crazygames', {
   showRewarded: function(){ return _cgReklamIste('rewarded'); }
 });
 
+// ── YANDEX GAMES ADAPTERI [ASAMA 5.3] ─────────────────────────────────
+// Kaynak: resmi Yandex Games SDK dokumani
+//   yandex.com/dev/games/doc/en/sdk/sdk-adv
+//   yandex.com/dev/games/doc/en/sdk/sdk-about
+// Kullanilan API (dokumandaki imzalarla birebir):
+//   const ysdk = await YaGames.init();
+//   ysdk.adv.showFullscreenAdv({ onOpen, onClose(wasShown), onError(error) })
+//   ysdk.adv.showRewardedVideo({ onOpen, onRewarded, onClose(wasShown), onError(error) })
+//
+// SCRIPT EKLENMEDI: Yandex '/sdk.js' dosyasini KENDI sunucusundan servis eder
+// ve yalnizca oraya yuklenen pakette bulunur. Bu dosyaya <script src> EKLEMEK
+// hem Yandex disindaki barindirmalarda 404 uretir hem de gereksizdir. Adapter
+// SDK'yi YALNIZCA sayfada zaten varsa (window.YaGames) kullanir; yoksa
+// sessizce kullanilamaz doner. UCUNCU TARAF reklam SDK'si cagrilmaz.
+//
+// Ucretsiz kural notu (dokuman): tam ekran reklamin siklígi Yandex tarafindan
+// yonetilir ve cok sik cagrilirsa reklam ACILMADAN onClose(false) gelir.
+// Ayrica dokuman, kazara tiklamayi onlemek icin oynanis SIRASINDA reklam
+// gosterilmemesini soyler; bu yuzden tek tetikleyici mac sonu (endGame).
+let _ysdk = null;            // YaGames.init() sonucu
+let _ysdkInit = null;        // init promise'i (bir kez)
+function _yandexBaslat(){
+  if(_ysdkInit) return _ysdkInit;
+  try{
+    if(typeof window.YaGames === 'undefined' || !window.YaGames ||
+       typeof window.YaGames.init !== 'function'){
+      _ysdkInit = Promise.resolve(null);
+      return _ysdkInit;
+    }
+    _ysdkInit = Promise.resolve(window.YaGames.init())
+      .then(function(s){ _ysdk = s || null; return _ysdk; })
+      .catch(function(){ _ysdk = null; return null; });
+  }catch(e){ _ysdkInit = Promise.resolve(null); }
+  return _ysdkInit;
+}
+
+// Tek yardimci: fullscreen ve rewarded ayni yasam dongusunu paylasir.
+// ASLA reject etmez, HER ZAMAN tek kez cozer, ses/oyun durumunu geri verir.
+function _yaReklamIste(tur){
+  return new Promise(function(cozumle){
+    let bitti = false, zamanlayici = null, odullendi = false;
+    function bitir(sonuc){
+      if(bitti) return;
+      bitti = true;
+      if(zamanlayici){ clearTimeout(zamanlayici); zamanlayici = null; }
+      _adDevam();
+      cozumle(sonuc);
+    }
+    function hataKodu(hata){
+      let kod = 'error';
+      try{
+        if(typeof hata === 'string') kod = hata;
+        else if(hata && typeof hata.code === 'string') kod = hata.code;
+        else if(hata && typeof hata.message === 'string') kod = hata.message;
+      }catch(e){}
+      return String(kod).slice(0, 40);
+    }
+    let adv;
+    try{ adv = _ysdk && _ysdk.adv; }catch(e){ return cozumle({ shown:false, reason:'unavailable' }); }
+    if(!adv) return cozumle({ shown:false, reason:'unavailable' });
+    zamanlayici = setTimeout(function(){ bitir({ shown:false, reason:'timeout' }); }, AD_CG_ZAMAN_ASIMI);
+    try{
+      if(tur === 'rewarded'){
+        if(typeof adv.showRewardedVideo !== 'function'){ return bitir({ shown:false, reason:'unavailable' }); }
+        adv.showRewardedVideo({
+          onOpen:     function(){ _adDuraklat(); },
+          // Odul YALNIZCA gosterim sayildiginda gelir.
+          onRewarded: function(){ odullendi = true; },
+          // Kapanista: odul gelmediyse ODUL YOK.
+          onClose:    function(){ bitir(odullendi ? { shown:true, reason:'ok' }
+                                                  : { shown:false, reason:'not_rewarded' }); },
+          onError:    function(h){ bitir({ shown:false, reason: hataKodu(h) }); }
+        });
+      } else {
+        if(typeof adv.showFullscreenAdv !== 'function'){ return bitir({ shown:false, reason:'unavailable' }); }
+        adv.showFullscreenAdv({
+          onOpen:  function(){ _adDuraklat(); },
+          // wasShown=false: reklam doldurulamadi VEYA cok sik cagrildi.
+          // Dokuman bu ikisini ayirmadigi icin tek 'not_shown' kodu kullanilir.
+          onClose: function(gosterildi){ bitir(gosterildi === true ? { shown:true,  reason:'ok' }
+                                                                  : { shown:false, reason:'not_shown' }); },
+          onError: function(h){ bitir({ shown:false, reason: hataKodu(h) }); }
+        });
+      }
+    }catch(e){
+      bitir({ shown:false, reason:'error' });
+    }
+  });
+}
+
+AD.register('yandex', {
+  // Senkron sozlesme: yalnizca init TAMAMLANMIS ve adv modulu varsa true.
+  isAvailable: function(){
+    try{ return !!(_ysdk && _ysdk.adv &&
+                   (typeof _ysdk.adv.showFullscreenAdv === 'function' ||
+                    typeof _ysdk.adv.showRewardedVideo === 'function')); }
+    catch(e){ return false; }
+  },
+  // Duraklatma/devam onOpen-onClose uzerinden yurur; bunlar emniyet kancasi.
+  beforeAd: function(){ return Promise.resolve(); },
+  afterAd:  function(){ _adDevam(); return Promise.resolve(); },
+  showMidgame:  function(){ return _yaReklamIste('fullscreen'); },
+  // Rewarded YALNIZCA AD.showRewarded uzerinden, kullanici acikca isterse.
+  showRewarded: function(){ return _yaReklamIste('rewarded'); }
+});
+// SDK sayfada ZATEN varsa init'i erkenden baslat (yeni script YUKLENMEZ).
+// Yandex disinda window.YaGames olmadigi icin bu cagri hicbir sey yapmaz.
+try{ _yandexBaslat(); }catch(e){}
+
 // Asagidakiler ISKELET adapterlerdir: SDK YUKLEMEZ, cagri YAPMAZ.
 // Kural notlari:
 //   * Bu portalda ucuncu taraf reklam entegrasyonu KULLANILMAZ; entegrasyon
 //     gerektiginde yalnizca portalin kendi SDK'si baglanir.
 //   * Mobil pakette gelistirme/test sirasinda YALNIZCA test reklam kimlikleri
 //     kullanilir; production kimligi bu asamada EKLENMEZ.
-AD.register('yandex',  { isAvailable: function(){ return false; } });
 AD.register('pixidus', { isAvailable: function(){ return false; } });
 AD.register('android', { isAvailable: function(){ return false; } });
 AD.register('unknown', { isAvailable: function(){ return false; } });
