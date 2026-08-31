@@ -4868,7 +4868,18 @@ function chatKur(){
   const gi = document.getElementById('chat-giris');
   if(gi) gi.onkeydown = function(e){ if(e.key === 'Enter') chatMesajGonder(); };
 }
-try{ chatKur(); }catch(e){}
+// [DUZELTME] chatKur() DOM AYRISTIRMASI BITTIKTEN SONRA calismali.
+// Bu script #screen-chat overlay'inden ONCE geldigi icin, burada dogrudan
+// cagrildiginda overlay elemanlari (chat-nick-btn, chat-kapat, chat-yolla,
+// chat-giris) DOM'da HENUZ YOKTUR ve hicbirine handler baglanamazdi.
+// Yalnizca #menu-chat baglaniyordu (o script'ten ONCE geldigi icin), bu da
+// overlay'in acilip icindeki hicbir butonun calismamasina yol aciyordu.
+// chatKur() govdesi DEGISMEDI; yalnizca CAGRI ZAMANI duzeltildi.
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', function(){ try{ chatKur(); }catch(e){} });
+} else {
+  try{ chatKur(); }catch(e){}
+}
 
 </script>
 
