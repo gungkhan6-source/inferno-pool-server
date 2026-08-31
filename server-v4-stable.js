@@ -372,7 +372,68 @@ const CHAT_RAPOR_MAX      = 200;    // bellekteki rapor halka tamponu
 const CHAT_MESAJ_MAX      = 250;    // karakter
 const CHAT_NICK_MIN       = 3;
 const CHAT_NICK_MAX       = 16;
-const CHAT_NICK_DESEN     = /^[A-Za-z0-9_]+$/;
+// ── UNICODE NICKNAME  [CHAT V1.1] ──────────────────────────────────────
+// ASCII sinirlamasi KALDIRILDI. Artik her yazi sistemi kabul edilir:
+// Sahin, Igrok, Japonca, Cince, Arapca, Korece, Yunanca, Hintce, Ibranice,
+// Tayca ve emoji iceren adlar dahil.
+//
+// IZIN VERILEN (beyaz liste — kara liste DEGIL, boylece yeni Unicode
+// blogu eklendiginde kendiliginden kapsanir):
+//   \p{L}  harf   \p{M}  birlesen isaret (Devanagari/Arapca/Tayca ve
+//                          emoji varyasyon seciciler icin ZORUNLU)
+//   \p{N}  rakam  _      alt cizgi
+//   \p{Extended_Pictographic}  emoji
+// REDDEDILEN: bosluk, kontrol karakteri, satir sonu, tab, noktalama ve
+// <, >, &, /, " gibi tum isaretler. ZWJ (U+200D) de reddedilir: gorunmez
+// oldugu icin ayni gorunen iki farkli nick uretmeye yarardi.
+const CHAT_NICK_DESEN = /^[\p{L}\p{M}\p{N}_\p{Extended_Pictographic}]+$/u;
+
+// UZUNLUK KOD NOKTASI ile olculur (UTF-16 birimi ile DEGIL): bir emoji
+// tek karakter sayilir. CJK/Kana/Hangul icin alt sinir 2'dir — o
+// yazilarda iki karakterlik tam ad olagandir (ornek: iki isaretli Cince
+// adlar). Diger yazilarda alt sinir 3 kalir.
+const CHAT_NICK_CJK = /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]/;
+// Ham girdide kontrol/gorunmez karakter varsa nick REDDEDILIR.
+// chatNormalize() bunlari kirptigi icin, kontrol EDILMEZSE "a"+NUL+"bc"
+// sessizce "abc" olur ve gecerli sayilirdi. Kural: reddet.
+const CHAT_NICK_KONTROL = /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028\u2029\uFEFF]/;
+function chatNickUzunluk(s){ return Array.from(s).length; }
+function chatNickAltSinir(s){ return CHAT_NICK_CJK.test(s) ? 2 : CHAT_NICK_MIN; }
+
+// Latin'e cok benzeyen Kiril/Yunan harfleri. Amac: "Igrok" gorunumlu bir
+// nick ile Latin bir nickin ayni odada birbirinin yerine gecmesini
+// zorlastirmak. YALNIZCA cakisma anahtarinda kullanilir; kullaniciya
+// gosterilen ad HIC DEGISMEZ.
+const CHAT_BENZER = {
+  '\u0430':'a','\u0432':'b','\u0435':'e','\u043a':'k','\u043c':'m','\u043d':'h','\u043e':'o',
+  '\u0440':'p','\u0441':'c','\u0442':'t','\u0443':'y','\u0445':'x','\u0456':'i','\u0455':'s',
+  '\u0458':'j','\u04bb':'h','\u0491':'r',
+  '\u03b1':'a','\u03b2':'b','\u03b5':'e','\u03b7':'n','\u03b9':'i','\u03ba':'k','\u03bc':'m',
+  '\u03bd':'v','\u03bf':'o','\u03c1':'p','\u03c3':'o','\u03c4':'t','\u03c5':'y','\u03c7':'x'
+};
+// Cakisma anahtari. Adimlar:
+//   1) NFKC  — tam/yari genislik ve uyumluluk bicimlerini birlestirir
+//   2) toLowerCase — buyuk/kucuk harf duyarsizligi (Unicode farkindalikli)
+//   3) YALNIZCA U+0307 (birlesen ustteki nokta) silinir — Turkce buyuk I
+//      kucuk harfe cevrilince "i" + U+0307 uretir; bu adim olmadan
+//      "SAHIN" ile "Sahin" ayni anahtara dusmezdi.
+//      TUM \p{M} isaretlerini silmek DENENDI ve BIRAKILDI: o adim
+//      Omer/Omer, Sahin/Sahin, Jose/Jose, Muller/Muller gibi MESRU
+//      farkli adlari ayni sayiyor ve Devanagari'de sesli isaretlerini
+//      sildigi icin Hintce adlari bozuyordu.
+//   4) NFC — kalan isaretler yeniden birlestirilir
+//   5) benzer harf katlama — Kiril/Yunan taklitlerini Latin'e indirger
+//      (Orion / Kiril-O'lu Orion hala cakisir: taklit korumasi korunur)
+function chatNickAnahtar(s){
+  let k = String(s);
+  try{ k = k.normalize('NFKC'); }catch(e){}
+  k = k.toLowerCase();
+  k = k.replace(/\u0307/g, '');
+  try{ k = k.normalize('NFC'); }catch(e){}
+  let c = '';
+  for(const ch of k) c += (CHAT_BENZER[ch] || ch);
+  return c;
+}
 const CHAT_HIZ_MS         = 1000;   // en az 1 sn arayla mesaj
 const CHAT_PENCERE_MS     = 10000;  // 10 sn penceresi
 const CHAT_PENCERE_MAX    = 6;      // pencerede en fazla 6 mesaj
@@ -491,11 +552,18 @@ function chatKufurIceriyor(s){
 }
 // Nickname dogrulama. ISTEMCIYE GUVENILMEZ; her kural sunucuda.
 function chatNickDogrula(ham, oda){
-  const n = chatNormalize(ham);
-  if(n.length < CHAT_NICK_MIN || n.length > CHAT_NICK_MAX) return { hata:'nick_length' };
+  // Kontrol/gorunmez karakter HAM girdide sinanir: normalize onlari
+  // kirpacagi icin sonrasinda tespit edilemezlerdi.
+  if(typeof ham === 'string' && CHAT_NICK_KONTROL.test(ham)) return { hata:'nick_chars' };
+  // NFKC: istemciler ayni adi farkli bicimlerde gonderebilir; once tek
+  // bicime indirilir. Sonra kontrol karakteri temizligi (chatNormalize).
+  let n = chatNormalize(ham);
+  try{ n = n.normalize('NFKC'); }catch(e){}
+  const uz = chatNickUzunluk(n);
+  if(uz < chatNickAltSinir(n) || uz > CHAT_NICK_MAX) return { hata:'nick_length' };
   if(!CHAT_NICK_DESEN.test(n)) return { hata:'nick_chars' };
   if(chatKufurIceriyor(n)) return { hata:'nick_forbidden' };
-  const alt = n.toLowerCase();
+  const alt = chatNickAnahtar(n);
   const o = chatRooms.get(oda);
   if(o){
     let cakisma = false;

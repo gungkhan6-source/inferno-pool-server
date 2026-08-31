@@ -1688,7 +1688,7 @@ en: {
   'chat.userJoined':'{nick} joined',
   'chat.userLeft':'{nick} left',
   'chat.errNickShort':'Nickname must be 3-16 characters',
-  'chat.errNickChars':'Only letters, numbers and underscore',
+  'chat.errNickChars':'Letters, numbers, _ and emoji only \u2014 no spaces or symbols',
   'chat.errNickTaken':'That nickname is already in use',
   'chat.errNickBad':'That nickname is not allowed',
   'chat.errTooFast':'Slow down — too many messages',
@@ -1868,7 +1868,7 @@ tr: {
   'chat.userJoined':'{nick} katıldı',
   'chat.userLeft':'{nick} ayrıldı',
   'chat.errNickShort':'Takma ad 3-16 karakter olmalı',
-  'chat.errNickChars':'Yalnızca harf, rakam ve alt çizgi',
+  'chat.errNickChars':'Harf, rakam, _ ve emoji \u2014 boşluk ve işaret olmaz',
   'chat.errNickTaken':'Bu takma ad kullanımda',
   'chat.errNickBad':'Bu takma ada izin verilmiyor',
   'chat.errTooFast':'Yavaş — çok fazla mesaj',
@@ -2048,7 +2048,7 @@ ru: {
   'chat.userJoined':'{nick} присоединился',
   'chat.userLeft':'{nick} вышел',
   'chat.errNickShort':'Никнейм должен быть 3-16 символов',
-  'chat.errNickChars':'Только буквы, цифры и подчёркивание',
+  'chat.errNickChars':'Буквы, цифры, _ и эмодзи — без пробелов',
   'chat.errNickTaken':'Этот никнейм уже занят',
   'chat.errNickBad':'Такой никнейм не разрешён',
   'chat.errTooFast':'Слишком быстро — много сообщений',
@@ -4533,7 +4533,71 @@ const CHAT_BLOK_ANAHTAR = 'inferno_chat_block';
 const CHAT_MUTE_ANAHTAR = 'inferno_chat_mute';
 // Istemci ON dogrulamasi YALNIZCA kullanici deneyimi icindir; asil
 // dogrulama sunucudadir ve sunucu karari her zaman uygulanir.
-const CHAT_NICK_ON_DESEN = /^[A-Za-z0-9_]{3,16}$/;
+// Kural SUNUCUDAKI ILE BIREBIR AYNIDIR (chatNickDogrula).
+const CHAT_NICK_MIN = 3;
+const CHAT_NICK_MAX = 16;
+// ── UNICODE NICKNAME  [CHAT V1.1] ──────────────────────────────────────
+// ASCII sinirlamasi KALDIRILDI. Artik her yazi sistemi kabul edilir:
+// Sahin, Igrok, Japonca, Cince, Arapca, Korece, Yunanca, Hintce, Ibranice,
+// Tayca ve emoji iceren adlar dahil.
+//
+// IZIN VERILEN (beyaz liste — kara liste DEGIL, boylece yeni Unicode
+// blogu eklendiginde kendiliginden kapsanir):
+//   \p{L}  harf   \p{M}  birlesen isaret (Devanagari/Arapca/Tayca ve
+//                          emoji varyasyon seciciler icin ZORUNLU)
+//   \p{N}  rakam  _      alt cizgi
+//   \p{Extended_Pictographic}  emoji
+// REDDEDILEN: bosluk, kontrol karakteri, satir sonu, tab, noktalama ve
+// <, >, &, /, " gibi tum isaretler. ZWJ (U+200D) de reddedilir: gorunmez
+// oldugu icin ayni gorunen iki farkli nick uretmeye yarardi.
+const CHAT_NICK_DESEN = /^[\p{L}\p{M}\p{N}_\p{Extended_Pictographic}]+$/u;
+
+// UZUNLUK KOD NOKTASI ile olculur (UTF-16 birimi ile DEGIL): bir emoji
+// tek karakter sayilir. CJK/Kana/Hangul icin alt sinir 2'dir — o
+// yazilarda iki karakterlik tam ad olagandir (ornek: iki isaretli Cince
+// adlar). Diger yazilarda alt sinir 3 kalir.
+const CHAT_NICK_CJK = /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]/;
+// Ham girdide kontrol/gorunmez karakter varsa nick REDDEDILIR.
+// chatNormalize() bunlari kirptigi icin, kontrol EDILMEZSE "a"+NUL+"bc"
+// sessizce "abc" olur ve gecerli sayilirdi. Kural: reddet.
+const CHAT_NICK_KONTROL = /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028\u2029\uFEFF]/;
+function chatNickUzunluk(s){ return Array.from(s).length; }
+function chatNickAltSinir(s){ return CHAT_NICK_CJK.test(s) ? 2 : CHAT_NICK_MIN; }
+
+// Latin'e cok benzeyen Kiril/Yunan harfleri. Amac: "Igrok" gorunumlu bir
+// nick ile Latin bir nickin ayni odada birbirinin yerine gecmesini
+// zorlastirmak. YALNIZCA cakisma anahtarinda kullanilir; kullaniciya
+// gosterilen ad HIC DEGISMEZ.
+const CHAT_BENZER = {
+  '\u0430':'a','\u0432':'b','\u0435':'e','\u043a':'k','\u043c':'m','\u043d':'h','\u043e':'o',
+  '\u0440':'p','\u0441':'c','\u0442':'t','\u0443':'y','\u0445':'x','\u0456':'i','\u0455':'s',
+  '\u0458':'j','\u04bb':'h','\u0491':'r',
+  '\u03b1':'a','\u03b2':'b','\u03b5':'e','\u03b7':'n','\u03b9':'i','\u03ba':'k','\u03bc':'m',
+  '\u03bd':'v','\u03bf':'o','\u03c1':'p','\u03c3':'o','\u03c4':'t','\u03c5':'y','\u03c7':'x'
+};
+// Cakisma anahtari. Adimlar:
+//   1) NFKC  — tam/yari genislik ve uyumluluk bicimlerini birlestirir
+//   2) toLowerCase — buyuk/kucuk harf duyarsizligi (Unicode farkindalikli)
+//   3) YALNIZCA U+0307 (birlesen ustteki nokta) silinir — Turkce buyuk I
+//      kucuk harfe cevrilince "i" + U+0307 uretir; bu adim olmadan
+//      "SAHIN" ile "Sahin" ayni anahtara dusmezdi.
+//      TUM \p{M} isaretlerini silmek DENENDI ve BIRAKILDI: o adim
+//      Omer/Omer, Sahin/Sahin, Jose/Jose, Muller/Muller gibi MESRU
+//      farkli adlari ayni sayiyor ve Devanagari'de sesli isaretlerini
+//      sildigi icin Hintce adlari bozuyordu.
+//   4) NFC — kalan isaretler yeniden birlestirilir
+//   5) benzer harf katlama — Kiril/Yunan taklitlerini Latin'e indirger
+//      (Orion / Kiril-O'lu Orion hala cakisir: taklit korumasi korunur)
+function chatNickAnahtar(s){
+  let k = String(s);
+  try{ k = k.normalize('NFKC'); }catch(e){}
+  k = k.toLowerCase();
+  k = k.replace(/\u0307/g, '');
+  try{ k = k.normalize('NFC'); }catch(e){}
+  let c = '';
+  for(const ch of k) c += (CHAT_BENZER[ch] || ch);
+  return c;
+}
 
 // Sunucu hata kodu -> i18n anahtari
 const CHAT_HATA_ANAHTAR = {
@@ -4830,12 +4894,20 @@ function chatNickGonder(){
   const gi = document.getElementById('chat-nick-giris');
   const h  = document.getElementById('chat-nick-hata');
   if(!gi) return;
-  const ham = (gi.value || '').trim();
+  let ham = (gi.value || '').trim();
   if(h) h.textContent = '';
+  // Kontrol/gorunmez karakter: sunucudaki ile AYNI kural, ayni sirada.
+  if(CHAT_NICK_KONTROL.test(ham)){ if(h) h.textContent = t('chat.errNickChars'); return; }
+  try{ ham = ham.normalize('NFKC'); }catch(e){}
   // ON dogrulama yalnizca kullanici deneyimi icin; sunucu yine dogrular.
-  if(!CHAT_NICK_ON_DESEN.test(ham)){
-    if(h) h.textContent = ham.length < 3 || ham.length > 16
-      ? t('chat.errNickShort') : t('chat.errNickChars');
+  // Uzunluk KOD NOKTASI ile olculur: bir emoji tek karakter sayilir.
+  const uz = chatNickUzunluk(ham);
+  if(uz < chatNickAltSinir(ham) || uz > CHAT_NICK_MAX){
+    if(h) h.textContent = t('chat.errNickShort');
+    return;
+  }
+  if(!CHAT_NICK_DESEN.test(ham)){
+    if(h) h.textContent = t('chat.errNickChars');
     return;
   }
   CHAT.nick = ham;
@@ -4903,7 +4975,7 @@ if(document.readyState === 'loading'){
     <div class="chat-nick-panel" id="chat-nick-panel">
       <div class="chat-hos" data-i18n="chat.welcome">WELCOME TO INFERNO POOL</div>
       <div class="chat-nick-alt" data-i18n="chat.chooseNick">Choose your nickname</div>
-      <input class="chat-nick-giris" id="chat-nick-giris" type="text" maxlength="16"
+      <input class="chat-nick-giris" id="chat-nick-giris" type="text" maxlength="40"
              autocomplete="off" spellcheck="false" data-i18n-ph="chat.enterNickname">
       <div class="chat-nick-alt chat-hata" id="chat-nick-hata"></div>
       <button class="chat-nick-btn" type="button" id="chat-nick-btn" data-i18n="chat.enterChat">ENTER CHAT</button>
