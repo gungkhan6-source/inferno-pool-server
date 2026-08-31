@@ -643,6 +643,16 @@ async function initCrazyGames() {
   } catch (e) {}
 }
 async function showMidrollAd() {
+  // [ASAMA 5.1] Reklam artik TEK KAPIDAN gecer: AD.showMidgame().
+  // Cagri noktasi (endGame -> dogal gecis) DEGISMEDI. AD katmani hazir
+  // degilse eski yol aynen korunur; her iki yolda da hata yutulur ve
+  // oyun akisi kilitlenmez.
+  try {
+    if (typeof AD !== 'undefined' && AD && typeof AD.showMidgame === 'function') {
+      await AD.showMidgame({ kaynak: 'match_over' });
+      return;
+    }
+  } catch (e) {}
   try {
     if (!cgReady) return;
     await CG_SDK.ad.requestAd('midgame');
@@ -4477,47 +4487,184 @@ loop();
 // Platform tespiti TEK YERDE: AD.platform(). Varsayilan 'web'. Bir portal
 // icin farkli davranis gerektiginde AD.register(id, uygulama) ile adapter
 // takilir; chat kodu degismez.
+// URUN KARARI [ASAMA 5.1]: SOHBET BUTONUNA REKLAM KONMAZ. Portallar
+// (ve genel iyi uygulama) reklamin navigasyon butonlarina degil, DOGAL
+// gecislere baglanmasini ister. Bu yuzden beforeEnterChat/afterChatAd
+// KASITLI OLARAK bos birakilmistir: chat DOGRUDAN acilir. Bu iki fonksiyon
+// yalnizca Chat V1 ile geriye donuk uyum icin durur.
+//
+// Reklam noktalari (yalnizca bunlar):
+//   * showMidgame()  -> mac sonucu / dogal gecis   (ileride level gecisi)
+//   * showRewarded() -> YALNIZCA kullanici acikca isterse
+//
+// SOZLESME: showMidgame/showRewarded ASLA reject etmez; her zaman
+// { shown:boolean, reason:string } ile cozulur. Reklam yoksa/hata verirse
+// oyun akisi DEVAM EDER, hicbir yerde kilitlenmez.
+const PLATFORM_LISTESI = ['crazygames','yandex','pixidus','android','web','unknown'];
+
 const AD = {
   _pl: null,
+  _test: null,
   _adapterler: { web: {} },
-  // Tespit tek nokta. Disaridan window.INFERNO_PLATFORM ile gecersiz
-  // kilinabilir; boylece portal katmani chat koduna sizmaz.
+
+  // ── PLATFORM TESPITI — TEK NOKTA ─────────────────────────────────────
+  // Chat kodu ve oyun kodu platform adi BILMEZ; yalnizca AD.* cagirir.
+  // Tespit SDK CAGIRMAZ, sadece ortam isaretlerine bakar.
   platform: function(){
     if(this._pl) return this._pl;
     let p = 'web';
     try{
-      if(typeof window.INFERNO_PLATFORM === 'string' && window.INFERNO_PLATFORM) {
-        p = window.INFERNO_PLATFORM;
+      const zorla = (typeof window.INFERNO_PLATFORM === 'string') ? window.INFERNO_PLATFORM : '';
+      if(zorla){
+        p = (PLATFORM_LISTESI.indexOf(zorla) >= 0) ? zorla : 'unknown';
+      } else {
+        const ana = (location.hostname || '').toLowerCase();
+        const ua  = (navigator.userAgent || '').toLowerCase();
+        if(window.CrazyGames)                                   p = 'crazygames';
+        else if(window.YaGames || ana.indexOf('yandex') >= 0)   p = 'yandex';
+        else if(window.PixiDUS || window.Pixidus)               p = 'pixidus';
+        else if(window.AndroidBridge || window.InfernoAndroid ||
+                (ua.indexOf('android') >= 0 && ua.indexOf('wv') >= 0)) p = 'android';
+        else                                                    p = 'web';
       }
-    }catch(e){}
+    }catch(e){ p = 'web'; }
     this._pl = p;
     return p;
   },
+
+  // ── TEST MODU ────────────────────────────────────────────────────────
+  // Test/gelistirme sirasinda GERCEK reklam cagrisi YAPILMAZ. Yerel
+  // adreslerde ve window.INFERNO_AD_TEST=true iken otomatik aciktir.
+  isTest: function(){
+    if(this._test !== null) return this._test;
+    let t = false;
+    try{
+      if(window.INFERNO_AD_TEST === true) t = true;
+      else {
+        const h = (location.hostname || '').toLowerCase();
+        t = (h === 'localhost' || h === '127.0.0.1' || h === '' || h.indexOf('.local') >= 0);
+      }
+    }catch(e){}
+    this._test = t;
+    return t;
+  },
+
   register: function(id, uygulama){ if(id) this._adapterler[id] = uygulama || {}; },
   _aktif: function(){ return this._adapterler[this.platform()] || this._adapterler.web; },
-  // Reklam gosterilebilir mi? Ilk surumde HER ZAMAN false.
+
+  // Adapter cagrilarini guvene alan tek sarmalayici: her zaman COZULUR.
+  _guvenli: function(ad, varsayilan, arg){
+    const a = this._aktif();
+    if(typeof a[ad] !== 'function') return Promise.resolve(varsayilan);
+    try{
+      return Promise.resolve(a[ad](arg)).then(function(r){
+        return (r && typeof r === 'object') ? r : varsayilan;
+      }).catch(function(){ return { shown:false, reason:'error' }; });
+    }catch(e){
+      // Adapter SENKRON hata firlattiysa da akis kilitlenmez; 'error' doner.
+      return Promise.resolve({ shown:false, reason:'error' });
+    }
+  },
+
   isAvailable: function(){
+    if(this.isTest()) return false;
     const a = this._aktif();
-    return typeof a.isAvailable === 'function' ? !!a.isAvailable() : false;
+    try{ return typeof a.isAvailable === 'function' ? !!a.isAvailable() : false; }catch(e){ return false; }
   },
-  // Chat'e girmeden ONCE. Ilk surumde aninda cozulur -> reklam yok,
-  // akis beklemez. Adapter takildiginda Promise gercekten beklenir.
-  beforeEnterChat: function(){
-    const a = this._aktif();
-    try{
-      if(typeof a.beforeEnterChat === 'function') return Promise.resolve(a.beforeEnterChat());
-    }catch(e){}
-    return Promise.resolve();
+
+  // Reklam oncesi/sonrasi kancalar (ses kisma, oyun duraklatma vb. icin).
+  beforeAd: function(){ return this._guvenli('beforeAd', undefined); },
+  afterAd:  function(){ return this._guvenli('afterAd',  undefined); },
+
+  // ── MIDGAME — dogal gecis (mac sonucu) ───────────────────────────────
+  showMidgame: function(baglam){
+    const self = this;
+    if(this.isTest())      return Promise.resolve({ shown:false, reason:'test' });
+    if(!this.isAvailable())return Promise.resolve({ shown:false, reason:'unavailable' });
+    return this.beforeAd()
+      .then(function(){ return self._guvenli('showMidgame', { shown:false, reason:'unavailable' }, baglam); })
+      .then(function(r){ return self.afterAd().then(function(){ return r; }); })
+      .catch(function(){ return { shown:false, reason:'error' }; });
   },
-  // Reklam kapandiktan SONRA.
-  afterChatAd: function(){
-    const a = this._aktif();
-    try{
-      if(typeof a.afterChatAd === 'function') return Promise.resolve(a.afterChatAd());
-    }catch(e){}
-    return Promise.resolve();
+
+  // ── REWARDED — YALNIZCA kullanici acikca isterse ─────────────────────
+  // Otomatik CAGRILMAZ. Odul yalnizca adapter 'shown:true' donerse verilir.
+  showRewarded: function(secenek){
+    const self = this;
+    const s = secenek || {};
+    const odul = (typeof s.onReward === 'function') ? s.onReward : null;
+    if(s.kullaniciIstedi !== true) return Promise.resolve({ shown:false, reason:'not_requested' });
+    if(this.isTest())       return Promise.resolve({ shown:false, reason:'test' });
+    if(!this.isAvailable()) return Promise.resolve({ shown:false, reason:'unavailable' });
+    return this.beforeAd()
+      .then(function(){ return self._guvenli('showRewarded', { shown:false, reason:'unavailable' }, s); })
+      .then(function(r){
+        return self.afterAd().then(function(){
+          if(r && r.shown === true && odul){ try{ odul(); }catch(e){} }
+          return r;
+        });
+      })
+      .catch(function(){ return { shown:false, reason:'error' }; });
+  },
+
+  // ── GERIYE DONUK UYUM — Chat V1 [ASAMA 4] ────────────────────────────
+  // Chat V1 bu iki fonksiyonu cagirir. Urun karari geregi ikisi de reklam
+  // GOSTERMEZ; aninda cozulur ve chat dogrudan acilir.
+  beforeEnterChat: function(){ return Promise.resolve(); },
+  afterChatAd:     function(){ return Promise.resolve(); },
+
+  // ── SAHTE ADAPTER — yalnizca test icin ───────────────────────────────
+  // Hicbir SDK cagirmaz. Ornek: AD.register(AD.platform(), AD.sahteAdapter());
+  sahteAdapter: function(ayar){
+    const a = ayar || {};
+    return {
+      isAvailable:  function(){ return a.available !== false; },
+      beforeAd:     function(){ return Promise.resolve(); },
+      afterAd:      function(){ return Promise.resolve(); },
+      showMidgame:  function(){ return Promise.resolve({ shown: a.shown !== false, reason:'fake' }); },
+      showRewarded: function(){ return Promise.resolve({ shown: a.shown !== false, reason:'fake' }); }
+    };
   }
 };
+
+// ── YERLESIK ADAPTERLER ────────────────────────────────────────────────
+// Portal adlari YALNIZCA bu blokta gecer. Chat V1 ve oyun kodu bunlari
+// gormez; tek temas noktasi AD.* fonksiyonlaridir.
+//
+// NOT: Bu asamada HICBIR YENI SDK EKLENMEDI. Asagidaki adapter, sayfada
+// ZATEN var olan portal SDK'sinin (initCrazyGames/CG_SDK) hazir olup
+// olmadigina bakar; SDK yoksa sessizce kullanilamaz doner.
+AD.register('crazygames', {
+  isAvailable: function(){
+    // Basic Launch'ta reklamlar KAPALI olabilir; o durumda cgReady false
+    // kalir ve akis reklamsiz devam eder.
+    try{ return (typeof cgReady !== 'undefined') && cgReady === true &&
+                (typeof CG_SDK !== 'undefined') && !!CG_SDK; }catch(e){ return false; }
+  },
+  showMidgame: function(){
+    try{ return Promise.resolve(CG_SDK.ad.requestAd('midgame'))
+      .then(function(){ return { shown:true, reason:'ok' }; })
+      .catch(function(){ return { shown:false, reason:'error' }; }); }
+    catch(e){ return Promise.resolve({ shown:false, reason:'error' }); }
+  },
+  showRewarded: function(){
+    try{ return Promise.resolve(CG_SDK.ad.requestAd('rewarded'))
+      .then(function(){ return { shown:true, reason:'ok' }; })
+      .catch(function(){ return { shown:false, reason:'error' }; }); }
+    catch(e){ return Promise.resolve({ shown:false, reason:'error' }); }
+  }
+});
+
+// Asagidakiler ISKELET adapterlerdir: SDK YUKLEMEZ, cagri YAPMAZ.
+// Kural notlari:
+//   * Bu portalda ucuncu taraf reklam entegrasyonu KULLANILMAZ; entegrasyon
+//     gerektiginde yalnizca portalin kendi SDK'si baglanir.
+//   * Mobil pakette gelistirme/test sirasinda YALNIZCA test reklam kimlikleri
+//     kullanilir; production kimligi bu asamada EKLENMEZ.
+AD.register('yandex',  { isAvailable: function(){ return false; } });
+AD.register('pixidus', { isAvailable: function(){ return false; } });
+AD.register('android', { isAvailable: function(){ return false; } });
+AD.register('unknown', { isAvailable: function(){ return false; } });
 
 // ═══════════════════════════════════════════════════════════════════════
 // CHAT V1 — ISTEMCI                                    [ASAMA 4]
