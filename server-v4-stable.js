@@ -596,6 +596,9 @@ function chatOdadanCikar(ws, bildir){
   const odaId = u.oda;
   const o = chatRooms.get(odaId);
   if(o) o.uyeler.delete(ws);
+  // [V2.1a] SID kaydi kullanici silinmeden ONCE tazelenir: TTL kopma
+  // anindan itibaren isler, boylece kisa kopmalarda ayni SID geri alinir.
+  if(u.sid) chatSidDokun(u.sid, u.nickAlt);
   chatUsers.delete(ws);            // nickname rezervasyonu serbest
   if(odaId && bildir !== false){
     chatYayinla(odaId, { type:'chat_leave', room: odaId, nick: u.nick });
@@ -633,10 +636,15 @@ function chatKatil(ws, msg){
 
   const o = ChatStore.getRoom(oda);
   o.uyeler.add(ws);
-  chatUsers.set(ws, { nick:d.nick, nickAlt:d.nickAlt, oda:oda,
+  // [V2.1a] Gecici oturum kimligi: gecerli jeton varsa AYNI SID korunur,
+  // aksi halde yenisi uretilir. Nick ile SID birbirinden BAGIMSIZDIR.
+  const sd = chatSidCoz(msg && msg.sid);
+  chatSidDokun(sd.sid, d.nickAlt);
+  chatUsers.set(ws, { nick:d.nick, nickAlt:d.nickAlt, oda:oda, sid:sd.sid,
                       sonMs:0, pencere:[], muteBitis:0, sonMetin:'', tekrar:0 });
 
   chatGonder(ws, { type:'chat_join', ok:true, room:oda, nick:d.nick,
+                   sid: chatSidJeton(sd.sid),
                    capacity:CHAT_ODA_KAPASITE, count:o.uyeler.size });
   chatGonder(ws, { type:'chat_history', room:oda, messages:o.mesajlar.slice() });
   chatGonder(ws, { type:'chat_users', room:oda, users:ChatStore.getUsers(oda) });
@@ -849,6 +857,8 @@ function chatTemizlik(){
       oda.mesajlar = oda.mesajlar.filter(function(m){ return m.ts >= gSinir; });
     }
   });
+  // [V2.1a] Suresi dolmus SID kayitlari ayni supurmede dusurulur.
+  chatSidSupur(simdi);
   const dSinir = simdi - CHAT_DM_TTL_MS;
   chatDM.forEach(function(k, id){
     chatDMSupur(k);
@@ -861,6 +871,100 @@ if(chatTemizlikTimer && typeof chatTemizlikTimer.unref === 'function'){
   chatTemizlikTimer.unref();                 // surec kapanisini engellemesin
 }
 wss.on('close', function(){ clearInterval(chatTemizlikTimer); });
+
+// ═══════════════════════════════════════════════════════════════════════
+// CHAT V2.1a — GECICI OTURUM KIMLIGI (SID)                        [V2.1a]
+// ═══════════════════════════════════════════════════════════════════════
+// NEDEN: nick gecicidir; soket kapaninca rezervasyon serbest kalir.
+// V2.1b'deki server-side Block ve V2.1d'deki moderator mute/ban'in
+// reconnect'ten sag cikabilmesi icin SOKETE degil KISIYE bagli, kisa
+// omurlu bir tanimlayici gerekir. Bu asama YALNIZCA o tanimlayiciyi
+// kurar; block / report / moderation davranisi EKLENMEZ.
+//
+// NE DEGILDIR: SID bir kimlik DOGRULAMASI degildir. Tarayici depolamasini
+// temizleyen kullanici yeni bir SID alir. Tek garantisi sudur:
+// BASKASININ SID'i taklit edilemez (HMAC imzasi). Kendine yeni kimlik
+// uretmek serbesttir; hesap sistemi olmadan bu kacinilmazdir.
+//
+// DEPOLAMA: tablo RAM'dedir, restart'ta sifirlanir (V2 karari korunur).
+// GIZLI ANAHTAR YALNIZCA SUNUCUDADIR; istemciye "sid.imza" jetonu gider,
+// anahtarin kendisi HICBIR ZAMAN gonderilmez.
+const chatCrypto        = require('crypto');
+const CHAT_SID_TTL_MS   = 30 * 60 * 1000;   // kopmadan sonra SID kaydinin omru
+const CHAT_SID_MAX      = 5000;             // tablo tavani (LRU ile korunur)
+const CHAT_SID_IMZA_UZ  = 32;               // hex karakter = 128 bit
+
+// Anahtar: once ortam degiskeni (Render env), yoksa SURECE OZEL rastgele
+// anahtar. Ikinci durumda jetonlar yalnizca bu surec boyunca gecerlidir;
+// her iki durumda da istemciye anahtar SIZMAZ.
+const CHAT_SID_ENV      = (typeof process.env.CHAT_SECRET === 'string' &&
+                           process.env.CHAT_SECRET.length >= 16);
+const CHAT_SID_SECRET   = CHAT_SID_ENV ? process.env.CHAT_SECRET
+                                       : chatCrypto.randomBytes(32).toString('hex');
+
+const chatSid = new Map();   // sid -> { nickAlt, sonGorulme }
+
+function chatSidImza(sid){
+  return chatCrypto.createHmac('sha256', CHAT_SID_SECRET)
+                   .update(sid).digest('hex').slice(0, CHAT_SID_IMZA_UZ);
+}
+function chatSidUret(){ return chatCrypto.randomBytes(16).toString('hex'); }
+function chatSidJeton(sid){ return sid + '.' + chatSidImza(sid); }
+
+// Jetonu dogrular. Bozuk imza -> null. Karsilastirma SABIT ZAMANLIDIR.
+function chatSidDogrula(jeton){
+  if(typeof jeton !== 'string' || jeton.length > 128) return null;
+  const i = jeton.indexOf('.');
+  if(i <= 0) return null;
+  const sid = jeton.slice(0, i), imza = jeton.slice(i + 1);
+  if(!/^[0-9a-f]{32}$/.test(sid)) return null;
+  if(imza.length !== CHAT_SID_IMZA_UZ || !/^[0-9a-f]+$/.test(imza)) return null;
+  const a = Buffer.from(imza, 'utf8');
+  const b = Buffer.from(chatSidImza(sid), 'utf8');
+  if(a.length !== b.length) return null;
+  try{ if(!chatCrypto.timingSafeEqual(a, b)) return null; }catch(e){ return null; }
+  return sid;
+}
+
+// LRU + TTL tablosu: dokunulan kayit sona alinir, tavan asilirsa EN ESKI
+// dokunulan kayit dusurulur. YENI ZAMANLAYICI YOKTUR; supurme mevcut
+// chatTemizlik() icinde yapilir.
+function chatSidDokun(sid, nickAlt){
+  let k = chatSid.get(sid);
+  if(k) chatSid.delete(sid);
+  else  k = { nickAlt: '', sonGorulme: 0 };
+  if(nickAlt) k.nickAlt = nickAlt;
+  k.sonGorulme = Date.now();
+  chatSid.set(sid, k);
+  while(chatSid.size > CHAT_SID_MAX){
+    const enEski = chatSid.keys().next();
+    if(enEski.done) break;
+    chatSid.delete(enEski.value);
+  }
+  return k;
+}
+
+// chat_join'daki jetonu cozer.
+//   gecerli imza + yasayan kayit -> AYNI SID korunur      (reconnect)
+//   imza bozuk / jeton yok       -> YENI SID              (sessizce)
+//   TTL dolmus / kayit dusmus    -> YENI SID              (kimlik yenilenir)
+function chatSidCoz(jeton){
+  const sid = chatSidDogrula(jeton);
+  if(!sid) return { sid: chatSidUret(), yeni: true, sebep: jeton ? 'invalid' : 'none' };
+  const k = chatSid.get(sid);
+  if(!k) return { sid: chatSidUret(), yeni: true, sebep: 'expired' };
+  if((Date.now() - k.sonGorulme) > CHAT_SID_TTL_MS){
+    chatSid.delete(sid);
+    return { sid: chatSidUret(), yeni: true, sebep: 'expired' };
+  }
+  return { sid: sid, yeni: false, sebep: 'ok' };
+}
+function chatSidSupur(simdi){
+  const sinir = simdi - CHAT_SID_TTL_MS;
+  chatSid.forEach(function(k, sid){ if(k.sonGorulme < sinir) chatSid.delete(sid); });
+}
+console.log('Chat V2.1a SID ready (ttl ' + (CHAT_SID_TTL_MS / 60000) + ' min, cap ' +
+            CHAT_SID_MAX + ', secret ' + (CHAT_SID_ENV ? 'env' : 'ephemeral') + ')');
 
 function chatYonlendir(ws, ham){
   let msg;

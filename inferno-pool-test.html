@@ -4913,6 +4913,9 @@ const CHAT_YENIDEN_MS  = 3000;     // yeniden baglanma araligi
 const CHAT_KATIL_MS    = 2500;     // yeniden katilim denemeleri arasi
 const CHAT_KATIL_MAX   = 8;        // en fazla yeniden katilim denemesi
 const CHAT_BLOK_ANAHTAR = 'inferno_chat_block';
+// [V2.1a] Gecici oturum kimligi jetonu ("sid.imza"). Sunucu uretir, imzayi
+// SUNUCU dogrular; gizli anahtar burada YOKTUR ve istemciye hic gelmez.
+const CHAT_SID_ANAHTAR  = 'inferno_chat_sid';
 const CHAT_MUTE_ANAHTAR = 'inferno_chat_mute';
 // Istemci ON dogrulamasi YALNIZCA kullanici deneyimi icindir; asil
 // dogrulama sunucudadir ve sunucu karari her zaman uygulanir.
@@ -5010,8 +5013,22 @@ let _chatKatilDeneme = 0;            // ardisik yeniden katilim denemesi
 // bellekte, en fazla CHAT_EKRAN_MAX); DM acikken global mesajlar kaybolmaz,
 // sadece gosterilmez. Hicbir sey localStorage'a YAZILMAZ.
 const CHAT = { nick:'', oda:'global', acik:false, bagli:false, sayac:0,
-               katildi:false, katildiOnce:false,
+               katildi:false, katildiOnce:false, sid:'',
                dmHedef:null, dmOkunmamis:{}, globalTampon:[] };
+
+// [V2.1a] Jeton okuma/yazma. Bozuk veya asiri uzun deger sessizce
+// yoksayilir; sunucu zaten gecersiz jetonda YENI kimlik uretir.
+function chatSidOku(){
+  try{
+    const j = localStorage.getItem(CHAT_SID_ANAHTAR);
+    return (typeof j === 'string' && j.length > 0 && j.length <= 128) ? j : '';
+  }catch(e){ return ''; }
+}
+function chatSidYaz(j){
+  if(typeof j !== 'string' || !j || j.length > 128) return;
+  CHAT.sid = j;
+  try{ localStorage.setItem(CHAT_SID_ANAHTAR, j); }catch(e){}
+}
 
 // ── Engelleme / susturma: YALNIZCA istemci tarafinda ─────────────────
 // Sunucuya blok listesi GONDERILMEZ (chat_block_notice yalnizca protokolu
@@ -5168,7 +5185,7 @@ function chatOdalariCiz(){
 }
 function chatOdayaGec(id){
   if(!CHAT.bagli || id === CHAT.oda) return;
-  chatWsGonder({ type:'chat_join', nick: CHAT.nick, room: id });
+  chatWsGonder({ type:'chat_join', nick: CHAT.nick, room: id, sid: chatSidOku() });
 }
 
 // ── CHAT_WS — oyun soketinden TAMAMEN ayri ───────────────────────────
@@ -5213,7 +5230,7 @@ function chatYenidenKatil(){
     // yeniden baglanma akisi (chatYenidenPlanla) zaten devrededir.
     if(!CHAT_WS || CHAT_WS.readyState !== WebSocket.OPEN) return;
     chatSistemYaz('chat.reconnecting');
-    chatWsGonder({ type:'chat_join', nick: CHAT.nick, room: CHAT.oda });
+    chatWsGonder({ type:'chat_join', nick: CHAT.nick, room: CHAT.oda, sid: chatSidOku() });
   }, CHAT_KATIL_MS);
   return true;
 }
@@ -5229,8 +5246,9 @@ function chatBaglan(){
     chatKatilimDurdur();             // eski zamanlayici birakilmaz
     chatPingBaslat();
     // Nickname YENI soket uzerinden tekrar gonderilir; oda bilgisi
-    // CHAT.oda'da saklidir ve kopmada korunur.
-    chatWsGonder({ type:'chat_join', nick: CHAT.nick, room: CHAT.oda });
+    // CHAT.oda'da saklidir ve kopmada korunur. [V2.1a] SID jetonu da
+    // gonderilir; sunucu gecerliyse AYNI kimligi surdurur.
+    chatWsGonder({ type:'chat_join', nick: CHAT.nick, room: CHAT.oda, sid: chatSidOku() });
   };
   CHAT_WS.onmessage = function(e){
     let m; try{ m = JSON.parse(e.data); }catch(x){ return; }
@@ -5261,6 +5279,8 @@ function chatBaglantiKapat(){
   CHAT.katildiOnce = false;          // sonraki acilis YENI bir ilk giristir
   // CHAT V2: gorunum ve gecici tamponlar sifirlanir (kalici depolama yok).
   CHAT.dmHedef = null; CHAT.dmOkunmamis = {}; CHAT.globalTampon = [];
+  // [V2.1a] SID jetonu BILEREK silinmez: ayni tarayicidan tekrar girisde
+  // kimlik surer. Jeton bir sirdir degildir; icinde nick veya kisisel veri yoktur.
   if(_chatYeniden){ clearTimeout(_chatYeniden); _chatYeniden = null; }
   try{ if(CHAT_WS && CHAT_WS.readyState === WebSocket.OPEN) chatWsGonder({type:'chat_leave'}); }catch(e){}
   try{ if(CHAT_WS) CHAT_WS.close(); }catch(e){}
@@ -5280,6 +5300,7 @@ function chatMsgIsle(m){
         chatKatilimDurdur();
         CHAT.nick = m.nick || CHAT.nick;
         CHAT.oda  = m.room || CHAT.oda;
+        chatSidYaz(m.sid);           // [V2.1a] sunucunun verdigi jeton saklanir
         chatOdalariCiz();
         chatPaneliAc();
         // Kopma sirasinda acik olan 1:1 sohbet yeniden acilir.
