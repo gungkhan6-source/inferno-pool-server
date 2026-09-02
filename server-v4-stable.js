@@ -710,6 +710,158 @@ function chatBlokBildirimi(ws, msg){
 // ── Yonlendirici ──────────────────────────────────────────────────────
 // 'chat_' ile baslamayan HER mesaj aninda birakilir: oyun trafigi bu
 // fonksiyondan hicbir sekilde etkilenmez.
+// ═══════════════════════════════════════════════════════════════════════
+// CHAT V2 — 1:1 OZEL MESAJ (DM) + GECICI DEPOLAMA                [V2]
+// ═══════════════════════════════════════════════════════════════════════
+// KALICI DEPOLAMA YOK: veritabani, dosya, disk — hicbiri kullanilmaz.
+// Her sey YALNIZCA RAM'dedir ve surec yeniden baslayinca SIFIRLANIR.
+//
+// GLOBAL : en fazla 100 mesaj (mevcut ChatStore.addMessage siniri) +
+//          6 saatten eski mesajlar periyodik supurme ile dusurulur.
+// DM     : konusma basina 100 mesaj, 24 saat TTL, en fazla 200 aktif
+//          konusma; tavan asilirsa EN ESKI DOKUNULAN konusma (LRU) atilir.
+//
+// DM MESAJLARI GLOBAL AKISA HIC GIRMEZ: ChatStore.addMessage() ve
+// chatYayinla() DM yolunda CAGRILMAZ; DM yalnizca iki tarafin soketine
+// dogrudan gonderilir. Global mesajlar da DM'e sizmaz.
+const CHAT_DM_GECMIS_MAX  = 100;                 // konusma basina mesaj
+const CHAT_DM_KONUSMA_MAX = 200;                 // ayni anda tutulan konusma
+const CHAT_DM_TTL_MS      = 24 * 60 * 60 * 1000; // 24 saat
+const CHAT_GLOBAL_TTL_MS  =  6 * 60 * 60 * 1000; // 6 saat
+const CHAT_TEMIZLIK_MS    =  5 * 60 * 1000;      // hafif supurme periyodu
+
+// konusmaId -> { mesajlar: [], sonMs }   (sonMs = LRU icin son dokunma)
+const chatDM = new Map();
+
+// Konusma kimligi nick ANAHTARLARINDAN uretilir (chatNickAnahtar), boylece
+// buyuk/kucuk harf ve Unicode taklit varyasyonlari ayni konusmaya duser.
+function chatDMKonusmaId(a, b){ return 'dm:' + [a, b].sort().join('|'); }
+
+function chatDMKonusma(id, olustur){
+  let k = chatDM.get(id);
+  if(!k){
+    if(!olustur) return null;
+    k = { mesajlar: [], sonMs: Date.now() };
+    chatDM.set(id, k);
+  }
+  // LRU: her dokunusta sona tasi.
+  chatDM.delete(id); chatDM.set(id, k);
+  k.sonMs = Date.now();
+  // Tavan asildiysa EN ESKI dokunulan konusmayi dusur.
+  while(chatDM.size > CHAT_DM_KONUSMA_MAX){
+    const enEski = chatDM.keys().next().value;
+    if(enEski === undefined) break;
+    chatDM.delete(enEski);
+  }
+  return k;
+}
+
+// Nick anahtarindan CANLI soketi bul. Nickler gecicidir; kullanici
+// baglantida degilse null doner -> 'dm_offline'.
+function chatSoketBul(anahtar){
+  for(const [soket, kayit] of chatUsers){
+    if(kayit && kayit.nickAlt === anahtar) return soket;
+  }
+  return null;
+}
+
+// Hedef nicki cozer. Basarisizsa hata kodu dondurur.
+function chatDMHedef(ws, u, hamNick){
+  let n = chatNormalize(hamNick);
+  try{ n = n.normalize('NFKC'); }catch(e){}
+  if(!n) return { hata:'dm_target' };
+  const anahtar = chatNickAnahtar(n);
+  if(anahtar === u.nickAlt) return { hata:'dm_self' };
+  const hedefWs = chatSoketBul(anahtar);
+  if(!hedefWs) return { hata:'dm_offline' };
+  const hedefU = chatUsers.get(hedefWs);
+  if(!hedefU) return { hata:'dm_offline' };
+  return { ws: hedefWs, u: hedefU, anahtar: anahtar };
+}
+
+// chat_dm_open: konusmayi ac, YALNIZCA o konusmanin gecmisini gonder.
+function chatDMAc(ws, msg){
+  const u = chatUsers.get(ws);
+  if(!u) return chatHata(ws, 'not_joined');
+  const h = chatDMHedef(ws, u, msg && msg.to);
+  if(h.hata) return chatHata(ws, h.hata);
+  const id = chatDMKonusmaId(u.nickAlt, h.anahtar);
+  const k = chatDMKonusma(id, true);
+  chatDMSupur(k);
+  chatGonder(ws, { type:'chat_dm_history', with: h.u.nick, messages: k.mesajlar.slice() });
+}
+
+// chat_dm: 1:1 mesaj. Global akisa YAZILMAZ, global odaya YAYILMAZ.
+function chatDMMesaj(ws, msg){
+  const u = chatUsers.get(ws);
+  if(!u) return chatHata(ws, 'not_joined');
+  const simdi = Date.now();
+
+  // ORTAK hiz limiti / mute: DM ile global sinirlari asilamaz.
+  const hiz = chatHizKontrol(u, simdi);
+  if(hiz) return chatHata(ws, hiz.hata, hiz.kalan);
+
+  const h = chatDMHedef(ws, u, msg && msg.to);
+  if(h.hata) return chatHata(ws, h.hata);
+
+  let metin = chatNormalize(msg && msg.text);
+  if(!metin) return chatHata(ws, 'empty');
+  if(metin.length > CHAT_MESAJ_MAX) return chatHata(ws, 'too_long');
+
+  u.sonMs = simdi;
+  u.pencere.push(simdi);
+
+  metin = chatKufurMaskele(metin);          // global ile ayni filtre
+
+  const id = chatDMKonusmaId(u.nickAlt, h.anahtar);
+  const k = chatDMKonusma(id, true);
+  chatDMSupur(k);
+  const kayit = { from: u.nick, to: h.u.nick, text: metin, ts: simdi };
+  k.mesajlar.push(kayit);
+  if(k.mesajlar.length > CHAT_DM_GECMIS_MAX){
+    k.mesajlar.splice(0, k.mesajlar.length - CHAT_DM_GECMIS_MAX);
+  }
+
+  // Yalnizca iki tarafa: gonderene 'with' = alici, aliciya 'with' = gonderen.
+  chatGonder(ws,   { type:'chat_dm_message', with: h.u.nick, from: u.nick,
+                     text: kayit.text, ts: kayit.ts, mine: true });
+  if(h.ws !== ws){
+    chatGonder(h.ws, { type:'chat_dm_message', with: u.nick, from: u.nick,
+                       text: kayit.text, ts: kayit.ts, mine: false });
+  }
+}
+
+// ── GECICI DEPOLAMA SUPURMESI ─────────────────────────────────────────
+function chatDMSupur(k){
+  if(!k || !k.mesajlar.length) return;
+  const sinir = Date.now() - CHAT_DM_TTL_MS;
+  if(k.mesajlar[0].ts >= sinir) return;              // en eski bile taze
+  k.mesajlar = k.mesajlar.filter(function(m){ return m.ts >= sinir; });
+}
+
+// Hafif periyodik temizlik: 5 dakikada bir, oda sayisi ve mesaj sayisi
+// zaten tavanli oldugu icin maliyeti ihmal edilebilir.
+function chatTemizlik(){
+  const simdi = Date.now();
+  const gSinir = simdi - CHAT_GLOBAL_TTL_MS;
+  chatRooms.forEach(function(oda){
+    if(oda.mesajlar.length && oda.mesajlar[0].ts < gSinir){
+      oda.mesajlar = oda.mesajlar.filter(function(m){ return m.ts >= gSinir; });
+    }
+  });
+  const dSinir = simdi - CHAT_DM_TTL_MS;
+  chatDM.forEach(function(k, id){
+    chatDMSupur(k);
+    // Konusma tamamen bosaldiysa ve uzun suredir dokunulmadiysa dusur.
+    if(!k.mesajlar.length && k.sonMs < dSinir) chatDM.delete(id);
+  });
+}
+const chatTemizlikTimer = setInterval(chatTemizlik, CHAT_TEMIZLIK_MS);
+if(chatTemizlikTimer && typeof chatTemizlikTimer.unref === 'function'){
+  chatTemizlikTimer.unref();                 // surec kapanisini engellemesin
+}
+wss.on('close', function(){ clearInterval(chatTemizlikTimer); });
+
 function chatYonlendir(ws, ham){
   let msg;
   try{ msg = JSON.parse(ham); }catch(e){ return; }
@@ -721,6 +873,9 @@ function chatYonlendir(ws, ham){
     case 'chat_leave':         chatAyril(ws); break;
     case 'chat_message':       chatMesaj(ws, msg); break;
     case 'chat_report':        chatRapor(ws, msg); break;
+    // CHAT V2 — 1:1 DM. Global akisla HICBIR paylasimi yoktur.
+    case 'chat_dm_open':       chatDMAc(ws, msg); break;
+    case 'chat_dm':            chatDMMesaj(ws, msg); break;
     case 'chat_block_notice':  chatBlokBildirimi(ws, msg); break;
     // Uygulama seviyesi chat heartbeat. Mevcut heartbeat blogu
     // DEGISTIRILMEDI; zaten her mesaj ws.lastAppMsg'i tazeliyor.

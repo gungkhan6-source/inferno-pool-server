@@ -1705,6 +1705,13 @@ en: {
   'chat.muted':'You are muted for {n} seconds',
   'chat.errDuplicate':'Do not repeat the same message',
   'chat.errNotJoined':'You are not in a room',
+  'chat.clear':'\ud83e\uddf9 CLEAR',
+  'chat.dmWith':'\ud83d\udcac {nick}',
+  'chat.dmOpened':'Private chat with {nick} \u2014 only the two of you see this.',
+  'chat.globalCleared':'Your view was cleared. Other players are not affected.',
+  'chat.errDmOffline':'That player is offline',
+  'chat.errDmSelf':'You cannot message yourself',
+  'chat.errDmTarget':'Player not found',
   'chat.errGeneric':'Chat error'
 },
 
@@ -1885,6 +1892,13 @@ tr: {
   'chat.muted':'{n} saniye susturuldun',
   'chat.errDuplicate':'Aynı mesajı tekrarlama',
   'chat.errNotJoined':'Bir odada değilsin',
+  'chat.clear':'\ud83e\uddf9 TEMİZLE',
+  'chat.dmWith':'\ud83d\udcac {nick}',
+  'chat.dmOpened':'{nick} ile özel sohbet — bunu yalnızca ikiniz görüyorsunuz.',
+  'chat.globalCleared':'Kendi ekranın temizlendi. Diğer oyuncular etkilenmedi.',
+  'chat.errDmOffline':'Bu oyuncu çevrimdışı',
+  'chat.errDmSelf':'Kendine mesaj gönderemezsin',
+  'chat.errDmTarget':'Oyuncu bulunamadı',
   'chat.errGeneric':'Sohbet hatası'
 },
 
@@ -2065,6 +2079,13 @@ ru: {
   'chat.muted':'Вы заглушены на {n} секунд',
   'chat.errDuplicate':'Не повторяйте одно и то же сообщение',
   'chat.errNotJoined':'Вы не в комнате',
+  'chat.clear':'\ud83e\uddf9 ОЧИСТИТЬ',
+  'chat.dmWith':'\ud83d\udcac {nick}',
+  'chat.dmOpened':'Личный чат с {nick} — видно только вам двоим.',
+  'chat.globalCleared':'Ваш экран очищен. Другие игроки не затронуты.',
+  'chat.errDmOffline':'Этот игрок не в сети',
+  'chat.errDmSelf':'Нельзя писать самому себе',
+  'chat.errDmTarget':'Игрок не найден',
   'chat.errGeneric':'Ошибка чата'
 }
 
@@ -4938,6 +4959,8 @@ const CHAT_HATA_ANAHTAR = {
   not_joined:'chat.errNotJoined',  muted:'chat.muted',
   too_fast:'chat.errTooFast',      empty:'chat.errEmpty',
   too_long:'chat.errTooLong',      duplicate:'chat.errDuplicate',
+  dm_offline:'chat.errDmOffline', dm_self:'chat.errDmSelf',
+  dm_target:'chat.errDmTarget',
   unknown_type:'chat.errGeneric'
 };
 
@@ -4951,8 +4974,13 @@ let _chatKatilTimer = null;          // yeniden katilim zamanlayicisi
 let _chatKatilDeneme = 0;            // ardisik yeniden katilim denemesi
 // bagli = soket OPEN;  katildi = sunucu chat_join ok:true dedi.
 // Ikisi AYRIDIR: soket acikken odada olmamak mumkundur (not_joined).
+// CHAT V2: dmHedef = null ise GLOBAL goruntuleniyor, aksi halde o nick ile
+// 1:1 ozel sohbet. globalTampon global mesajlari EKRAN icin tutar (yalnizca
+// bellekte, en fazla CHAT_EKRAN_MAX); DM acikken global mesajlar kaybolmaz,
+// sadece gosterilmez. Hicbir sey localStorage'a YAZILMAZ.
 const CHAT = { nick:'', oda:'global', acik:false, bagli:false, sayac:0,
-               katildi:false, katildiOnce:false };
+               katildi:false, katildiOnce:false,
+               dmHedef:null, dmOkunmamis:{}, globalTampon:[] };
 
 // ── Engelleme / susturma: YALNIZCA istemci tarafinda ─────────────────
 // Sunucuya blok listesi GONDERILMEZ (chat_block_notice yalnizca protokolu
@@ -5047,13 +5075,22 @@ function chatAkisTazele(){
 }
 function chatKullanicilariCiz(liste){
   const k = document.getElementById('chat-kullanicilar'); if(!k) return;
+  if(liste) CHAT.sonKullanicilar = liste.slice();
   while(k.firstChild) k.removeChild(k.firstChild);
   (liste || []).forEach(function(nick){
     const d = document.createElement('div');
-    d.className = 'chat-kullanici';
+    d.className = 'chat-kullanici' + (nick === CHAT.dmHedef ? ' sel' : '');
     d.appendChild(document.createTextNode(String(nick)));   // metin dugumu
-    d.title = t('chat.block');
-    d.onclick = function(){ if(nick !== CHAT.nick) chatEngelleAc(nick); };
+    // CHAT V2: nick tiklamasi 1:1 ozel sohbet acar. Engelleme her mesajin
+    // yanindaki dugmede (chat-arac) durmaya devam eder.
+    d.title = t('chat.dmWith', { nick: nick });
+    d.onclick = function(){ if(nick !== CHAT.nick) chatDMAc(nick); };
+    if(CHAT.dmOkunmamis[nick]){
+      const r = document.createElement('span');
+      r.className = 'chat-arac';
+      r.appendChild(document.createTextNode(' \u25cf'));    // okunmamis noktasi
+      d.appendChild(r);
+    }
     k.appendChild(d);
   });
   // Yalnizca SAYI yazilir; 'ONLINE PLAYERS' etiketi data-i18n ile bagli
@@ -5073,9 +5110,22 @@ function chatOdalariCiz(){
     b.className = 'chat-oda' + (id === CHAT.oda ? ' sel' : '');
     b.type = 'button';
     b.appendChild(document.createTextNode(id === 'global' ? t('chat.roomGlobal') : id));
-    b.onclick = function(){ chatOdayaGec(id); };
+    // CHAT V2: GLOBAL'e donus oda degistirmez; yalnizca gorunumu global
+    // akisa cevirir (kullanici zaten global odada kalmaya devam eder).
+    b.onclick = function(){ if(CHAT.dmHedef) chatGlobaleDon(); else chatOdayaGec(id); };
+    if(id === CHAT.oda && !CHAT.dmHedef) b.className = 'chat-oda sel';
+    else if(id === CHAT.oda) b.className = 'chat-oda';
     kok.appendChild(b);
   });
+  // Acik 1:1 sohbet ayri bir girdi olarak gosterilir.
+  if(CHAT.dmHedef){
+    const d = document.createElement('button');
+    d.className = 'chat-oda sel';
+    d.type = 'button';
+    d.appendChild(document.createTextNode(t('chat.dmWith', { nick: CHAT.dmHedef })));
+    d.onclick = function(){ chatDMAc(CHAT.dmHedef); };
+    kok.appendChild(d);
+  }
 }
 function chatOdayaGec(id){
   if(!CHAT.bagli || id === CHAT.oda) return;
@@ -5170,6 +5220,8 @@ function chatBaglantiKapat(){
   _chatKatilDeneme = 0;
   CHAT.katildi = false;
   CHAT.katildiOnce = false;          // sonraki acilis YENI bir ilk giristir
+  // CHAT V2: gorunum ve gecici tamponlar sifirlanir (kalici depolama yok).
+  CHAT.dmHedef = null; CHAT.dmOkunmamis = {}; CHAT.globalTampon = [];
   if(_chatYeniden){ clearTimeout(_chatYeniden); _chatYeniden = null; }
   try{ if(CHAT_WS && CHAT_WS.readyState === WebSocket.OPEN) chatWsGonder({type:'chat_leave'}); }catch(e){}
   try{ if(CHAT_WS) CHAT_WS.close(); }catch(e){}
@@ -5191,23 +5243,48 @@ function chatMsgIsle(m){
         CHAT.oda  = m.room || CHAT.oda;
         chatOdalariCiz();
         chatPaneliAc();
+        // Kopma sirasinda acik olan 1:1 sohbet yeniden acilir.
+        if(CHAT.dmHedef) chatWsGonder({ type:'chat_dm_open', to: CHAT.dmHedef });
       } else if(m.nick){
         chatSistemYaz('chat.userJoined', { nick: m.nick });
       }
       break;
     case 'chat_history': {
-      const a = chatAkisEleman();
-      if(a){ while(a.firstChild) a.removeChild(a.firstChild); }
-      (m.messages || []).slice(-CHAT_EKRAN_MAX).forEach(function(x){
-        chatMesajYaz(x.nick, x.text, x.ts);
-      });
+      // GLOBAL gecmis: tampona alinir; ekrana YALNIZCA global gorunumde
+      // cizilir. DM acikken global gecmis DM ekranini bozmaz.
+      CHAT.globalTampon = (m.messages || []).slice(-CHAT_EKRAN_MAX)
+        .map(function(x){ return { nick:x.nick, text:x.text, ts:x.ts }; });
+      if(!CHAT.dmHedef) chatGlobalCiz();
       break;
     }
+    // CHAT V2 — 1:1 ozel sohbet gecmisi. Global tampona DOKUNMAZ.
+    case 'chat_dm_history': {
+      if(CHAT.dmHedef && m.with === CHAT.dmHedef){
+        chatAkisBosalt();
+        chatSistemYaz('chat.dmOpened', { nick: m.with });
+        (m.messages || []).slice(-CHAT_EKRAN_MAX).forEach(function(x){
+          chatMesajYaz(x.from, x.text, x.ts);
+        });
+      }
+      break;
+    }
+    // CHAT V2 — 1:1 mesaj. Global akisa YAZILMAZ.
+    case 'chat_dm_message':
+      if(CHAT.dmHedef && m.with === CHAT.dmHedef){
+        chatMesajYaz(m.from, m.text, m.ts);
+      } else if(m.mine !== true){
+        CHAT.dmOkunmamis[m.with] = (CHAT.dmOkunmamis[m.with] || 0) + 1;
+        chatKullanicilariCiz(CHAT.sonKullanicilar || []);
+      }
+      break;
     case 'chat_users':
       chatKullanicilariCiz(m.users);
       break;
     case 'chat_message':
-      chatMesajYaz(m.nick, m.text, m.ts);
+      // Global mesaj: her zaman tampona; ekrana YALNIZCA global gorunumde.
+      // DM acikken kaybolmaz, sadece gosterilmez.
+      chatGlobalTamponaEkle(m.nick, m.text, m.ts);
+      if(!CHAT.dmHedef) chatMesajYaz(m.nick, m.text, m.ts);
       break;
     case 'chat_leave':
       if(!m.ok && m.nick) chatSistemYaz('chat.userLeft', { nick: m.nick });
@@ -5308,12 +5385,60 @@ function chatNickGonder(){
 }
 
 // ── Mesaj gonderimi ───────────────────────────────────────────────────
+// ── CHAT V2 — GLOBAL / DM GORUNUM AYRIMI ─────────────────────────────
+// Tek kural: ekrana ne cizilecegini YALNIZCA CHAT.dmHedef belirler.
+// Global mesaj DM ekranina, DM mesaji global ekrana ASLA yazilmaz.
+function chatGlobalTamponaEkle(nick, metin, ts){
+  CHAT.globalTampon.push({ nick:nick, text:metin, ts:ts });
+  if(CHAT.globalTampon.length > CHAT_EKRAN_MAX){
+    CHAT.globalTampon.splice(0, CHAT.globalTampon.length - CHAT_EKRAN_MAX);
+  }
+}
+function chatAkisBosalt(){
+  const a = chatAkisEleman(); if(!a) return;
+  while(a.firstChild) a.removeChild(a.firstChild);
+}
+function chatGlobalCiz(){
+  chatAkisBosalt();
+  CHAT.globalTampon.forEach(function(x){ chatMesajYaz(x.nick, x.text, x.ts); });
+}
+// Kullanicinin KENDI ekranini temizler. Sunucuya hicbir sey gonderilmez,
+// sunucudaki global gecmis SILINMEZ, diger oyuncular etkilenmez.
+function chatGlobalTemizle(){
+  if(CHAT.dmHedef) return;                 // yalnizca global gorunumde
+  CHAT.globalTampon = [];
+  chatAkisBosalt();
+  chatSistemYaz('chat.globalCleared');
+}
+function chatDMAc(nick){
+  if(!nick || nick === CHAT.nick) return;
+  CHAT.dmHedef = nick;
+  delete CHAT.dmOkunmamis[nick];
+  chatAkisBosalt();
+  chatSistemYaz('chat.dmOpened', { nick: nick });
+  chatOdalariCiz();
+  chatKullanicilariCiz(CHAT.sonKullanicilar || []);
+  chatWsGonder({ type:'chat_dm_open', to: nick });
+}
+function chatGlobaleDon(){
+  if(!CHAT.dmHedef) return;
+  CHAT.dmHedef = null;
+  chatGlobalCiz();                          // YALNIZCA global mesajlar
+  chatOdalariCiz();
+  chatKullanicilariCiz(CHAT.sonKullanicilar || []);
+}
+
 function chatMesajGonder(){
   const gi = document.getElementById('chat-giris');
   if(!gi) return;
   const metin = (gi.value || '').trim();
   if(!metin) return;
-  if(!chatWsGonder({ type:'chat_message', text: metin })) return;
+  // CHAT V2: DM acikken mesaj YALNIZCA chat_dm ile gider; global akisa
+  // hicbir sey yazilmaz.
+  const paket = CHAT.dmHedef
+    ? { type:'chat_dm', to: CHAT.dmHedef, text: metin }
+    : { type:'chat_message', text: metin };
+  if(!chatWsGonder(paket)) return;
   gi.value = '';
 }
 
@@ -5329,6 +5454,8 @@ function chatKur(){
   if(ng) ng.onkeydown = function(e){ if(e.key === 'Enter') chatNickGonder(); };
   const yolla = document.getElementById('chat-yolla');
   if(yolla) yolla.onclick = chatMesajGonder;
+  const tmz = document.getElementById('chat-temizle');
+  if(tmz) tmz.onclick = chatGlobalTemizle;
   const gi = document.getElementById('chat-giris');
   if(gi) gi.onkeydown = function(e){ if(e.key === 'Enter') chatMesajGonder(); };
 }
@@ -5379,6 +5506,7 @@ if(document.readyState === 'loading'){
       <div class="chat-yan">
         <div class="chat-yan-baslik" data-i18n="chat.rooms">ROOMS</div>
         <div class="chat-oda-listesi" id="chat-oda-listesi"></div>
+        <button class="chat-oda" type="button" id="chat-temizle" data-i18n="chat.clear">CLEAR</button>
         <div class="chat-yan-baslik" data-i18n="chat.onlinePlayers">ONLINE PLAYERS</div>
         <div class="chat-kullanicilar" id="chat-kullanicilar"></div>
       </div>
