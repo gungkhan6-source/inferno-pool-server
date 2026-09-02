@@ -545,51 +545,60 @@ font-family:sans-serif;
    Renkler mevcut temadan (--dk/--em/--gd/--pn) alinir. */
 #screen-chat{position:fixed;inset:0;z-index:80;display:none;
   align-items:center;justify-content:center;background:rgba(4,0,10,0.9);}
-.chat-kutu{width:min(760px,94vw);height:min(560px,88vh);display:flex;flex-direction:column;
+/* [CHAT V2 UI] Kucuk merkez kutu yerine neredeyse tam ekran overlay.
+   Desktop ~%95 genislik / ~%92 yukseklik; tablet ve mobil asagidaki
+   medya sorgularinda. Yalnizca olcu degisir, tema ayni kalir. */
+.chat-kutu{width:95vw;height:92vh;display:flex;flex-direction:column;
   background:var(--pn);border:1px solid rgba(255,136,0,0.28);border-radius:10px;
   box-shadow:0 0 40px rgba(255,68,0,0.18);overflow:hidden;}
-.chat-ust{display:flex;align-items:center;gap:10px;padding:10px 12px;
+.chat-ust{display:flex;align-items:center;gap:14px;padding:12px 18px;
   border-bottom:1px solid rgba(255,136,0,0.18);flex:none;}
-.chat-baslik{font-family:'Cinzel Decorative',serif;font-size:0.78rem;letter-spacing:1.5px;
-  color:var(--gd);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.chat-sayac{font-family:'Rajdhani',sans-serif;font-size:0.62rem;letter-spacing:1px;
+.chat-baslik{font-family:'Cinzel Decorative',serif;font-size:0.95rem;letter-spacing:1.5px;
+  color:var(--gd);flex:none;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* [CHAT V2 UI] Hangi konusmadasin: GLOBAL ya da DM'deki kisinin nicki.
+   Icerigi chatOdalariCiz() yazar; mesajlasma mantigi degismez. */
+.chat-baglam{flex:1;min-width:0;font-family:'Rajdhani',sans-serif;font-weight:700;
+  font-size:0.82rem;letter-spacing:1.4px;color:var(--em);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.chat-sayac{font-family:'Rajdhani',sans-serif;font-size:0.72rem;letter-spacing:1px;
   color:rgba(255,255,255,0.45);white-space:nowrap;flex:none;}
-.chat-kapat{flex:none;padding:5px 10px;border-radius:5px;cursor:pointer;
-  font-family:'Rajdhani',sans-serif;font-size:0.66rem;letter-spacing:1px;
+.chat-kapat{flex:none;padding:7px 14px;border-radius:5px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.72rem;letter-spacing:1px;
   background:rgba(180,0,0,0.15);border:1px solid rgba(255,50,50,0.3);color:rgba(255,150,150,0.85);}
 .chat-govde{flex:1;display:flex;min-height:0;}
-.chat-yan{width:150px;flex:none;display:flex;flex-direction:column;
+.chat-yan{width:220px;flex:none;display:flex;flex-direction:column;
   border-right:1px solid rgba(255,136,0,0.14);min-height:0;}
-.chat-yan-baslik{padding:7px 10px;font-family:'Rajdhani',sans-serif;font-size:0.56rem;
+.chat-yan-baslik{padding:10px 12px 6px;font-family:'Rajdhani',sans-serif;font-size:0.62rem;
   letter-spacing:1.6px;color:rgba(255,200,140,0.6);text-transform:uppercase;flex:none;}
-.chat-oda-listesi{flex:none;padding:0 8px 6px;}
-.chat-oda{width:100%;text-align:left;padding:6px 8px;margin-bottom:4px;border-radius:5px;
-  cursor:pointer;font-family:'Rajdhani',sans-serif;font-size:0.62rem;letter-spacing:1px;
+.chat-oda-listesi{flex:none;padding:0 10px 6px;}
+.chat-oda{width:100%;text-align:left;padding:9px 11px;margin-bottom:5px;border-radius:5px;
+  cursor:pointer;font-family:'Rajdhani',sans-serif;font-size:0.72rem;letter-spacing:1px;
   background:transparent;border:1px solid rgba(255,100,0,0.16);color:rgba(255,255,255,0.5);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .chat-oda:hover,.chat-oda.sel{background:rgba(255,100,0,0.18);border-color:var(--em);color:#fff;}
-.chat-kullanicilar{flex:1;overflow-y:auto;padding:0 8px 8px;min-height:0;}
-.chat-kullanici{font-family:'Rajdhani',sans-serif;font-size:0.6rem;padding:3px 6px;
+.chat-kullanicilar{flex:1;overflow-y:auto;padding:0 10px 10px;min-height:0;}
+.chat-kullanici{font-family:'Rajdhani',sans-serif;font-size:0.7rem;padding:6px 8px;
   color:rgba(255,255,255,0.45);border-radius:4px;cursor:pointer;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .chat-kullanici:hover{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.8);}
 .chat-sag{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;}
-.chat-akis{flex:1;overflow-y:auto;padding:10px 12px;min-height:0;}
-.chat-satir{margin-bottom:7px;font-family:'Rajdhani',sans-serif;font-size:0.72rem;
-  line-height:1.35;word-break:break-word;overflow-wrap:anywhere;}
+.chat-akis{flex:1;overflow-y:auto;padding:14px 20px;min-height:0;}
+.chat-satir{margin-bottom:9px;font-family:'Rajdhani',sans-serif;font-size:0.86rem;
+  line-height:1.4;word-break:break-word;overflow-wrap:anywhere;}
 .chat-nick{color:var(--em);font-weight:700;margin-right:5px;}
 .chat-metin{color:rgba(255,255,255,0.82);}
-.chat-sistem{color:rgba(255,255,255,0.34);font-style:italic;font-size:0.66rem;}
+.chat-sistem{color:rgba(255,255,255,0.34);font-style:italic;font-size:0.78rem;}
 .chat-hata{color:#ff7766;}
-.chat-arac{margin-left:6px;font-size:0.58rem;color:rgba(255,255,255,0.28);cursor:pointer;}
+.chat-arac{margin-left:8px;font-size:0.72rem;color:rgba(255,255,255,0.28);cursor:pointer;}
 .chat-arac:hover{color:var(--gd);}
-.chat-alt{display:flex;gap:7px;padding:9px 12px;border-top:1px solid rgba(255,136,0,0.18);flex:none;}
-.chat-giris{flex:1;min-width:0;padding:8px 10px;border-radius:5px;
+.chat-alt{display:flex;gap:10px;padding:12px 20px;border-top:1px solid rgba(255,136,0,0.18);
+  flex:none;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));}
+.chat-giris{flex:1;min-width:0;padding:11px 14px;border-radius:5px;
   background:rgba(0,0,0,0.35);border:1px solid rgba(255,136,0,0.22);color:#fff;
-  font-family:'Rajdhani',sans-serif;font-size:0.72rem;outline:none;}
+  font-family:'Rajdhani',sans-serif;font-size:0.86rem;outline:none;}
 .chat-giris:focus{border-color:var(--em);}
-.chat-yolla{flex:none;padding:8px 16px;border-radius:5px;cursor:pointer;
-  font-family:'Cinzel Decorative',serif;font-size:0.64rem;letter-spacing:1.5px;
+.chat-yolla{flex:none;padding:11px 24px;border-radius:5px;cursor:pointer;
+  font-family:'Cinzel Decorative',serif;font-size:0.74rem;letter-spacing:1.5px;
   background:linear-gradient(135deg,var(--fr),#aa2200);border:1px solid rgba(255,136,0,0.4);color:#fff;}
 .chat-yolla:disabled{opacity:0.45;cursor:default;}
 /* Nickname paneli */
@@ -605,14 +614,36 @@ font-family:sans-serif;
   font-family:'Cinzel Decorative',serif;font-size:0.7rem;letter-spacing:2px;
   background:linear-gradient(135deg,var(--fr),#aa2200);border:1px solid rgba(255,136,0,0.4);color:#fff;}
 .chat-not{font-family:'Rajdhani',sans-serif;font-size:0.58rem;color:rgba(255,255,255,0.3);}
-/* Mobil: yan panel gizlenir, oda listesi yatay seride tasinir */
+/* [CHAT V2 UI] Tablet: neredeyse tam genislik. */
+@media (max-width:1024px){
+  .chat-kutu{width:97vw;height:94vh;}
+  .chat-yan{width:180px;}
+}
+/* [CHAT V2 UI] Mobil: TAM ekran; sol panel USTTE yatay serit olur.
+   Oda listesi ve kullanici listesi yan yana, yatay kaydirmali.
+   Islevler ayni: oda/DM butonlari ve nick tiklamasi degismedi. */
 @media (max-width:560px){
-  .chat-kutu{width:100vw;height:100vh;border-radius:0;border:none;}
-  .chat-yan{width:110px;}
-  .chat-yan-baslik{font-size:0.5rem;letter-spacing:1px;}
-  .chat-oda,.chat-kullanici{font-size:0.56rem;}
-  .chat-satir{font-size:0.68rem;}
-  .chat-yolla{padding:8px 12px;font-size:0.58rem;}
+  #screen-chat{align-items:stretch;justify-content:stretch;}
+  .chat-kutu{width:100vw;height:100vh;height:100dvh;border-radius:0;border:none;}
+  .chat-ust{padding:10px 12px;gap:8px;}
+  .chat-baslik{font-size:0.7rem;letter-spacing:1px;flex:0 1 auto;max-width:26%;}
+  .chat-baglam{font-size:0.7rem;letter-spacing:1px;flex:1 1 auto;}
+  .chat-sayac{font-size:0.6rem;}
+  .chat-govde{flex-direction:column;}
+  .chat-yan{width:100%;flex:none;flex-direction:row;align-items:center;gap:8px;
+    border-right:none;border-bottom:1px solid rgba(255,136,0,0.14);
+    padding:6px 8px;overflow-x:auto;overflow-y:hidden;}
+  .chat-yan-baslik{display:none;}
+  .chat-oda-listesi{flex:none;display:flex;gap:6px;padding:0;}
+  .chat-oda{width:auto;margin-bottom:0;padding:7px 10px;font-size:0.66rem;white-space:nowrap;}
+  .chat-kullanicilar{flex:1;display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;padding:0;}
+  .chat-kullanici{flex:none;padding:6px 9px;font-size:0.66rem;
+    border:1px solid rgba(255,100,0,0.14);border-radius:5px;}
+  .chat-akis{padding:12px 14px;}
+  .chat-satir{font-size:0.8rem;}
+  .chat-alt{padding:10px 12px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));}
+  .chat-giris{font-size:0.8rem;padding:10px 12px;}
+  .chat-yolla{padding:10px 14px;font-size:0.68rem;}
 }
 
 </style>
@@ -5117,6 +5148,14 @@ function chatOdalariCiz(){
     else if(id === CHAT.oda) b.className = 'chat-oda';
     kok.appendChild(b);
   });
+  // [CHAT V2 UI] Basliktaki baglam etiketi: GLOBAL mi, kiminle DM mi.
+  // Yalnizca gorsel; mesaj yonlendirmesi CHAT.dmHedef ile yapilmaya devam eder.
+  const bg = document.getElementById('chat-baglam');
+  if(bg){
+    while(bg.firstChild) bg.removeChild(bg.firstChild);
+    bg.appendChild(document.createTextNode(
+      CHAT.dmHedef ? t('chat.dmWith', { nick: CHAT.dmHedef }) : t('chat.roomGlobal')));
+  }
   // Acik 1:1 sohbet ayri bir girdi olarak gosterilir.
   if(CHAT.dmHedef){
     const d = document.createElement('button');
@@ -5486,6 +5525,7 @@ if(document.readyState === 'loading'){
   <div class="chat-kutu">
     <div class="chat-ust">
       <div class="chat-baslik" data-i18n="chat.title">INFERNO POOL COMMUNITY</div>
+      <div class="chat-baglam" id="chat-baglam"></div>
       <div class="chat-sayac"><span data-i18n="chat.onlinePlayers">ONLINE PLAYERS</span>: <span id="chat-sayi">0</span></div>
       <button class="chat-kapat" type="button" id="chat-kapat" data-i18n="common.close">CLOSE</button>
     </div>
