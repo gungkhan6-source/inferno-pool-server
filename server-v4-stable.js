@@ -796,7 +796,11 @@ function chatDMAc(ws, msg){
   const id = chatDMKonusmaId(u.nickAlt, h.anahtar);
   const k = chatDMKonusma(id, true);
   chatDMSupur(k);
-  chatGonder(ws, { type:'chat_dm_history', with: h.u.nick, messages: k.mesajlar.slice() });
+  // [V2.1b] 'blocked' YALNIZCA acan kisinin KENDI engelini bildirir.
+  // Karsi tarafin engeli buradan SIZMAZ (notr davranis korunur).
+  chatGonder(ws, { type:'chat_dm_history', with: h.u.nick,
+                   blocked: chatBlokVarMi(u.sid, h.u),
+                   messages: k.mesajlar.slice() });
 }
 
 // chat_dm: 1:1 mesaj. Global akisa YAZILMAZ, global odaya YAYILMAZ.
@@ -811,6 +815,13 @@ function chatDMMesaj(ws, msg){
 
   const h = chatDMHedef(ws, u, msg && msg.to);
   if(h.hata) return chatHata(ws, h.hata);
+
+  // [V2.1b] Iki yonlu engel. Kendi engelini uygulayan gonderen acik
+  // 'dm_blocked' alir; karsi taraf engellendigini OGRENMEZ, notr
+  // 'dm_unavailable' doner. Kontrol hiz limitinden SONRADIR: engel,
+  // anti-spam penceresini atlatmanin yolu olamaz.
+  if(chatBlokVarMi(u.sid, h.u))    return chatHata(ws, 'dm_blocked');
+  if(chatBlokVarMi(h.u.sid, u))    return chatHata(ws, 'dm_unavailable');
 
   let metin = chatNormalize(msg && msg.text);
   if(!metin) return chatHata(ws, 'empty');
@@ -859,6 +870,8 @@ function chatTemizlik(){
   });
   // [V2.1a] Suresi dolmus SID kayitlari ayni supurmede dusurulur.
   chatSidSupur(simdi);
+  // [V2.1b] Suresi dolmus engel kayitlari ayni supurmede dusurulur.
+  chatBlokSupur(simdi);
   const dSinir = simdi - CHAT_DM_TTL_MS;
   chatDM.forEach(function(k, id){
     chatDMSupur(k);
@@ -966,6 +979,159 @@ function chatSidSupur(simdi){
 console.log('Chat V2.1a SID ready (ttl ' + (CHAT_SID_TTL_MS / 60000) + ' min, cap ' +
             CHAT_SID_MAX + ', secret ' + (CHAT_SID_ENV ? 'env' : 'ephemeral') + ')');
 
+// ═══════════════════════════════════════════════════════════════════════
+// CHAT V2.1b — SUNUCU TARAFI BLOCK (ENGELLEME)                   [V2.1b]
+// ═══════════════════════════════════════════════════════════════════════
+// KAPSAM: YALNIZCA 1:1 DM. Global sohbet BILEREK etkilenmez; engelleyen
+// ve engellenen kullanicilar global odada birbirlerinin mesajlarini
+// gormeye DEVAM EDER (urun karari).
+//
+// KIMLIK: birincil anahtar V2.1a'daki SID'dir. nickAlt YALNIZCA yedek
+// eslestirmedir: engellenen kisi yeni bir SID ile ayni nick'e donerse
+// engel yine uygulanir. Nick geri donusumunden dogabilecek yanlis
+// pozitifi sinirlamak icin kayitlarin TTL'i vardir.
+//
+// DEPOLAMA: RAM. Kisi basi 100 kayit, toplam 2000 kayit, 24 saat TTL,
+// tavan asilirsa EN ESKI kayit dusurulur (LRU). Supurme mevcut
+// chatTemizlik() icinde yapilir; YENI ZAMANLAYICI EKLENMEZ.
+//
+// SIZINTI KURALI: engellenen kisiye engellendigi SOYLENMEZ. Kendi
+// engelini uygulayan gonderen 'dm_blocked', karsi taraf notr
+// 'dm_unavailable' alir.
+const CHAT_BLOK_KISI_MAX   = 100;                  // bir kullanicinin engel sayisi
+const CHAT_BLOK_TOPLAM_MAX = 2000;                 // sunucudaki toplam kayit
+const CHAT_BLOK_TTL_MS     = 24 * 60 * 60 * 1000;  // 24 saat
+const CHAT_BLOK_HIZ_MS     = 500;                  // ardisik block/unblock araligi
+
+// sahipSid -> Map(anahtar -> { sid, nickAlt, nick, ts })
+// anahtar: hedef cevrimiciyse 's:'+sid, degilse 'n:'+nickAlt
+const chatBloklar = new Map();
+let chatBlokSayac = 0;                             // toplam kayit sayisi
+
+function chatBlokAnahtar(hedef){
+  return hedef.sid ? ('s:' + hedef.sid) : ('n:' + hedef.nickAlt);
+}
+// Toplam tavan asildiginda EN ESKI kayit dusurulur (nadir yol; O(toplam)).
+function chatBlokTavanUygula(){
+  while(chatBlokSayac > CHAT_BLOK_TOPLAM_MAX){
+    let enEskiSahip = null, enEskiAnahtar = null, enEskiTs = Infinity;
+    chatBloklar.forEach(function(harita, sahip){
+      harita.forEach(function(kayit, anahtar){
+        if(kayit.ts < enEskiTs){ enEskiTs = kayit.ts; enEskiSahip = sahip; enEskiAnahtar = anahtar; }
+      });
+    });
+    if(enEskiSahip === null) break;
+    const h = chatBloklar.get(enEskiSahip);
+    if(h && h.delete(enEskiAnahtar)) chatBlokSayac--;
+    if(h && h.size === 0) chatBloklar.delete(enEskiSahip);
+  }
+}
+// Engel hedefini cozer: cevrimici ise SID + nickAlt, degilse yalnizca
+// nickAlt ile kaydedilir. Nick dogrulamasi chat_join ile AYNI kurallardir.
+function chatBlokHedef(u, hamNick){
+  let nick = chatNormalize(hamNick);
+  try{ nick = nick.normalize('NFKC'); }catch(e){}
+  if(!nick) return { hata:'block_target' };
+  const uz = chatNickUzunluk(nick);
+  if(uz < chatNickAltSinir(nick) || uz > CHAT_NICK_MAX) return { hata:'block_target' };
+  if(!CHAT_NICK_DESEN.test(nick)) return { hata:'block_target' };
+  const anahtar = chatNickAnahtar(nick);
+  if(anahtar === u.nickAlt) return { hata:'block_self' };
+  const hedefWs = chatSoketBul(anahtar);
+  const hedefU = hedefWs ? chatUsers.get(hedefWs) : null;
+  return { sid: hedefU ? hedefU.sid : null, nickAlt: anahtar,
+           nick: hedefU ? hedefU.nick : nick };
+}
+// Iki yonlu kontrolde kullanilir: sahip, hedefi engellemis mi?
+// Once SID (O(1) benzeri), sonra nickAlt yedegi (en fazla 100 kayit).
+function chatBlokVarMi(sahipSid, hedefU){
+  if(!sahipSid || !hedefU) return false;
+  const harita = chatBloklar.get(sahipSid);
+  if(!harita || harita.size === 0) return false;
+  const simdi = Date.now();
+  let bulundu = false;
+  harita.forEach(function(kayit, anahtar){
+    if(bulundu) return;
+    if((simdi - kayit.ts) > CHAT_BLOK_TTL_MS){ harita.delete(anahtar); chatBlokSayac--; return; }
+    if(kayit.sid && hedefU.sid && kayit.sid === hedefU.sid) bulundu = true;
+    else if(kayit.nickAlt && kayit.nickAlt === hedefU.nickAlt) bulundu = true;
+  });
+  if(harita.size === 0) chatBloklar.delete(sahipSid);
+  return bulundu;
+}
+// Hafif hiz koruması: block/unblock akisi global mesaj penceresini
+// TUKETMEZ, ayri ve cok basit bir aralik kontrolu kullanir.
+function chatBlokHizAsildi(u, simdi){
+  if(u.sonBlokMs && (simdi - u.sonBlokMs) < CHAT_BLOK_HIZ_MS) return true;
+  u.sonBlokMs = simdi;
+  return false;
+}
+function chatBlokListesiGonder(ws, u){
+  const harita = chatBloklar.get(u.sid);
+  const nickler = [];
+  if(harita) harita.forEach(function(kayit){ nickler.push(kayit.nick); });
+  chatGonder(ws, { type:'chat_block_list', nicks: nickler });
+}
+
+function chatBlokEkle(ws, msg){
+  const u = chatUsers.get(ws);
+  if(!u) return chatHata(ws, 'not_joined');
+  const simdi = Date.now();
+  if(chatBlokHizAsildi(u, simdi)) return chatHata(ws, 'too_fast');
+  const h = chatBlokHedef(u, msg && msg.nick);
+  if(h.hata) return chatHata(ws, h.hata);
+
+  let harita = chatBloklar.get(u.sid);
+  if(!harita){ harita = new Map(); chatBloklar.set(u.sid, harita); }
+  const anahtar = chatBlokAnahtar(h);
+  if(!harita.has(anahtar)){
+    if(harita.size >= CHAT_BLOK_KISI_MAX) return chatHata(ws, 'block_limit');
+    chatBlokSayac++;
+  }
+  harita.set(anahtar, { sid: h.sid, nickAlt: h.nickAlt, nick: h.nick, ts: simdi });
+  chatBlokTavanUygula();
+  chatGonder(ws, { type:'chat_block_ok', nick: h.nick, blocked: true });
+  chatBlokListesiGonder(ws, u);
+}
+
+function chatBlokKaldir(ws, msg){
+  const u = chatUsers.get(ws);
+  if(!u) return chatHata(ws, 'not_joined');
+  const simdi = Date.now();
+  if(chatBlokHizAsildi(u, simdi)) return chatHata(ws, 'too_fast');
+  const h = chatBlokHedef(u, msg && msg.nick);
+  if(h.hata) return chatHata(ws, h.hata);
+
+  const harita = chatBloklar.get(u.sid);
+  if(harita){
+    // Ayni kisi hem SID hem nick anahtariyla kayitli olabilir: TUMU silinir.
+    const silinecek = [];
+    harita.forEach(function(kayit, anahtar){
+      if(kayit.nickAlt === h.nickAlt || (h.sid && kayit.sid === h.sid)) silinecek.push(anahtar);
+    });
+    silinecek.forEach(function(a){ if(harita.delete(a)) chatBlokSayac--; });
+    if(harita.size === 0) chatBloklar.delete(u.sid);
+  }
+  chatGonder(ws, { type:'chat_block_ok', nick: h.nick, blocked: false });
+  chatBlokListesiGonder(ws, u);
+}
+
+function chatBlokListe(ws){
+  const u = chatUsers.get(ws);
+  if(!u) return chatHata(ws, 'not_joined');
+  chatBlokListesiGonder(ws, u);
+}
+// Suresi dolmus kayitlari dusurur (chatTemizlik icinden cagrilir).
+function chatBlokSupur(simdi){
+  const sinir = simdi - CHAT_BLOK_TTL_MS;
+  chatBloklar.forEach(function(harita, sahip){
+    harita.forEach(function(kayit, anahtar){
+      if(kayit.ts < sinir){ harita.delete(anahtar); chatBlokSayac--; }
+    });
+    if(harita.size === 0) chatBloklar.delete(sahip);
+  });
+}
+
 function chatYonlendir(ws, ham){
   let msg;
   try{ msg = JSON.parse(ham); }catch(e){ return; }
@@ -981,6 +1147,10 @@ function chatYonlendir(ws, ham){
     case 'chat_dm_open':       chatDMAc(ws, msg); break;
     case 'chat_dm':            chatDMMesaj(ws, msg); break;
     case 'chat_block_notice':  chatBlokBildirimi(ws, msg); break;
+    // CHAT V2.1b — sunucu tarafi engelleme. YALNIZCA DM'i etkiler.
+    case 'chat_block':         chatBlokEkle(ws, msg); break;
+    case 'chat_unblock':       chatBlokKaldir(ws, msg); break;
+    case 'chat_block_list':    chatBlokListe(ws); break;
     // Uygulama seviyesi chat heartbeat. Mevcut heartbeat blogu
     // DEGISTIRILMEDI; zaten her mesaj ws.lastAppMsg'i tazeliyor.
     case 'chat_ping':          chatGonder(ws, { type:'chat_pong', ts: Date.now() }); break;

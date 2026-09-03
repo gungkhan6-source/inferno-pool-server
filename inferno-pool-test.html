@@ -560,6 +560,14 @@ font-family:sans-serif;
 .chat-baglam{flex:1;min-width:0;font-family:'Rajdhani',sans-serif;font-weight:700;
   font-size:0.82rem;letter-spacing:1.4px;color:var(--em);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* [CHAT V2.1b] DM basligindaki engelle/engeli kaldir dugmesi. Yalnizca
+   DM gorunumunde gosterilir; global gorunumde display:none kalir. */
+.chat-blok{flex:none;display:none;padding:6px 12px;border-radius:5px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.68rem;letter-spacing:1px;white-space:nowrap;
+  background:rgba(120,60,0,0.18);border:1px solid rgba(255,136,0,0.32);color:rgba(255,200,150,0.9);}
+.chat-blok:hover{background:rgba(255,100,0,0.24);color:#fff;}
+.chat-blok.acik{background:rgba(180,0,0,0.2);border-color:rgba(255,80,80,0.4);
+  color:rgba(255,170,170,0.95);}
 .chat-sayac{font-family:'Rajdhani',sans-serif;font-size:0.72rem;letter-spacing:1px;
   color:rgba(255,255,255,0.45);white-space:nowrap;flex:none;}
 .chat-kapat{flex:none;padding:7px 14px;border-radius:5px;cursor:pointer;
@@ -628,7 +636,8 @@ font-family:sans-serif;
   .chat-ust{padding:10px 12px;gap:8px;}
   .chat-baslik{font-size:0.7rem;letter-spacing:1px;flex:0 1 auto;max-width:26%;}
   .chat-baglam{font-size:0.7rem;letter-spacing:1px;flex:1 1 auto;}
-  .chat-sayac{font-size:0.6rem;}
+  .chat-sayac{display:none;}          /* [V2.1b] yerini engelle dugmesi alir */
+  .chat-blok{padding:5px 9px;font-size:0.62rem;letter-spacing:0.5px;}
   .chat-govde{flex-direction:column;}
   .chat-yan{width:100%;flex:none;flex-direction:row;align-items:center;gap:8px;
     border-right:none;border-bottom:1px solid rgba(255,136,0,0.14);
@@ -1740,6 +1749,15 @@ en: {
   'chat.dmWith':'\ud83d\udcac {nick}',
   'chat.dmOpened':'Private chat with {nick} \u2014 only the two of you see this.',
   'chat.globalCleared':'Your view was cleared. Other players are not affected.',
+  'chat.block':'BLOCK',
+  'chat.unblock':'UNBLOCK',
+  'chat.blockedUser':'{nick} is blocked. Private messages are off in both directions.',
+  'chat.unblockedUser':'{nick} is unblocked. You can message each other again.',
+  'chat.errDmBlocked':'You blocked this player. Unblock to send messages.',
+  'chat.errDmUnavailable':'This message could not be delivered',
+  'chat.errBlockLimit':'Block list is full (100)',
+  'chat.errBlockTarget':'Player not found',
+  'chat.errBlockSelf':'You cannot block yourself',
   'chat.errDmOffline':'That player is offline',
   'chat.errDmSelf':'You cannot message yourself',
   'chat.errDmTarget':'Player not found',
@@ -1927,6 +1945,15 @@ tr: {
   'chat.dmWith':'\ud83d\udcac {nick}',
   'chat.dmOpened':'{nick} ile özel sohbet — bunu yalnızca ikiniz görüyorsunuz.',
   'chat.globalCleared':'Kendi ekranın temizlendi. Diğer oyuncular etkilenmedi.',
+  'chat.block':'ENGELLE',
+  'chat.unblock':'ENGELİ KALDIR',
+  'chat.blockedUser':'{nick} engellendi. Özel mesajlar iki yönde de kapalı.',
+  'chat.unblockedUser':'{nick} engeli kaldırıldı. Yeniden mesajlaşabilirsiniz.',
+  'chat.errDmBlocked':'Bu oyuncuyu engelledin. Mesaj için engeli kaldır.',
+  'chat.errDmUnavailable':'Bu mesaj iletilemedi',
+  'chat.errBlockLimit':'Engel listesi dolu (100)',
+  'chat.errBlockTarget':'Oyuncu bulunamadı',
+  'chat.errBlockSelf':'Kendini engelleyemezsin',
   'chat.errDmOffline':'Bu oyuncu çevrimdışı',
   'chat.errDmSelf':'Kendine mesaj gönderemezsin',
   'chat.errDmTarget':'Oyuncu bulunamadı',
@@ -2114,6 +2141,15 @@ ru: {
   'chat.dmWith':'\ud83d\udcac {nick}',
   'chat.dmOpened':'Личный чат с {nick} — видно только вам двоим.',
   'chat.globalCleared':'Ваш экран очищен. Другие игроки не затронуты.',
+  'chat.block':'ЗАБЛОКИРОВАТЬ',
+  'chat.unblock':'РАЗБЛОКИРОВАТЬ',
+  'chat.blockedUser':'{nick} заблокирован. Личные сообщения отключены в обе стороны.',
+  'chat.unblockedUser':'{nick} разблокирован. Вы снова можете переписываться.',
+  'chat.errDmBlocked':'Вы заблокировали этого игрока. Снимите блокировку.',
+  'chat.errDmUnavailable':'Сообщение не доставлено',
+  'chat.errBlockLimit':'Список блокировки полон (100)',
+  'chat.errBlockTarget':'Игрок не найден',
+  'chat.errBlockSelf':'Нельзя заблокировать себя',
   'chat.errDmOffline':'Этот игрок не в сети',
   'chat.errDmSelf':'Нельзя писать самому себе',
   'chat.errDmTarget':'Игрок не найден',
@@ -4995,6 +5031,9 @@ const CHAT_HATA_ANAHTAR = {
   too_long:'chat.errTooLong',      duplicate:'chat.errDuplicate',
   dm_offline:'chat.errDmOffline', dm_self:'chat.errDmSelf',
   dm_target:'chat.errDmTarget',
+  dm_blocked:'chat.errDmBlocked', dm_unavailable:'chat.errDmUnavailable',
+  block_limit:'chat.errBlockLimit', block_target:'chat.errBlockTarget',
+  block_self:'chat.errBlockSelf',
   unknown_type:'chat.errGeneric'
 };
 
@@ -5014,7 +5053,35 @@ let _chatKatilDeneme = 0;            // ardisik yeniden katilim denemesi
 // sadece gosterilmez. Hicbir sey localStorage'a YAZILMAZ.
 const CHAT = { nick:'', oda:'global', acik:false, bagli:false, sayac:0,
                katildi:false, katildiOnce:false, sid:'',
-               dmHedef:null, dmOkunmamis:{}, globalTampon:[] };
+               dmHedef:null, dmOkunmamis:{}, globalTampon:[],
+               // [V2.1b] Sunucudan gelen engel listesi. TEK OTORITE SUNUCUDUR;
+               // buradaki kopya yalnizca dugme etiketini secmek icindir.
+               blokListesi:[] };
+
+// [V2.1b] Nick karsilastirmasi: sunucudaki nickAlt esdegeri degil, yalnizca
+// kaba bir gorsel eslestirmedir. Gercek karar her zaman sunucudadir.
+function chatBlokluMu(nick){
+  if(!nick) return false;
+  const k = String(nick).toLocaleLowerCase();
+  for(let i = 0; i < CHAT.blokListesi.length; i++){
+    if(String(CHAT.blokListesi[i]).toLocaleLowerCase() === k) return true;
+  }
+  return false;
+}
+function chatBlokDugmesiCiz(){
+  const b = document.getElementById('chat-blok'); if(!b) return;
+  if(!CHAT.dmHedef){ b.style.display = 'none'; return; }
+  const acik = chatBlokluMu(CHAT.dmHedef);
+  // CSS varsayilani display:none oldugu icin bos dize YETMEZ: acik deger verilir.
+  b.style.display = 'inline-block';
+  b.className = 'chat-blok' + (acik ? ' acik' : '');
+  while(b.firstChild) b.removeChild(b.firstChild);
+  b.appendChild(document.createTextNode(t(acik ? 'chat.unblock' : 'chat.block')));
+  b.onclick = function(){
+    if(!CHAT.dmHedef) return;
+    chatWsGonder({ type: acik ? 'chat_unblock' : 'chat_block', nick: CHAT.dmHedef });
+  };
+}
 
 // [V2.1a] Jeton okuma/yazma. Bozuk veya asiri uzun deger sessizce
 // yoksayilir; sunucu zaten gecersiz jetonda YENI kimlik uretir.
@@ -5173,6 +5240,7 @@ function chatOdalariCiz(){
     bg.appendChild(document.createTextNode(
       CHAT.dmHedef ? t('chat.dmWith', { nick: CHAT.dmHedef }) : t('chat.roomGlobal')));
   }
+  chatBlokDugmesiCiz();          // [V2.1b] DM'de engelle/kaldir dugmesi
   // Acik 1:1 sohbet ayri bir girdi olarak gosterilir.
   if(CHAT.dmHedef){
     const d = document.createElement('button');
@@ -5279,6 +5347,7 @@ function chatBaglantiKapat(){
   CHAT.katildiOnce = false;          // sonraki acilis YENI bir ilk giristir
   // CHAT V2: gorunum ve gecici tamponlar sifirlanir (kalici depolama yok).
   CHAT.dmHedef = null; CHAT.dmOkunmamis = {}; CHAT.globalTampon = [];
+  CHAT.blokListesi = [];         // [V2.1b] yerel kopya; asil liste sunucuda
   // [V2.1a] SID jetonu BILEREK silinmez: ayni tarayicidan tekrar girisde
   // kimlik surer. Jeton bir sirdir degildir; icinde nick veya kisisel veri yoktur.
   if(_chatYeniden){ clearTimeout(_chatYeniden); _chatYeniden = null; }
@@ -5301,6 +5370,7 @@ function chatMsgIsle(m){
         CHAT.nick = m.nick || CHAT.nick;
         CHAT.oda  = m.room || CHAT.oda;
         chatSidYaz(m.sid);           // [V2.1a] sunucunun verdigi jeton saklanir
+        chatWsGonder({ type:'chat_block_list' });   // [V2.1b] engel listesi
         chatOdalariCiz();
         chatPaneliAc();
         // Kopma sirasinda acik olan 1:1 sohbet yeniden acilir.
@@ -5319,6 +5389,18 @@ function chatMsgIsle(m){
     }
     // CHAT V2 — 1:1 ozel sohbet gecmisi. Global tampona DOKUNMAZ.
     case 'chat_dm_history': {
+      // [V2.1b] 'blocked' YALNIZCA kendi engelimizi bildirir; karsi tarafin
+      // engeli bu bayraktan OGRENILEMEZ.
+      if(m.with && typeof m.blocked === 'boolean'){
+        const vr = chatBlokluMu(m.with);
+        if(m.blocked && !vr) CHAT.blokListesi.push(m.with);
+        if(!m.blocked && vr){
+          const kk = String(m.with).toLocaleLowerCase();
+          CHAT.blokListesi = CHAT.blokListesi.filter(function(x){
+            return String(x).toLocaleLowerCase() !== kk; });
+        }
+        chatBlokDugmesiCiz();
+      }
       if(CHAT.dmHedef && m.with === CHAT.dmHedef){
         chatAkisBosalt();
         chatSistemYaz('chat.dmOpened', { nick: m.with });
@@ -5363,6 +5445,16 @@ function chatMsgIsle(m){
       } else {
         chatHataYaz(m.code, m.detail);
       }
+      break;
+    // [V2.1b] Sunucudaki engel listesi. Karar sunucuda uygulanir; burada
+    // yalnizca dugme etiketi guncellenir.
+    case 'chat_block_list':
+      CHAT.blokListesi = Array.isArray(m.nicks) ? m.nicks.slice(0, 100) : [];
+      chatBlokDugmesiCiz();
+      break;
+    case 'chat_block_ok':
+      chatSistemYaz(m.blocked ? 'chat.blockedUser' : 'chat.unblockedUser',
+                    { nick: m.nick });
       break;
     case 'chat_pong':
     case 'chat_report':
@@ -5547,6 +5639,7 @@ if(document.readyState === 'loading'){
     <div class="chat-ust">
       <div class="chat-baslik" data-i18n="chat.title">INFERNO POOL COMMUNITY</div>
       <div class="chat-baglam" id="chat-baglam"></div>
+      <button class="chat-blok" type="button" id="chat-blok"></button>
       <div class="chat-sayac"><span data-i18n="chat.onlinePlayers">ONLINE PLAYERS</span>: <span id="chat-sayi">0</span></div>
       <button class="chat-kapat" type="button" id="chat-kapat" data-i18n="common.close">CLOSE</button>
     </div>
