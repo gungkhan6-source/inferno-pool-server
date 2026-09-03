@@ -5962,6 +5962,17 @@ function chatNickGonder(){
   }
   CHAT.nick = ham;
   try{ localStorage.setItem('inferno_chat_nick', ham); }catch(e){}
+  // [FIX] nick_taken sonrasi yeniden giris: chatBaglan() soket ZATEN ACIKSA
+  // erken donuyor ve yeni chat_join gonderilmiyordu; kullanici nickini
+  // duzeltse bile sayfayi yenilemek zorunda kaliyordu. Soket acik ve HENUZ
+  // odaya girilmemisse mevcut soket uzerinden yeni katilim denenir.
+  // YENI SOKET ACILMAZ: cift baglanti veya cift join olusmaz.
+  if(CHAT_WS && CHAT_WS.readyState === WebSocket.OPEN && !CHAT.katildi){
+    chatKatilimDurdur();          // bekleyen yeniden katilim zamanlayicisi iptal
+    _chatKatilDeneme = 0;
+    chatWsGonder({ type:'chat_join', nick: CHAT.nick, room: CHAT.oda, sid: chatSidOku() });
+    return;
+  }
   chatBaglan();
 }
 
