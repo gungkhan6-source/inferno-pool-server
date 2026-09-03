@@ -1614,6 +1614,94 @@ function chatModSupur(simdi){
     else if(k.kilitBitis && simdi >= k.kilitBitis) chatModDeneme.delete(a);
   });
 }
+// ── [V2.1d / BUG-FIX #4] Guvenilir istemci IP kaynagi ────────────────
+// NEDEN: eskiden x-forwarded-for'un ILK degeri kullaniliyordu. Cloudflare
+// ve Render mevcut XFF basligini EZMEZ, yalnizca sonuna ekler; dolayisiyla
+// ilk deger ISTEMCININ yazdigi degerdir. Bu haliyle saldirgan hem kendi
+// hiz limitini atlatabilir hem de bir moderatorun kovasini secip onu
+// kilitleyebilirdi.
+//
+// KAYNAK SIRASI (ilk gecerli olan kazanir):
+//   1) cf-connecting-ip   — Cloudflare her istekte SET eder, istemci ezemez
+//   2) true-client-ip     — ayni amacli ikinci Cloudflare basligi
+//   3) x-forwarded-for    — SAGDAN taranir; istemcinin ekledigi degerler
+//      her zaman SOLDA kaldigi icin sagdan ilk gecerli ve OZEL OLMAYAN
+//      adres alinir. Boylece hop SAYISINI bilmek gerekmez.
+//   4) req.socket.remoteAddress — proxy adresi olabilir; son care.
+// Hicbiri gecerli degilse 'bilinmeyen' doner (mevcut davranisla ayni).
+//
+// NOT: Render/Cloudflare zincirindeki hop sayisi production'da
+// DOGRULANMADI; bu yuzden sabit bir pozisyon yerine "sagdan ilk genel
+// adres" kurali kullanildi.
+//
+// HAM IP: yalnizca bu fonksiyonun donusu olarak, cagrildigi yerde HMAC'e
+// girdi olur. Hicbir nesnede saklanmaz ve log'a yazilmaz.
+const CHAT_IP4 = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
+const CHAT_IP6 = /^[0-9a-f:]+$/i;
+function chatIpDuzelt(ham){
+  let v = String(ham || '').trim();
+  if(!v) return '';
+  if(v.charAt(0) === '['){                       // [::1]:1234
+    const kapa = v.indexOf(']');
+    if(kapa > 0) v = v.slice(1, kapa);
+  } else if(v.indexOf('.') > 0 && v.indexOf(':') > 0){
+    v = v.split(':')[0];                         // 1.2.3.4:5678
+  }
+  if(v.lastIndexOf('::ffff:', 0) === 0) v = v.slice(7);   // IPv4-mapped IPv6
+  return v.trim();
+}
+function chatIpGecerli(ip){
+  if(!ip || ip.length > 45) return false;
+  if(CHAT_IP4.test(ip)) return true;
+  return ip.indexOf(':') > 0 && CHAT_IP6.test(ip);
+}
+// Ozel / dahili adresler: proxy hop'lari bunlarla gorunur.
+function chatIpOzel(ip){
+  if(!ip) return true;
+  if(CHAT_IP4.test(ip)){
+    const p = ip.split('.').map(Number);
+    if(p[0] === 10 || p[0] === 127) return true;
+    if(p[0] === 172 && p[1] >= 16 && p[1] <= 31) return true;
+    if(p[0] === 192 && p[1] === 168) return true;
+    if(p[0] === 169 && p[1] === 254) return true;
+    if(p[0] === 100 && p[1] >= 64 && p[1] <= 127) return true;
+    if(p[0] === 0) return true;
+    return false;
+  }
+  const a = ip.toLowerCase();
+  if(a === '::' || a === '::1') return true;
+  if(a.lastIndexOf('fe8', 0) === 0 || a.lastIndexOf('fe9', 0) === 0 ||
+     a.lastIndexOf('fea', 0) === 0 || a.lastIndexOf('feb', 0) === 0) return true;  // fe80::/10
+  if(a.charAt(0) === 'f' && (a.charAt(1) === 'c' || a.charAt(1) === 'd')) return true; // fc00::/7
+  return false;
+}
+function chatIstemciIp(req){
+  if(!req || !req.headers) return '';
+  const b = req.headers;
+  // 1-2) Cloudflare basliklari: istemci tarafindan EZILEMEZ.
+  const cf = [b['cf-connecting-ip'], b['true-client-ip']];
+  for(let i = 0; i < cf.length; i++){
+    const v = chatIpDuzelt(cf[i]);
+    if(chatIpGecerli(v)) return v;
+  }
+  // 3) XFF: SAGDAN tara. Istemcinin ekledigi degerler solda kalir.
+  const xff = b['x-forwarded-for'];
+  if(xff){
+    const liste = String(xff).split(',');
+    let sagdanGecerli = '';
+    for(let i = liste.length - 1; i >= 0; i--){
+      const v = chatIpDuzelt(liste[i]);
+      if(!chatIpGecerli(v)) continue;
+      if(!sagdanGecerli) sagdanGecerli = v;      // bicimi gecerli ilk aday
+      if(!chatIpOzel(v)) return v;               // sagdan ilk GENEL adres
+    }
+    if(sagdanGecerli) return sagdanGecerli;      // hepsi ozelse en sagdaki
+  }
+  // 4) Son care: proxy adresi olabilir.
+  const soket = chatIpDuzelt(req.socket && req.socket.remoteAddress);
+  return chatIpGecerli(soket) ? soket : '';
+}
+
 console.log('Chat V2.1d moderation ready (mod ' + (CHAT_MOD_TOKEN ? 'env' : 'KAPALI') +
             ', admin ' + (CHAT_ADMIN_TOKEN ? 'env' : 'KAPALI') + ')');
 
@@ -1661,9 +1749,10 @@ wss.on('connection', function(ws, req){
   // [V2.1d] Brute-force sayaci icin IP'nin HMAC ozeti tutulur; HAM IP
   // hicbir yerde saklanmaz ve log'a yazilmaz.
   try{
-    const ham0 = (req && req.headers && req.headers['x-forwarded-for'])
-      ? String(req.headers['x-forwarded-for']).split(',')[0].trim()
-      : ((req && req.socket && req.socket.remoteAddress) || '');
+    // [BUG-FIX #4] Kaynak sirasi chatIstemciIp() icinde: cf-connecting-ip ->
+    // true-client-ip -> XFF'te sagdan ilk genel adres -> remoteAddress.
+    // Ham deger DEGISKENDE KALMAZ; dogrudan HMAC'e girer.
+    const ham0 = chatIstemciIp(req);
     ws.__chatIpHash = ham0
       ? chatCrypto.createHmac('sha256', CHAT_SID_SECRET).update(ham0).digest('hex').slice(0, 16)
       : 'bilinmeyen';
