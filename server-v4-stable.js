@@ -535,18 +535,32 @@ function chatNormalize(s){
   return t.trim();
 }
 // Kufur maskesi: eslesen harfleri *** yapar, mesaji DUSURMEZ.
+// [FIX] Kisa ve belirsiz terimler kelime ICINDE eslesince masum kelimeleri
+// sansurluyordu: 'oc' -> bl(oc)k / unbl(oc)k / (oc)ak, 'pic' -> (pic)ture /
+// e(pic) / to(pic), 'aq' -> (aq)ua. Bu terimler artik YALNIZCA TAM KELIME
+// olarak eslesir. Listedeki DIGER terimlerin davranisi DEGISMEDI: alt dize
+// eslesmesi korunur (fucking, siktirgit, orospucocugu gibi bitisik
+// kullanimlar yakalanmaya devam eder).
+const CHAT_KUFUR_TAM = ['oc', 'aq', 'pic'];
+// Kelime siniri Unicode duyarlidir: harf/rakam komsulugu varsa eslesme YOK.
+// Turkce ve Kiril karakterler de harf sayilir (cocuk, ocak, sikayet ...).
+function chatKufurDeseni(kelime, bayrak){
+  const e = kelime.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if(CHAT_KUFUR_TAM.indexOf(kelime) === -1) return new RegExp(e, bayrak);
+  return new RegExp('(?<![\\p{L}\\p{N}])' + e + '(?![\\p{L}\\p{N}])', bayrak + 'u');
+}
 function chatKufurMaskele(s){
   let t = s;
   for(let i = 0; i < CHAT_KUFUR.length; i++){
-    const k = CHAT_KUFUR[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    t = t.replace(new RegExp(k, 'gi'), function(m){ return '*'.repeat(Math.min(m.length, 3)); });
+    t = t.replace(chatKufurDeseni(CHAT_KUFUR[i], 'gi'),
+                  function(m){ return '*'.repeat(Math.min(m.length, 3)); });
   }
   return t;
 }
 function chatKufurIceriyor(s){
-  const d = String(s).toLowerCase();
+  const d = String(s);
   for(let i = 0; i < CHAT_KUFUR.length; i++){
-    if(d.indexOf(CHAT_KUFUR[i].toLowerCase()) !== -1) return true;
+    if(chatKufurDeseni(CHAT_KUFUR[i], 'i').test(d)) return true;
   }
   return false;
 }
