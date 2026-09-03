@@ -1495,8 +1495,12 @@ function chatModMuteUygula(ws, msg){
   chatModTabloYaz(chatModMute, chatModAnahtarlar(h.sid, h.nickAlt), kayit);
   if(h.ws) chatGonder(h.ws, { type:'chat_muted', seconds: Math.ceil(sure / 1000) });
   console.log('CHAT MOD MUTE', u.nick, '->', h.nick, Math.ceil(sure/60000) + 'dk');
+  // [FIX] Bilgilendirme alanlari YUKARI yuvarlanmaz: 2 saniyelik mute artik
+  // "1 dakika" gorunmez. 'seconds' tam degeri tasir; 'minutes' tam dakika
+  // sayisidir (1 dakikadan kisa sureler 0 doner). Gercek sure DEGISMEDI.
   chatGonder(ws, { type:'chat_mod_ok', action:'mute', nick: h.nick,
-                   until: kayit.bitis, minutes: Math.ceil(sure / 60000) });
+                   until: kayit.bitis, seconds: Math.round(sure / 1000),
+                   minutes: Math.floor(sure / 60000) });
   chatModRaporDurum(msg && msg.reportId, 'islem_yapildi');
 }
 function chatModUnmute(ws, msg){
@@ -1543,8 +1547,12 @@ function chatModBanla(ws, msg){
     try{ h.ws.close(); }catch(e){}
   }
   console.log('CHAT MOD BAN', u.nick, '->', h.nick, Math.ceil(sure/3600000) + 'sa');
+  // [FIX] Bilgilendirme alanlari YUKARI yuvarlanmaz: 2 saniyelik ban artik
+  // "1 saat" gorunmez. 'seconds' tam degeri tasir; 'hours' tam saat
+  // sayisidir (1 saatten kisa sureler 0 doner). Gercek sure DEGISMEDI.
   chatGonder(ws, { type:'chat_mod_ok', action:'ban', nick: h.nick,
-                   until: kayit.bitis, hours: Math.ceil(sure / 3600000) });
+                   until: kayit.bitis, seconds: Math.round(sure / 1000),
+                   hours: Math.floor(sure / 3600000) });
   chatModRaporDurum(msg && msg.reportId, 'islem_yapildi');
 }
 function chatModUnban(ws, msg){
