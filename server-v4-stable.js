@@ -749,6 +749,11 @@ function chatRapor(ws, msg){
       // tutulur ve restart sonrasi sifirlanir.
       id:          'r' + (simdi.toString(36)) + Math.floor(Math.random() * 1e6).toString(36),
       durum:       'bekliyor',
+      // [V2.1d.1] Rapora UYGULANAN moderasyon isleminin turu. Baslangicta
+      // null; mute/kick/ban/block uygulandiginda ilgili kod yazilir. Yalnizca
+      // sabit kod tutulur (serbest metin degil), RAM'de kalir ve restart
+      // sonrasi diger rapor alanlariyla birlikte sifirlanir.
+      action:      null,
       ts:          simdi,
       ilkTs:       simdi,
       sonTs:       simdi,
@@ -1549,7 +1554,7 @@ function chatModMuteUygula(ws, msg){
   chatGonder(ws, { type:'chat_mod_ok', action:'mute', nick: h.nick,
                    until: kayit.bitis, seconds: Math.round(sure / 1000),
                    minutes: Math.floor(sure / 60000) });
-  chatModRaporDurum(msg && msg.reportId, 'islem_yapildi');
+  chatModRaporDurum(msg && msg.reportId, 'islem_yapildi', 'mute');
 }
 function chatModUnmute(ws, msg){
   const u = chatModYetki(ws); if(!u) return;
@@ -1574,7 +1579,7 @@ function chatModKick(ws, msg){
   try{ h.ws.close(); }catch(e){}
   console.log('CHAT MOD KICK', u.nick, '->', h.nick);
   chatGonder(ws, { type:'chat_mod_ok', action:'kick', nick: h.nick });
-  chatModRaporDurum(msg && msg.reportId, 'islem_yapildi');
+  chatModRaporDurum(msg && msg.reportId, 'islem_yapildi', 'kick');
 }
 function chatModBanla(ws, msg){
   const u = chatModYetki(ws); if(!u) return;
@@ -1601,7 +1606,7 @@ function chatModBanla(ws, msg){
   chatGonder(ws, { type:'chat_mod_ok', action:'ban', nick: h.nick,
                    until: kayit.bitis, seconds: Math.round(sure / 1000),
                    hours: Math.floor(sure / 3600000) });
-  chatModRaporDurum(msg && msg.reportId, 'islem_yapildi');
+  chatModRaporDurum(msg && msg.reportId, 'islem_yapildi', 'ban');
 }
 function chatModUnban(ws, msg){
   const u = chatModYetki(ws); if(!u) return;
@@ -1614,10 +1619,23 @@ function chatModUnban(ws, msg){
   chatGonder(ws, { type:'chat_mod_ok', action:'unban', nick: h.nick });
 }
 // ── Raporlar ─────────────────────────────────────────────────────────
-function chatModRaporDurum(id, durum){
+// [V2.1d.1] Izin verilen islem kodlari. Listede olmayan hicbir deger
+// kayda yazilmaz; boylece paneldeki 'action' alani serbest metin tasiyamaz.
+const CHAT_MOD_ISLEMLER = ['mute', 'kick', 'ban', 'block'];
+function chatModIslemKodu(v){
+  return (typeof v === 'string' && CHAT_MOD_ISLEMLER.indexOf(v) >= 0) ? v : null;
+}
+// 'islem' opsiyoneldir: verilmezse mevcut action DEGISMEZ (durum guncellemesi
+// tek basina uygulanan islemi silmez).
+function chatModRaporDurum(id, durum, islem){
   if(!id) return null;
+  const kod = chatModIslemKodu(islem);
   for(let i = chatReports.length - 1; i >= 0; i--){
-    if(chatReports[i].id === id){ chatReports[i].durum = durum; return chatReports[i]; }
+    if(chatReports[i].id === id){
+      chatReports[i].durum = durum;
+      if(kod) chatReports[i].action = kod;
+      return chatReports[i];
+    }
   }
   return null;
 }
@@ -1637,6 +1655,7 @@ function chatModRaporlar(ws, msg){
       message:   r.message,
       count:     r.sayac,
       status:    r.durum || 'bekliyor',
+      action:    r.action || null,
       room:      r.room
     };
   }).reverse();
@@ -1648,9 +1667,13 @@ function chatModRaporIsaretle(ws, msg){
               : (msg && msg.status === 'incelendi')     ? 'incelendi'
               : (msg && msg.status === 'bekliyor')      ? 'bekliyor' : null;
   if(!durum) return chatHata(ws, 'mod_status');
-  const r = chatModRaporDurum(msg && msg.reportId, durum);
+  // [V2.1d.1] Panelden gelen islem kodu (yalnizca izinli liste). Gecersiz
+  // deger sessizce yok sayilir; kayittaki mevcut action korunur.
+  const islem = chatModIslemKodu(msg && msg.action);
+  const r = chatModRaporDurum(msg && msg.reportId, durum, islem);
   if(!r) return chatHata(ws, 'mod_report');
-  chatGonder(ws, { type:'chat_mod_ok', action:'status', reportId: r.id, status: durum });
+  chatGonder(ws, { type:'chat_mod_ok', action:'status', reportId: r.id,
+                   status: durum, appliedAction: r.action || null });
 }
 // Suresi dolmus moderasyon kayitlarini dusurur (chatTemizlik icinden).
 function chatModSupur(simdi){

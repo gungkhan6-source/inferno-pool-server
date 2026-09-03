@@ -1833,6 +1833,11 @@ en: {
   'chat.modPending':'pending',
   'chat.modReviewed':'reviewed',
   'chat.modActioned':'actioned',
+  'chat.modAction':'Action: {action}',
+  'chat.modActionMute':'MUTE',
+  'chat.modActionKick':'KICK',
+  'chat.modActionBan':'BAN',
+  'chat.modActionBlock':'BLOCK',
   'chat.modActMute':'MUTE 10m',
   'chat.modActKick':'KICK',
   'chat.modActBan':'BAN 1h',
@@ -2072,6 +2077,11 @@ tr: {
   'chat.modPending':'bekliyor',
   'chat.modReviewed':'incelendi',
   'chat.modActioned':'işlem yapıldı',
+  'chat.modAction':'İşlem: {action}',
+  'chat.modActionMute':'SUSTURMA',
+  'chat.modActionKick':'ATMA',
+  'chat.modActionBan':'BAN',
+  'chat.modActionBlock':'ENGELLEME',
   'chat.modActMute':'SUSTUR 10dk',
   'chat.modActKick':'ATTıR',
   'chat.modActBan':'BAN 1sa',
@@ -2311,6 +2321,11 @@ ru: {
   'chat.modPending':'ожидает',
   'chat.modReviewed':'проверено',
   'chat.modActioned':'приняты меры',
+  'chat.modAction':'Действие: {action}',
+  'chat.modActionMute':'ЗАГЛУШЕНИЕ',
+  'chat.modActionKick':'КИК',
+  'chat.modActionBan':'БАН',
+  'chat.modActionBlock':'БЛОКИРОВКА',
   'chat.modActMute':'МУТ 10м',
   'chat.modActKick':'КИК',
   'chat.modActBan':'БАН 1ч',
@@ -5328,6 +5343,15 @@ function chatModGiris(){
   if(!jeton) return;
   chatWsGonder({ type:'chat_mod_auth', token: jeton });
 }
+// [V2.1d.1] Uygulanan moderasyon isleminin adi. Sunucudan YALNIZCA sabit kod
+// gelir; gorunen metin burada t() ile secili dile gore uretilir.
+function chatModIslemMetni(kod){
+  return kod === 'mute'  ? t('chat.modActionMute')
+       : kod === 'kick'  ? t('chat.modActionKick')
+       : kod === 'ban'   ? t('chat.modActionBan')
+       : kod === 'block' ? t('chat.modActionBlock')
+       : '';
+}
 function chatModDurumMetni(kod){
   return kod === 'islem_yapildi' ? t('chat.modActioned')
        : kod === 'incelendi'     ? t('chat.modReviewed')
@@ -5367,10 +5391,14 @@ function chatModRaporlariCiz(items, toplam){
       d.appendChild(x);
     }
     const zaman = new Date(r.ts);
+    // [V2.1d.1] Uygulanmis islem varsa ayri satir olarak gosterilir. Metin
+    // i18n'den gelir, createTextNode ile yazilir (XSS yuzeyi yok).
+    const islemAdi = chatModIslemMetni(r.action);
     satir('#', String(r.reported) + '  ←  ' + String(r.reporter));
     satir('!', String(r.reason) + ' / ' + String(r.scope) +
                (r.count > 1 ? ('  ×' + r.count) : ''));
     satir('⏱', zaman.toLocaleString());
+    if(islemAdi) satir('✓', t('chat.modAction', { action: islemAdi }));
     if(r.message) satir('“', String(r.message));
     const islem = document.createElement('div');
     islem.className = 'chat-mod-islem';
@@ -5388,8 +5416,12 @@ function chatModRaporlariCiz(items, toplam){
     dugme('chat.modActBan', function(){
       chatWsGonder({ type:'chat_mod_ban', nick: r.reported, hours: 1, reportId: r.id }); });
     dugme('chat.modActBlock', function(){
+      // [V2.1d.1] Engelleme de bir moderasyon islemidir: rapor 'islem_yapildi'
+      // olarak isaretlenir ve action:'block' kaydedilir. Engelleme mantigi
+      // (chat_block) AYNEN korunur, degistirilmedi.
       chatWsGonder({ type:'chat_block', nick: r.reported });
-      chatWsGonder({ type:'chat_mod_status', reportId: r.id, status:'incelendi' }); });
+      chatWsGonder({ type:'chat_mod_status', reportId: r.id,
+                     status:'islem_yapildi', action:'block' }); });
     dugme('chat.modActReviewed', function(){
       chatWsGonder({ type:'chat_mod_status', reportId: r.id, status:'incelendi' }); });
     d.appendChild(islem);
