@@ -1323,10 +1323,14 @@ const CHAT_ADMIN_TOKEN = (typeof process.env.CHAT_ADMIN_TOKEN === 'string' &&
                           process.env.CHAT_ADMIN_TOKEN.length >= 8)
                          ? process.env.CHAT_ADMIN_TOKEN : null;
 
-const CHAT_MOD_DENEME_MAX   = 5;                    // pencere basina deneme
-const CHAT_MOD_PENCERE_MS   = 10 * 60 * 1000;       // deneme penceresi
-const CHAT_MOD_KILIT_MS     = 15 * 60 * 1000;       // asilirsa kilit suresi
-const CHAT_MOD_GECIKME_MS   = 350;                  // sabit yanit gecikmesi
+// [BUG-FIX #5] SERT KILIT KALDIRILDI. Yanlis denemeler artik REDDEDILMEZ,
+// KADEMELI OLARAK GECIKTIRILIR; dogru token her zaman kabul edilir.
+// Merdiven: 0.4 / 1 / 2 / 4 / 8 / 15 / 30 sn — tavan 30 sn.
+const CHAT_MOD_GECIKME = [400, 1000, 2000, 4000, 8000, 15000, 30000];
+const CHAT_MOD_PENCERE_MS   = 10 * 60 * 1000;       // ceza penceresi (sonra sifirlanir)
+const CHAT_MOD_GECIKME_MS   = CHAT_MOD_GECIKME[0];  // ilk/temiz kova gecikmesi
+const CHAT_MOD_BEKLEYEN_MAX = 3;                    // kova basina eszamanli bekleyen
+const CHAT_MOD_DENEME_KAYIT = 5000;                 // deneme tablosu tavani (LRU)
 const CHAT_MOD_MUTE_MAX_MS  = 60 * 60 * 1000;       // moderator mute tavani
 const CHAT_MOD_BAN_MAX_MS   = 24 * 60 * 60 * 1000;  // temp ban tavani
 const CHAT_KICK_BEKLEME_MS  = 60 * 1000;            // kick sonrasi rejoin engeli
@@ -1337,7 +1341,7 @@ const CHAT_MOD_RAPOR_LIMIT  = 50;                   // panele gonderilen rapor
 const chatModMute     = new Map();
 const chatModBan      = new Map();
 const chatKickBekleme = new Map();   // anahtar -> bitis (ms)
-// ipHash -> { sayi, ilk, kilitBitis }   (HAM IP TUTULMAZ)
+// ipHash -> { sayi, ilk, sonMs, bekleyen }   (HAM IP TUTULMAZ; KILIT YOK)
 const chatModDeneme   = new Map();
 
 // Bir kullanicinin iki anahtari: SID (birincil) ve nickAlt (yedek).
@@ -1402,17 +1406,42 @@ function chatModTokenEsit(girilen, dogru){
   if(a.length !== b.length) return false;
   try{ return chatCrypto.timingSafeEqual(a, b); }catch(e){ return false; }
 }
-function chatModDenemeDurum(ipHash, simdi){
-  let k = chatModDeneme.get(ipHash);
-  if(!k){ k = { sayi: 0, ilk: simdi, kilitBitis: 0 }; chatModDeneme.set(ipHash, k); }
-  if(k.kilitBitis && simdi >= k.kilitBitis){ k.kilitBitis = 0; k.sayi = 0; k.ilk = simdi; }
-  if((simdi - k.ilk) > CHAT_MOD_PENCERE_MS && !k.kilitBitis){ k.sayi = 0; k.ilk = simdi; }
-  while(chatModDeneme.size > CHAT_MOD_STORE_MAX){
+// [BUG-FIX #5] Tablo artik GERCEK LRU: dokunulan kayit delete+set ile sona
+// alinir, tavan asilinca ONCE CEZASIZ (sayi === 0) en eski kayitlar duser.
+// Boylece saldirgan tabloyu doldurup kendi cezasini kolayca itemez.
+function chatModTavanUygula(){
+  if(chatModDeneme.size <= CHAT_MOD_DENEME_KAYIT) return;
+  // 1. tur: cezasiz kayitlar (ekleme sirasina gore en eskiden baslar)
+  for(const [a, k] of chatModDeneme){
+    if(chatModDeneme.size <= CHAT_MOD_DENEME_KAYIT) return;
+    if(!k.sayi) chatModDeneme.delete(a);
+  }
+  // 2. tur: hala tasiyorsa en eski dokunulan kayit duser
+  while(chatModDeneme.size > CHAT_MOD_DENEME_KAYIT){
     const enEski = chatModDeneme.keys().next();
     if(enEski.done) break;
     chatModDeneme.delete(enEski.value);
   }
+}
+function chatModDenemeDurum(ipHash, simdi){
+  let k = chatModDeneme.get(ipHash);
+  if(k) chatModDeneme.delete(ipHash);            // LRU: sona tasinacak
+  else  k = { sayi: 0, ilk: simdi, sonMs: 0, bekleyen: 0 };
+  // Ceza penceresi gectiyse sayac sifirlanir (kilit YOK).
+  if(k.sayi && (simdi - (k.sonMs || k.ilk)) > CHAT_MOD_PENCERE_MS){
+    k.sayi = 0; k.ilk = simdi;
+  }
+  chatModDeneme.set(ipHash, k);
+  chatModTavanUygula();
   return k;
+}
+// Basarisiz deneme sayisina gore gecikme (tavan 30 sn).
+// Sayisal olmayan / negatif girdi ilk kademeye (400 ms) duser.
+function chatModGecikme(sayi){
+  const s = Number(sayi);
+  const i = (!isFinite(s) || s < 0) ? 0
+          : Math.min(Math.floor(s), CHAT_MOD_GECIKME.length - 1);
+  return CHAT_MOD_GECIKME[i];
 }
 function chatModAuth(ws, msg){
   const u = chatUsers.get(ws);
@@ -1421,13 +1450,13 @@ function chatModAuth(ws, msg){
   const ipHash = ws.__chatIpHash || 'bilinmeyen';
   const d = chatModDenemeDurum(ipHash, simdi);
 
-  // Kilitli mi? (brute-force korumasi)
-  if(d.kilitBitis && simdi < d.kilitBitis){
-    return setTimeout(function(){
-      chatHata(ws, 'mod_rate', Math.ceil((d.kilitBitis - simdi) / 1000));
-    }, CHAT_MOD_GECIKME_MS);
+  // [BUG-FIX #5] Eszamanli bekleyen dogrulama tavani: gecikme setTimeout ile
+  // uygulandigi icin ayni kovadan sinirsiz bekleyen istek birikmesin.
+  // Event loop BLOKLANMAZ; yalnizca yanit ertelenir.
+  if(d.bekleyen >= CHAT_MOD_BEKLEYEN_MAX){
+    return chatHata(ws, 'mod_rate', Math.ceil(chatModGecikme(d.sayi) / 1000));
   }
-  // Hicbir token tanimli degilse sistem KAPALIDIR.
+  // Hicbir token tanimli degilse sistem KAPALIDIR (fail-closed).
   if(!CHAT_MOD_TOKEN && !CHAT_ADMIN_TOKEN){
     return setTimeout(function(){ chatHata(ws, 'mod_disabled'); }, CHAT_MOD_GECIKME_MS);
   }
@@ -1436,20 +1465,27 @@ function chatModAuth(ws, msg){
   if(CHAT_ADMIN_TOKEN && chatModTokenEsit(girilen, CHAT_ADMIN_TOKEN)) rol = 'admin';
   else if(CHAT_MOD_TOKEN && chatModTokenEsit(girilen, CHAT_MOD_TOKEN)) rol = 'mod';
 
+  // Gecikme, O ANDAKI basarisiz deneme sayisina gore belirlenir. DOGRU
+  // token da ayni gecikmeyi bekler ama HICBIR ZAMAN REDDEDILMEZ.
+  const gecikme = chatModGecikme(d.sayi);
+  d.bekleyen++;
   setTimeout(function(){
+    d.bekleyen--;
+    const bitis = Date.now();
     if(!rol){
       d.sayi++;
-      if(d.sayi >= CHAT_MOD_DENEME_MAX){
-        d.kilitBitis = simdi + CHAT_MOD_KILIT_MS;
-        console.log('CHAT MOD AUTH kilit', ipHash);      // TOKEN LOGLANMAZ
+      d.sonMs = bitis;
+      if(d.sayi === CHAT_MOD_GECIKME.length){
+        console.log('CHAT MOD AUTH gecikme tavani', ipHash);  // TOKEN LOGLANMAZ
       }
-      return chatHata(ws, 'mod_denied');
+      return chatHata(ws, 'mod_denied', Math.ceil(chatModGecikme(d.sayi) / 1000));
     }
-    d.sayi = 0; d.ilk = simdi; d.kilitBitis = 0;
+    // [BUG-FIX #5/D] Basarili auth cezayi TEMIZLER.
+    d.sayi = 0; d.ilk = bitis; d.sonMs = 0;
     u.rol = rol;                                          // YALNIZ bu baglantiya
     console.log('CHAT MOD AUTH ok', u.nick, rol, ipHash); // TOKEN LOGLANMAZ
     chatGonder(ws, { type:'chat_mod_auth', ok:true, role: rol });
-  }, CHAT_MOD_GECIKME_MS);
+  }, gecikme);
 }
 // HER moderasyon komutunda cagrilir. 'admin' gerektiren komutlarda
 // gerekli='admin' verilir.
@@ -1609,9 +1645,11 @@ function chatModSupur(simdi){
   chatModMute.forEach(function(k, a){ if(k.bitis && simdi >= k.bitis) chatModMute.delete(a); });
   chatModBan.forEach(function(k, a){ if(k.bitis && simdi >= k.bitis) chatModBan.delete(a); });
   chatKickBekleme.forEach(function(b, a){ if(simdi >= b) chatKickBekleme.delete(a); });
+  // [BUG-FIX #5] Kilit alani kalmadi: penceresi gecmis ve BEKLEYENI OLMAYAN
+  // kayitlar dusurulur.
   chatModDeneme.forEach(function(k, a){
-    if(!k.kilitBitis && (simdi - k.ilk) > CHAT_MOD_PENCERE_MS) chatModDeneme.delete(a);
-    else if(k.kilitBitis && simdi >= k.kilitBitis) chatModDeneme.delete(a);
+    if(k.bekleyen) return;
+    if((simdi - (k.sonMs || k.ilk)) > CHAT_MOD_PENCERE_MS) chatModDeneme.delete(a);
   });
 }
 // ── [V2.1d / BUG-FIX #4] Guvenilir istemci IP kaynagi ────────────────
