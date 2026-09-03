@@ -585,6 +585,51 @@ font-family:sans-serif;
   font-family:'Rajdhani',sans-serif;font-size:0.76rem;letter-spacing:0.6px;
   background:transparent;border:1px solid rgba(255,100,0,0.2);color:rgba(255,255,255,0.72);}
 .chat-rapor-neden:hover{background:rgba(255,100,0,0.18);border-color:var(--em);color:#fff;}
+/* [CHAT V2.1d] Moderator giris noktasi ve paneli. Giris noktasi HERKESE
+   goruntulenir; yetki YALNIZCA sunucuda dogrulanir. */
+.chat-mod-btn{flex:none;padding:6px 10px;border-radius:5px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.66rem;letter-spacing:1px;white-space:nowrap;
+  background:rgba(40,40,60,0.35);border:1px solid rgba(160,160,200,0.22);
+  color:rgba(200,200,220,0.75);}
+.chat-mod-btn:hover{background:rgba(80,80,140,0.32);color:#fff;}
+.chat-mod{position:absolute;inset:0;z-index:6;display:none;
+  align-items:center;justify-content:center;background:rgba(4,0,10,0.9);}
+.chat-mod.acik{display:flex;}
+.chat-mod-kutu{width:min(620px,94%);max-height:86%;display:flex;flex-direction:column;
+  background:var(--pn);border:1px solid rgba(160,160,220,0.3);border-radius:10px;
+  padding:18px;gap:10px;box-shadow:0 0 30px rgba(80,80,200,0.18);}
+.chat-mod-baslik{font-family:'Cinzel Decorative',serif;font-size:0.82rem;letter-spacing:1.4px;
+  color:var(--gd);}
+.chat-mod-not{font-family:'Rajdhani',sans-serif;font-size:0.68rem;color:rgba(255,255,255,0.4);
+  line-height:1.4;}
+.chat-mod-token{width:100%;padding:10px 12px;border-radius:5px;
+  background:rgba(0,0,0,0.4);border:1px solid rgba(160,160,220,0.25);color:#fff;
+  font-family:'Rajdhani',sans-serif;font-size:0.8rem;outline:none;}
+.chat-mod-token:focus{border-color:rgba(180,180,255,0.6);}
+.chat-mod-gir{padding:9px 16px;border-radius:5px;cursor:pointer;
+  font-family:'Cinzel Decorative',serif;font-size:0.68rem;letter-spacing:1.2px;
+  background:linear-gradient(135deg,#3a3a80,#22224a);border:1px solid rgba(160,160,220,0.35);
+  color:#fff;}
+.chat-mod-rol{font-family:'Rajdhani',sans-serif;font-size:0.72rem;letter-spacing:1px;
+  color:var(--em);}
+.chat-mod-liste{flex:1;overflow-y:auto;min-height:0;display:flex;flex-direction:column;gap:8px;}
+.chat-mod-rapor{border:1px solid rgba(255,136,0,0.16);border-radius:6px;padding:9px 11px;
+  font-family:'Rajdhani',sans-serif;font-size:0.72rem;color:rgba(255,255,255,0.72);
+  word-break:break-word;overflow-wrap:anywhere;}
+.chat-mod-satir{margin-bottom:3px;}
+.chat-mod-etiket{color:rgba(255,200,140,0.6);margin-right:5px;}
+.chat-mod-durum{float:right;font-size:0.64rem;letter-spacing:1px;color:rgba(255,255,255,0.45);}
+.chat-mod-islem{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;}
+.chat-mod-islem button{padding:5px 9px;border-radius:4px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.64rem;letter-spacing:0.6px;
+  background:rgba(255,100,0,0.12);border:1px solid rgba(255,120,0,0.28);
+  color:rgba(255,220,190,0.9);}
+.chat-mod-islem button:hover{background:rgba(255,100,0,0.26);color:#fff;}
+.chat-mod-alt{display:flex;gap:8px;justify-content:flex-end;}
+.chat-mod-kapat-btn,.chat-mod-yenile{padding:8px 14px;border-radius:5px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.7rem;letter-spacing:1px;
+  background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);
+  color:rgba(255,255,255,0.6);}
 .chat-rapor-iptal{margin-top:6px;padding:8px 12px;border-radius:5px;cursor:pointer;
   font-family:'Rajdhani',sans-serif;font-size:0.7rem;letter-spacing:1px;
   background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);
@@ -660,7 +705,8 @@ font-family:sans-serif;
   .chat-baslik{font-size:0.7rem;letter-spacing:1px;flex:0 1 auto;max-width:26%;}
   .chat-baglam{font-size:0.7rem;letter-spacing:1px;flex:1 1 auto;}
   .chat-sayac{display:none;}          /* [V2.1b] yerini engelle dugmesi alir */
-  .chat-blok,.chat-rapor-btn{padding:5px 8px;font-size:0.6rem;letter-spacing:0.3px;}
+  .chat-blok,.chat-rapor-btn,.chat-mod-btn{padding:5px 7px;font-size:0.58rem;letter-spacing:0.2px;}
+  .chat-mod-kutu{width:96%;max-height:92%;padding:12px;}
   .chat-baslik{max-width:20%;}          /* [V2.1c] iki dugmeye yer acilir */
   .chat-govde{flex-direction:column;}
   .chat-yan{width:100%;flex:none;flex-direction:row;align-items:center;gap:8px;
@@ -1775,6 +1821,38 @@ en: {
   'chat.unblock':'UNBLOCK',
   'chat.blockedUser':'{nick} is blocked. Private messages are off in both directions.',
   'chat.unblockedUser':'{nick} is unblocked. You can message each other again.',
+  'chat.mod':'⚙ MOD',
+  'chat.modTitle':'MODERATOR PANEL',
+  'chat.modTokenPh':'Moderator token',
+  'chat.modLogin':'SIGN IN',
+  'chat.modNote':'Authorisation is verified on the server only. This panel grants no rights by itself.',
+  'chat.modRole':'Role: {role}',
+  'chat.modReports':'REPORTS ({n})',
+  'chat.modEmpty':'No reports yet.',
+  'chat.modPending':'pending',
+  'chat.modReviewed':'reviewed',
+  'chat.modActioned':'actioned',
+  'chat.modActMute':'MUTE 10m',
+  'chat.modActKick':'KICK',
+  'chat.modActBan':'BAN 1h',
+  'chat.modActBlock':'BLOCK',
+  'chat.modActReviewed':'MARK REVIEWED',
+  'chat.modRefresh':'REFRESH',
+  'chat.modDone':'{action} applied: {nick}',
+  'chat.modMuted':'A moderator muted you for {n} s.',
+  'chat.modKicked':'You were removed from the room. You can rejoin in {n} s.',
+  'chat.modBanned':'Your access is closed for {n} s.',
+  'chat.errModDenied':'Not authorised',
+  'chat.errModRate':'Too many attempts. Try again in {n} s',
+  'chat.errModDisabled':'Moderation is disabled on this server',
+  'chat.errModTarget':'Player not found',
+  'chat.errModSelf':'You cannot moderate yourself',
+  'chat.errModProtected':'You cannot moderate another moderator',
+  'chat.errModOffline':'That player is offline',
+  'chat.errModStatus':'Invalid status',
+  'chat.errModReport':'Report not found',
+  'chat.errBanned':'Your access is closed for {n} s',
+  'chat.errKickCooldown':'You can rejoin in {n} s',
   'chat.reportTitle':'Report {nick}',
   'chat.reasonSpam':'Spam',
   'chat.reasonHarass':'Insult / harassment',
@@ -1981,6 +2059,38 @@ tr: {
   'chat.unblock':'ENGELİ KALDIR',
   'chat.blockedUser':'{nick} engellendi. Özel mesajlar iki yönde de kapalı.',
   'chat.unblockedUser':'{nick} engeli kaldırıldı. Yeniden mesajlaşabilirsiniz.',
+  'chat.mod':'⚙ MOD',
+  'chat.modTitle':'MODERATÖR PANELİ',
+  'chat.modTokenPh':'Moderatör token',
+  'chat.modLogin':'GİRİŞ',
+  'chat.modNote':'Yetki yalnızca sunucuda doğrulanır. Bu panel tek başına yetki vermez.',
+  'chat.modRole':'Rol: {role}',
+  'chat.modReports':'RAPORLAR ({n})',
+  'chat.modEmpty':'Henüz rapor yok.',
+  'chat.modPending':'bekliyor',
+  'chat.modReviewed':'incelendi',
+  'chat.modActioned':'işlem yapıldı',
+  'chat.modActMute':'SUSTUR 10dk',
+  'chat.modActKick':'ATTıR',
+  'chat.modActBan':'BAN 1sa',
+  'chat.modActBlock':'ENGELLE',
+  'chat.modActReviewed':'İNCELENDİ',
+  'chat.modRefresh':'YENİLE',
+  'chat.modDone':'{action} uygulandı: {nick}',
+  'chat.modMuted':'Bir moderatör seni {n} sn susturdu.',
+  'chat.modKicked':'Odadan çıkarıldın. {n} sn sonra tekrar girebilirsin.',
+  'chat.modBanned':'Girişin {n} sn süreyle kapatıldı.',
+  'chat.errModDenied':'Yetkin yok',
+  'chat.errModRate':'Çok fazla deneme. {n} sn sonra tekrar dene',
+  'chat.errModDisabled':'Bu sunucuda moderasyon kapalı',
+  'chat.errModTarget':'Oyuncu bulunamadı',
+  'chat.errModSelf':'Kendine moderasyon uygulayamazsın',
+  'chat.errModProtected':'Başka bir moderatöre işlem uygulayamazsın',
+  'chat.errModOffline':'Bu oyuncu çevrimdışı',
+  'chat.errModStatus':'Geçersiz durum',
+  'chat.errModReport':'Rapor bulunamadı',
+  'chat.errBanned':'Girişin {n} sn süreyle kapalı',
+  'chat.errKickCooldown':'{n} sn sonra tekrar girebilirsin',
   'chat.reportTitle':'{nick} raporla',
   'chat.reasonSpam':'Spam',
   'chat.reasonHarass':'Hakaret / taciz',
@@ -2187,6 +2297,38 @@ ru: {
   'chat.unblock':'РАЗБЛОКИРОВАТЬ',
   'chat.blockedUser':'{nick} заблокирован. Личные сообщения отключены в обе стороны.',
   'chat.unblockedUser':'{nick} разблокирован. Вы снова можете переписываться.',
+  'chat.mod':'⚙ МОД',
+  'chat.modTitle':'ПАНЕЛЬ МОДЕРАТОРА',
+  'chat.modTokenPh':'Токен модератора',
+  'chat.modLogin':'ВОЙТИ',
+  'chat.modNote':'Права проверяются только на сервере. Сама панель прав не даёт.',
+  'chat.modRole':'Роль: {role}',
+  'chat.modReports':'ЖАЛОБЫ ({n})',
+  'chat.modEmpty':'Жалоб пока нет.',
+  'chat.modPending':'ожидает',
+  'chat.modReviewed':'проверено',
+  'chat.modActioned':'приняты меры',
+  'chat.modActMute':'МУТ 10м',
+  'chat.modActKick':'КИК',
+  'chat.modActBan':'БАН 1ч',
+  'chat.modActBlock':'БЛОК',
+  'chat.modActReviewed':'ПРОВЕРЕНО',
+  'chat.modRefresh':'ОБНОВИТЬ',
+  'chat.modDone':'{action} применено: {nick}',
+  'chat.modMuted':'Модератор заглушил вас на {n} с.',
+  'chat.modKicked':'Вас удалили из комнаты. Повторный вход через {n} с.',
+  'chat.modBanned':'Доступ закрыт на {n} с.',
+  'chat.errModDenied':'Нет прав',
+  'chat.errModRate':'Слишком много попыток. Повторите через {n} с',
+  'chat.errModDisabled':'Модерация отключена',
+  'chat.errModTarget':'Игрок не найден',
+  'chat.errModSelf':'Нельзя применить к себе',
+  'chat.errModProtected':'Нельзя применить к другому модератору',
+  'chat.errModOffline':'Игрок не в сети',
+  'chat.errModStatus':'Неверный статус',
+  'chat.errModReport':'Жалоба не найдена',
+  'chat.errBanned':'Доступ закрыт на {n} с',
+  'chat.errKickCooldown':'Повторный вход через {n} с',
   'chat.reportTitle':'Пожаловаться на {nick}',
   'chat.reasonSpam':'Спам',
   'chat.reasonHarass':'Оскорбление / травля',
@@ -5088,6 +5230,12 @@ const CHAT_HATA_ANAHTAR = {
   dm_blocked:'chat.errDmBlocked', dm_unavailable:'chat.errDmUnavailable',
   block_limit:'chat.errBlockLimit', block_target:'chat.errBlockTarget',
   block_self:'chat.errBlockSelf',
+  mod_denied:'chat.errModDenied',   mod_rate:'chat.errModRate',
+  mod_disabled:'chat.errModDisabled', mod_target:'chat.errModTarget',
+  mod_self:'chat.errModSelf',       mod_protected:'chat.errModProtected',
+  mod_offline:'chat.errModOffline', mod_status:'chat.errModStatus',
+  mod_report:'chat.errModReport',   banned:'chat.errBanned',
+  kick_cooldown:'chat.errKickCooldown',
   reason_invalid:'chat.errReasonInvalid', report_rate:'chat.errReportRate',
   report_limit:'chat.errReportLimit',    report_target:'chat.errReportTarget',
   report_self:'chat.errReportSelf',
@@ -5113,7 +5261,10 @@ const CHAT = { nick:'', oda:'global', acik:false, bagli:false, sayac:0,
                dmHedef:null, dmOkunmamis:{}, globalTampon:[],
                // [V2.1b] Sunucudan gelen engel listesi. TEK OTORITE SUNUCUDUR;
                // buradaki kopya yalnizca dugme etiketini secmek icindir.
-               blokListesi:[] };
+               blokListesi:[],
+               // [V2.1d] Yalnizca GORSEL rol kopyasi. Sunucu her komutta
+               // yetkiyi yeniden dogrular; bu alan yetki VERMEZ.
+               rol:null };
 
 // [V2.1b] Nick karsilastirmasi: sunucudaki nickAlt esdegeri degil, yalnizca
 // kaba bir gorsel eslestirmedir. Gercek karar her zaman sunucudadir.
@@ -5125,6 +5276,130 @@ function chatBlokluMu(nick){
   }
   return false;
 }
+// [V2.1d] Moderator paneli. ROL BILGISI YALNIZCA GORSELDIR: sunucu her
+// komutta yetkiyi yeniden dogrular ve istemcinin iddiasina guvenmez.
+// Token HICBIR YERDE saklanmaz (localStorage'a yazilmaz, degiskende
+// tutulmaz); yalnizca gonderim aninda okunur ve alan temizlenir.
+function chatModPaneliKapat(){
+  const p = document.getElementById('chat-mod');
+  if(p) p.className = 'chat-mod';
+  const t0 = document.getElementById('chat-mod-token');
+  if(t0) t0.value = '';
+}
+function chatModPaneliAc(){
+  const p = document.getElementById('chat-mod'); if(!p) return;
+  const b  = document.getElementById('chat-mod-baslik');
+  const gi = document.getElementById('chat-mod-giris');
+  const pn = document.getElementById('chat-mod-panel');
+  const gb = document.getElementById('chat-mod-gir');
+  const kb = document.getElementById('chat-mod-kapat');
+  const yb = document.getElementById('chat-mod-yenile');
+  const nt = document.getElementById('chat-mod-not');
+  const tk = document.getElementById('chat-mod-token');
+  if(b){ while(b.firstChild) b.removeChild(b.firstChild);
+         b.appendChild(document.createTextNode(t('chat.modTitle'))); }
+  if(nt){ while(nt.firstChild) nt.removeChild(nt.firstChild);
+          nt.appendChild(document.createTextNode(t('chat.modNote'))); }
+  if(tk){ tk.placeholder = t('chat.modTokenPh'); tk.value = ''; }
+  if(gb){ while(gb.firstChild) gb.removeChild(gb.firstChild);
+          gb.appendChild(document.createTextNode(t('chat.modLogin')));
+          gb.onclick = chatModGiris; }
+  if(kb){ while(kb.firstChild) kb.removeChild(kb.firstChild);
+          kb.appendChild(document.createTextNode(t('common.close')));
+          kb.onclick = chatModPaneliKapat; }
+  if(yb){ while(yb.firstChild) yb.removeChild(yb.firstChild);
+          yb.appendChild(document.createTextNode(t('chat.modRefresh')));
+          yb.onclick = function(){ chatWsGonder({ type:'chat_mod_reports' }); }; }
+  const yetkili = (CHAT.rol === 'mod' || CHAT.rol === 'admin');
+  if(gi) gi.style.display = yetkili ? 'none' : '';
+  if(pn) pn.style.display = yetkili ? '' : 'none';
+  if(yb) yb.style.display = yetkili ? '' : 'none';
+  if(yetkili) chatWsGonder({ type:'chat_mod_reports' });
+  p.className = 'chat-mod acik';
+  if(tk && !yetkili) tk.focus();
+}
+function chatModGiris(){
+  const tk = document.getElementById('chat-mod-token'); if(!tk) return;
+  const jeton = tk.value || '';
+  tk.value = '';                       // token ekranda BIRAKILMAZ
+  if(!jeton) return;
+  chatWsGonder({ type:'chat_mod_auth', token: jeton });
+}
+function chatModDurumMetni(kod){
+  return kod === 'islem_yapildi' ? t('chat.modActioned')
+       : kod === 'incelendi'     ? t('chat.modReviewed')
+       : t('chat.modPending');
+}
+// Rapor listesi: TUM alanlar createTextNode ile yazilir.
+function chatModRaporlariCiz(items, toplam){
+  const kok = document.getElementById('chat-mod-liste'); if(!kok) return;
+  while(kok.firstChild) kok.removeChild(kok.firstChild);
+  const rol = document.getElementById('chat-mod-rol');
+  if(rol){ while(rol.firstChild) rol.removeChild(rol.firstChild);
+           rol.appendChild(document.createTextNode(
+             t('chat.modRole', { role: CHAT.rol || '-' }) + '  |  ' +
+             t('chat.modReports', { n: (typeof toplam === 'number' ? toplam : (items||[]).length) }))); }
+  if(!items || !items.length){
+    const bos = document.createElement('div');
+    bos.className = 'chat-mod-not';
+    bos.appendChild(document.createTextNode(t('chat.modEmpty')));
+    kok.appendChild(bos);
+    return;
+  }
+  items.forEach(function(r){
+    const d = document.createElement('div');
+    d.className = 'chat-mod-rapor';
+    const dur = document.createElement('span');
+    dur.className = 'chat-mod-durum';
+    dur.appendChild(document.createTextNode(chatModDurumMetni(r.status)));
+    d.appendChild(dur);
+    function satir(etiket, deger){
+      const x = document.createElement('div');
+      x.className = 'chat-mod-satir';
+      const e = document.createElement('span');
+      e.className = 'chat-mod-etiket';
+      e.appendChild(document.createTextNode(etiket));
+      x.appendChild(e);
+      x.appendChild(document.createTextNode(String(deger)));
+      d.appendChild(x);
+    }
+    const zaman = new Date(r.ts);
+    satir('#', String(r.reported) + '  ←  ' + String(r.reporter));
+    satir('!', String(r.reason) + ' / ' + String(r.scope) +
+               (r.count > 1 ? ('  ×' + r.count) : ''));
+    satir('⏱', zaman.toLocaleString());
+    if(r.message) satir('“', String(r.message));
+    const islem = document.createElement('div');
+    islem.className = 'chat-mod-islem';
+    function dugme(anahtar, fn){
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.appendChild(document.createTextNode(t(anahtar)));
+      b.onclick = fn;
+      islem.appendChild(b);
+    }
+    dugme('chat.modActMute', function(){
+      chatWsGonder({ type:'chat_mod_mute', nick: r.reported, minutes: 10, reportId: r.id }); });
+    dugme('chat.modActKick', function(){
+      chatWsGonder({ type:'chat_mod_kick', nick: r.reported, reportId: r.id }); });
+    dugme('chat.modActBan', function(){
+      chatWsGonder({ type:'chat_mod_ban', nick: r.reported, hours: 1, reportId: r.id }); });
+    dugme('chat.modActBlock', function(){
+      chatWsGonder({ type:'chat_block', nick: r.reported });
+      chatWsGonder({ type:'chat_mod_status', reportId: r.id, status:'incelendi' }); });
+    dugme('chat.modActReviewed', function(){
+      chatWsGonder({ type:'chat_mod_status', reportId: r.id, status:'incelendi' }); });
+    d.appendChild(islem);
+    kok.appendChild(d);
+  });
+}
+function chatModDugmesiCiz(){
+  const b = document.getElementById('chat-mod-btn'); if(!b) return;
+  while(b.firstChild) b.removeChild(b.firstChild);
+  b.appendChild(document.createTextNode(t('chat.mod')));
+  b.onclick = chatModPaneliAc;
+}
+
 // [V2.1c] Rapor nedenleri. Anahtarlar SUNUCUDAKI liste ile birebir ayni;
 // sunucu gecersiz nedeni 'reason_invalid' ile reddeder.
 const CHAT_RAPOR_NEDENLERI = [
@@ -5361,6 +5636,7 @@ function chatOdalariCiz(){
   }
   chatBlokDugmesiCiz();          // [V2.1b] DM'de engelle/kaldir dugmesi
   chatRaporDugmesiCiz();         // [V2.1c] DM'de raporla dugmesi
+  chatModDugmesiCiz();           // [V2.1d] moderator giris noktasi
   // Acik 1:1 sohbet ayri bir girdi olarak gosterilir.
   if(CHAT.dmHedef){
     const d = document.createElement('button');
@@ -5446,6 +5722,7 @@ function chatBaglan(){
   CHAT_WS.onclose = function(){
     CHAT.bagli = false;
     CHAT.katildi = false;
+    CHAT.rol = null;               // [V2.1d] rol SOKETE baglidir; kopunca duser
     chatKatilimDurdur();             // eski sokete ait deneme iptal
     chatPingDurdur();
     // KRITIK: burada G.phase'e, showScreen'e veya oyun WS'ine HIC
@@ -5469,6 +5746,8 @@ function chatBaglantiKapat(){
   CHAT.dmHedef = null; CHAT.dmOkunmamis = {}; CHAT.globalTampon = [];
   CHAT.blokListesi = [];         // [V2.1b] yerel kopya; asil liste sunucuda
   chatRaporPaneliKapat();        // [V2.1c] acik kalan rapor paneli kapatilir
+  chatModPaneliKapat();          // [V2.1d] moderator paneli kapatilir
+  CHAT.rol = null;               // [V2.1d] rol baglantiyla birlikte duser
   // [V2.1a] SID jetonu BILEREK silinmez: ayni tarayicidan tekrar girisde
   // kimlik surer. Jeton bir sirdir degildir; icinde nick veya kisisel veri yoktur.
   if(_chatYeniden){ clearTimeout(_chatYeniden); _chatYeniden = null; }
@@ -5580,6 +5859,32 @@ function chatMsgIsle(m){
     // [V2.1c] Rapor onayi: tekrar eden rapor ayri kayit acmaz, sayac artar.
     case 'chat_report':
       if(m.ok) chatSistemYaz(m.duplicate ? 'chat.reportedAgain' : 'chat.reported');
+      break;
+    // [V2.1d] Moderasyon yanitlari.
+    case 'chat_mod_auth':
+      if(m.ok){
+        CHAT.rol = m.role;
+        chatModPaneliAc();          // panel yetkili gorunume gecer
+      }
+      break;
+    case 'chat_mod_reports':
+      chatModRaporlariCiz(m.items || [], m.total);
+      break;
+    case 'chat_mod_ok':
+      if(m.action === 'status'){ chatWsGonder({ type:'chat_mod_reports' }); }
+      else {
+        chatSistemYaz('chat.modDone', { action: String(m.action || ''), nick: String(m.nick || '') });
+        chatWsGonder({ type:'chat_mod_reports' });
+      }
+      break;
+    case 'chat_muted':
+      chatSistemYaz('chat.modMuted', { n: m.seconds });
+      break;
+    case 'chat_kicked':
+      chatSistemYaz('chat.modKicked', { n: m.seconds });
+      break;
+    case 'chat_banned':
+      chatSistemYaz('chat.modBanned', { n: m.seconds });
       break;
     case 'chat_pong':
     case 'chat_block_notice':
@@ -5765,6 +6070,7 @@ if(document.readyState === 'loading'){
       <div class="chat-baglam" id="chat-baglam"></div>
       <button class="chat-blok" type="button" id="chat-blok"></button>
       <button class="chat-rapor-btn" type="button" id="chat-rapor-btn"></button>
+      <button class="chat-mod-btn" type="button" id="chat-mod-btn"></button>
       <div class="chat-sayac"><span data-i18n="chat.onlinePlayers">ONLINE PLAYERS</span>: <span id="chat-sayi">0</span></div>
       <button class="chat-kapat" type="button" id="chat-kapat" data-i18n="common.close">CLOSE</button>
     </div>
@@ -5781,6 +6087,31 @@ if(document.readyState === 'loading'){
     </div>
 
     <!-- 2) Sohbet paneli -->
+    <!-- [CHAT V2.1d] Moderator paneli. Yetki YALNIZCA sunucuda dogrulanir;
+         bu panelin acilmasi hicbir yetki vermez. Rapor icerikleri JS ile
+         TEXT NODE olarak yazilir; innerHTML KULLANILMAZ. -->
+    <div class="chat-mod" id="chat-mod">
+      <div class="chat-mod-kutu">
+        <div class="chat-mod-baslik" id="chat-mod-baslik"></div>
+        <div id="chat-mod-giris">
+          <input class="chat-mod-token" id="chat-mod-token" type="password"
+                 maxlength="128" autocomplete="off" spellcheck="false">
+          <div class="chat-mod-alt" style="margin-top:8px">
+            <button class="chat-mod-gir" type="button" id="chat-mod-gir"></button>
+          </div>
+          <div class="chat-mod-not" id="chat-mod-not" style="margin-top:8px"></div>
+        </div>
+        <div id="chat-mod-panel" style="display:none">
+          <div class="chat-mod-rol" id="chat-mod-rol"></div>
+          <div class="chat-mod-liste" id="chat-mod-liste"></div>
+        </div>
+        <div class="chat-mod-alt">
+          <button class="chat-mod-yenile" type="button" id="chat-mod-yenile"
+                  style="display:none"></button>
+          <button class="chat-mod-kapat-btn" type="button" id="chat-mod-kapat"></button>
+        </div>
+      </div>
+    </div>
     <!-- [CHAT V2.1c] Rapor nedeni secimi. Icerik JS ile TEXT NODE olarak
          doldurulur; innerHTML KULLANILMAZ. -->
     <div class="chat-rapor" id="chat-rapor">

@@ -608,6 +608,12 @@ function chatOdadanCikar(ws, bildir){
 }
 // Hiz siniri. Donen deger: null = gecebilir, aksi halde hata kodu.
 function chatHizKontrol(u, simdi){
+  // [V2.1d] Moderator mute'u: SID/nick tabanli oldugu icin reconnect
+  // sonrasinda da gecerlidir. Anti-spam mute'u (u.muteBitis) DEGISMEDI.
+  const modBitis = chatModMuteBitis(u);
+  if(modBitis && simdi < modBitis){
+    return { hata:'muted', kalan: Math.ceil((modBitis - simdi) / 1000) };
+  }
   if(u.muteBitis && simdi < u.muteBitis){
     return { hata:'muted', kalan: Math.ceil((u.muteBitis - simdi) / 1000) };
   }
@@ -640,6 +646,9 @@ function chatKatil(ws, msg){
   // aksi halde yenisi uretilir. Nick ile SID birbirinden BAGIMSIZDIR.
   const sd = chatSidCoz(msg && msg.sid);
   chatSidDokun(sd.sid, d.nickAlt);
+  // [V2.1d] Sureli ban ve kick sonrasi bekleme suresi GIRISTE uygulanir.
+  const engel = chatModGirisEngeli(sd.sid, d.nickAlt, Date.now());
+  if(engel) return chatHata(ws, engel.kod, engel.kalan);
   chatUsers.set(ws, { nick:d.nick, nickAlt:d.nickAlt, oda:oda, sid:sd.sid,
                       sonMs:0, pencere:[], muteBitis:0, sonMetin:'', tekrar:0 });
 
@@ -722,6 +731,10 @@ function chatRapor(ws, msg){
     tekrar = true;
   } else {
     ChatStore.addReport({
+      // [V2.1d] Moderator paneli kayitlari id ile adresler; durum RAM'de
+      // tutulur ve restart sonrasi sifirlanir.
+      id:          'r' + (simdi.toString(36)) + Math.floor(Math.random() * 1e6).toString(36),
+      durum:       'bekliyor',
       ts:          simdi,
       ilkTs:       simdi,
       sonTs:       simdi,
@@ -915,6 +928,8 @@ function chatTemizlik(){
   chatBlokSupur(simdi);
   // [V2.1c] Rapor akis sayaclari ayni supurmede sadelestirilir.
   chatRaporSupur(simdi);
+  // [V2.1d] Suresi dolmus mute / ban / kick beklemesi ayni supurmede duser.
+  chatModSupur(simdi);
   const dSinir = simdi - CHAT_DM_TTL_MS;
   chatDM.forEach(function(k, id){
     chatDMSupur(k);
@@ -1264,6 +1279,322 @@ function chatRaporSupur(simdi){
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// CHAT V2.1d — MODERATOR / ADMIN YETKISI + MUTE / KICK / TEMP BAN [V2.1d]
+// ═══════════════════════════════════════════════════════════════════════
+// YETKI MODELI:
+//   * Yetki YALNIZCA process.env icindeki paylasimli sirlarla verilir:
+//     CHAT_MOD_TOKEN (moderator) ve CHAT_ADMIN_TOKEN (admin).
+//   * Nick'e, SID'e veya istemci iddiasina gore ASLA yetki verilmez.
+//   * Ilgili env YOKSA o rol TAMAMEN KAPALIDIR (fail-closed). Varsayilan
+//     parola, gomulu sir veya "gelistirme modu" YOKTUR.
+//   * Rol basarili dogrulamadan sonra YALNIZCA o WebSocket baglantisina
+//     yazilir (u.rol). Baglanti kopunca rol de gider; reconnect sonrasi
+//     yeniden dogrulama gerekir.
+//   * HER moderasyon komutu, calismadan once u.rol'u YENIDEN kontrol
+//     eder; auth anindaki kontrol yeterli sayilmaz.
+//   * Token HICBIR log satirinda, hata mesajinda veya istemciye giden
+//     pakette yer almaz.
+//
+// PERMANENT BAN YOKTUR. Yalnizca sureli (temporary) ban vardir.
+//
+// DEPOLAMA: her sey RAM'dedir; veritabani, dosya, disk kullanilmaz.
+// Restart / redeploy tum mute, ban, kick bekleme ve rapor durumlarini
+// sifirlar. Supurme MEVCUT 5 dakikalik chatTemizlik() icinde yapilir;
+// yeni surekli zamanlayici EKLENMEZ.
+const CHAT_MOD_TOKEN   = (typeof process.env.CHAT_MOD_TOKEN === 'string' &&
+                          process.env.CHAT_MOD_TOKEN.length >= 8)
+                         ? process.env.CHAT_MOD_TOKEN : null;
+const CHAT_ADMIN_TOKEN = (typeof process.env.CHAT_ADMIN_TOKEN === 'string' &&
+                          process.env.CHAT_ADMIN_TOKEN.length >= 8)
+                         ? process.env.CHAT_ADMIN_TOKEN : null;
+
+const CHAT_MOD_DENEME_MAX   = 5;                    // pencere basina deneme
+const CHAT_MOD_PENCERE_MS   = 10 * 60 * 1000;       // deneme penceresi
+const CHAT_MOD_KILIT_MS     = 15 * 60 * 1000;       // asilirsa kilit suresi
+const CHAT_MOD_GECIKME_MS   = 350;                  // sabit yanit gecikmesi
+const CHAT_MOD_MUTE_MAX_MS  = 60 * 60 * 1000;       // moderator mute tavani
+const CHAT_MOD_BAN_MAX_MS   = 24 * 60 * 60 * 1000;  // temp ban tavani
+const CHAT_KICK_BEKLEME_MS  = 60 * 1000;            // kick sonrasi rejoin engeli
+const CHAT_MOD_STORE_MAX    = 500;                  // mute/ban tablo tavani
+const CHAT_MOD_RAPOR_LIMIT  = 50;                   // panele gonderilen rapor
+
+// anahtar -> { bitis, sebep, veren, ts }   (anahtar: 's:'+sid | 'n:'+nickAlt)
+const chatModMute     = new Map();
+const chatModBan      = new Map();
+const chatKickBekleme = new Map();   // anahtar -> bitis (ms)
+// ipHash -> { sayi, ilk, kilitBitis }   (HAM IP TUTULMAZ)
+const chatModDeneme   = new Map();
+
+// Bir kullanicinin iki anahtari: SID (birincil) ve nickAlt (yedek).
+function chatModAnahtarlar(sid, nickAlt){
+  const a = [];
+  if(sid) a.push('s:' + sid);
+  if(nickAlt) a.push('n:' + nickAlt);
+  return a;
+}
+function chatModTabloYaz(tablo, anahtarlar, kayit){
+  anahtarlar.forEach(function(a){
+    if(tablo.has(a)) tablo.delete(a);
+    tablo.set(a, kayit);
+  });
+  while(tablo.size > CHAT_MOD_STORE_MAX){
+    const enEski = tablo.keys().next();
+    if(enEski.done) break;
+    tablo.delete(enEski.value);
+  }
+}
+function chatModTabloSil(tablo, anahtarlar){
+  let n = 0;
+  anahtarlar.forEach(function(a){ if(tablo.delete(a)) n++; });
+  return n;
+}
+function chatModTabloBul(tablo, anahtarlar, simdi){
+  for(let i = 0; i < anahtarlar.length; i++){
+    const k = tablo.get(anahtarlar[i]);
+    if(!k) continue;
+    if(k.bitis && simdi >= k.bitis){ tablo.delete(anahtarlar[i]); continue; }
+    return k;
+  }
+  return null;
+}
+// chatHizKontrol tarafindan cagrilir: moderator mute'u bitis zamani.
+function chatModMuteBitis(u){
+  if(!u) return 0;
+  const k = chatModTabloBul(chatModMute, chatModAnahtarlar(u.sid, u.nickAlt), Date.now());
+  return k ? k.bitis : 0;
+}
+// chatKatil tarafindan cagrilir: giris engeli var mi?
+function chatModGirisEngeli(sid, nickAlt, simdi){
+  const anah = chatModAnahtarlar(sid, nickAlt);
+  const ban = chatModTabloBul(chatModBan, anah, simdi);
+  if(ban) return { kod:'banned', kalan: Math.ceil((ban.bitis - simdi) / 1000) };
+  for(let i = 0; i < anah.length; i++){
+    const bitis = chatKickBekleme.get(anah[i]);
+    if(!bitis) continue;
+    if(simdi >= bitis){ chatKickBekleme.delete(anah[i]); continue; }
+    return { kod:'kick_cooldown', kalan: Math.ceil((bitis - simdi) / 1000) };
+  }
+  return null;
+}
+
+// ── Yetki dogrulama ──────────────────────────────────────────────────
+// Sabit zamanli karsilastirma. Uzunluk farki da sizinti olmasin diye
+// once uzunluk kontrol edilir, sonra timingSafeEqual calistirilir.
+function chatModTokenEsit(girilen, dogru){
+  if(typeof girilen !== 'string' || typeof dogru !== 'string') return false;
+  const a = Buffer.from(girilen, 'utf8');
+  const b = Buffer.from(dogru, 'utf8');
+  if(a.length !== b.length) return false;
+  try{ return chatCrypto.timingSafeEqual(a, b); }catch(e){ return false; }
+}
+function chatModDenemeDurum(ipHash, simdi){
+  let k = chatModDeneme.get(ipHash);
+  if(!k){ k = { sayi: 0, ilk: simdi, kilitBitis: 0 }; chatModDeneme.set(ipHash, k); }
+  if(k.kilitBitis && simdi >= k.kilitBitis){ k.kilitBitis = 0; k.sayi = 0; k.ilk = simdi; }
+  if((simdi - k.ilk) > CHAT_MOD_PENCERE_MS && !k.kilitBitis){ k.sayi = 0; k.ilk = simdi; }
+  while(chatModDeneme.size > CHAT_MOD_STORE_MAX){
+    const enEski = chatModDeneme.keys().next();
+    if(enEski.done) break;
+    chatModDeneme.delete(enEski.value);
+  }
+  return k;
+}
+function chatModAuth(ws, msg){
+  const u = chatUsers.get(ws);
+  if(!u) return chatHata(ws, 'not_joined');
+  const simdi = Date.now();
+  const ipHash = ws.__chatIpHash || 'bilinmeyen';
+  const d = chatModDenemeDurum(ipHash, simdi);
+
+  // Kilitli mi? (brute-force korumasi)
+  if(d.kilitBitis && simdi < d.kilitBitis){
+    return setTimeout(function(){
+      chatHata(ws, 'mod_rate', Math.ceil((d.kilitBitis - simdi) / 1000));
+    }, CHAT_MOD_GECIKME_MS);
+  }
+  // Hicbir token tanimli degilse sistem KAPALIDIR.
+  if(!CHAT_MOD_TOKEN && !CHAT_ADMIN_TOKEN){
+    return setTimeout(function(){ chatHata(ws, 'mod_disabled'); }, CHAT_MOD_GECIKME_MS);
+  }
+  const girilen = (msg && typeof msg.token === 'string') ? msg.token : '';
+  let rol = null;
+  if(CHAT_ADMIN_TOKEN && chatModTokenEsit(girilen, CHAT_ADMIN_TOKEN)) rol = 'admin';
+  else if(CHAT_MOD_TOKEN && chatModTokenEsit(girilen, CHAT_MOD_TOKEN)) rol = 'mod';
+
+  setTimeout(function(){
+    if(!rol){
+      d.sayi++;
+      if(d.sayi >= CHAT_MOD_DENEME_MAX){
+        d.kilitBitis = simdi + CHAT_MOD_KILIT_MS;
+        console.log('CHAT MOD AUTH kilit', ipHash);      // TOKEN LOGLANMAZ
+      }
+      return chatHata(ws, 'mod_denied');
+    }
+    d.sayi = 0; d.ilk = simdi; d.kilitBitis = 0;
+    u.rol = rol;                                          // YALNIZ bu baglantiya
+    console.log('CHAT MOD AUTH ok', u.nick, rol, ipHash); // TOKEN LOGLANMAZ
+    chatGonder(ws, { type:'chat_mod_auth', ok:true, role: rol });
+  }, CHAT_MOD_GECIKME_MS);
+}
+// HER moderasyon komutunda cagrilir. 'admin' gerektiren komutlarda
+// gerekli='admin' verilir.
+function chatModYetki(ws, gerekli){
+  const u = chatUsers.get(ws);
+  if(!u){ chatHata(ws, 'not_joined'); return null; }
+  const rol = u.rol;
+  if(rol !== 'mod' && rol !== 'admin'){ chatHata(ws, 'mod_denied'); return null; }
+  if(gerekli === 'admin' && rol !== 'admin'){ chatHata(ws, 'mod_denied'); return null; }
+  return u;
+}
+// Moderasyon hedefi: cevrimici degilse de islem yapilabilir (nick yedegi).
+function chatModHedef(u, hamNick){
+  let nick = chatNormalize(hamNick);
+  try{ nick = nick.normalize('NFKC'); }catch(e){}
+  if(!nick) return { hata:'mod_target' };
+  const uz = chatNickUzunluk(nick);
+  if(uz < chatNickAltSinir(nick) || uz > CHAT_NICK_MAX) return { hata:'mod_target' };
+  if(!CHAT_NICK_DESEN.test(nick)) return { hata:'mod_target' };
+  const anahtar = chatNickAnahtar(nick);
+  if(anahtar === u.nickAlt) return { hata:'mod_self' };
+  const hedefWs = chatSoketBul(anahtar);
+  const hedefU = hedefWs ? chatUsers.get(hedefWs) : null;
+  return { ws: hedefWs, u: hedefU, nickAlt: anahtar,
+           sid: hedefU ? hedefU.sid : null,
+           nick: hedefU ? hedefU.nick : nick };
+}
+// Moderator hedefi de moderator/admin ise islem reddedilir.
+function chatModKorumali(h){ return !!(h.u && (h.u.rol === 'mod' || h.u.rol === 'admin')); }
+
+// ── Komutlar ─────────────────────────────────────────────────────────
+function chatModMuteUygula(ws, msg){
+  const u = chatModYetki(ws); if(!u) return;
+  const h = chatModHedef(u, msg && msg.nick);
+  if(h.hata) return chatHata(ws, h.hata);
+  if(chatModKorumali(h)) return chatHata(ws, 'mod_protected');
+  const simdi = Date.now();
+  let dk = Number(msg && msg.minutes);
+  if(!isFinite(dk) || dk <= 0) dk = 10;
+  let sure = Math.min(dk * 60 * 1000, CHAT_MOD_MUTE_MAX_MS);
+  const kayit = { bitis: simdi + sure, sebep: chatNormalize(msg && msg.reason).slice(0, 80),
+                  veren: u.rol, ts: simdi };
+  chatModTabloYaz(chatModMute, chatModAnahtarlar(h.sid, h.nickAlt), kayit);
+  if(h.ws) chatGonder(h.ws, { type:'chat_muted', seconds: Math.ceil(sure / 1000) });
+  console.log('CHAT MOD MUTE', u.nick, '->', h.nick, Math.ceil(sure/60000) + 'dk');
+  chatGonder(ws, { type:'chat_mod_ok', action:'mute', nick: h.nick,
+                   until: kayit.bitis, minutes: Math.ceil(sure / 60000) });
+  chatModRaporDurum(msg && msg.reportId, 'islem_yapildi');
+}
+function chatModUnmute(ws, msg){
+  const u = chatModYetki(ws); if(!u) return;
+  const h = chatModHedef(u, msg && msg.nick);
+  if(h.hata) return chatHata(ws, h.hata);
+  chatModTabloSil(chatModMute, chatModAnahtarlar(h.sid, h.nickAlt));
+  chatGonder(ws, { type:'chat_mod_ok', action:'unmute', nick: h.nick });
+}
+function chatModKick(ws, msg){
+  const u = chatModYetki(ws); if(!u) return;
+  const h = chatModHedef(u, msg && msg.nick);
+  if(h.hata) return chatHata(ws, h.hata);
+  if(chatModKorumali(h)) return chatHata(ws, 'mod_protected');
+  if(!h.ws) return chatHata(ws, 'mod_offline');
+  const simdi = Date.now();
+  chatModAnahtarlar(h.sid, h.nickAlt).forEach(function(a){
+    chatKickBekleme.set(a, simdi + CHAT_KICK_BEKLEME_MS);
+  });
+  chatGonder(h.ws, { type:'chat_kicked', seconds: Math.ceil(CHAT_KICK_BEKLEME_MS / 1000),
+                     reason: chatNormalize(msg && msg.reason).slice(0, 80) });
+  chatOdadanCikar(h.ws, true);
+  try{ h.ws.close(); }catch(e){}
+  console.log('CHAT MOD KICK', u.nick, '->', h.nick);
+  chatGonder(ws, { type:'chat_mod_ok', action:'kick', nick: h.nick });
+  chatModRaporDurum(msg && msg.reportId, 'islem_yapildi');
+}
+function chatModBanla(ws, msg){
+  const u = chatModYetki(ws); if(!u) return;
+  const h = chatModHedef(u, msg && msg.nick);
+  if(h.hata) return chatHata(ws, h.hata);
+  if(chatModKorumali(h)) return chatHata(ws, 'mod_protected');
+  const simdi = Date.now();
+  let sa = Number(msg && msg.hours);
+  // PERMANENT BAN YOKTUR: sure her zaman pozitif ve tavanla sinirlidir.
+  if(!isFinite(sa) || sa <= 0) sa = 1;
+  const sure = Math.min(sa * 60 * 60 * 1000, CHAT_MOD_BAN_MAX_MS);
+  const kayit = { bitis: simdi + sure, sebep: chatNormalize(msg && msg.reason).slice(0, 80),
+                  veren: u.rol, ts: simdi };
+  chatModTabloYaz(chatModBan, chatModAnahtarlar(h.sid, h.nickAlt), kayit);
+  if(h.ws){
+    chatGonder(h.ws, { type:'chat_banned', seconds: Math.ceil(sure / 1000) });
+    chatOdadanCikar(h.ws, true);
+    try{ h.ws.close(); }catch(e){}
+  }
+  console.log('CHAT MOD BAN', u.nick, '->', h.nick, Math.ceil(sure/3600000) + 'sa');
+  chatGonder(ws, { type:'chat_mod_ok', action:'ban', nick: h.nick,
+                   until: kayit.bitis, hours: Math.ceil(sure / 3600000) });
+  chatModRaporDurum(msg && msg.reportId, 'islem_yapildi');
+}
+function chatModUnban(ws, msg){
+  const u = chatModYetki(ws); if(!u) return;
+  const h = chatModHedef(u, msg && msg.nick);
+  if(h.hata) return chatHata(ws, h.hata);
+  const anah = chatModAnahtarlar(h.sid, h.nickAlt);
+  chatModTabloSil(chatModBan, anah);
+  chatModTabloSil(chatKickBekleme, anah);
+  anah.forEach(function(a){ chatKickBekleme.delete(a); });
+  chatGonder(ws, { type:'chat_mod_ok', action:'unban', nick: h.nick });
+}
+// ── Raporlar ─────────────────────────────────────────────────────────
+function chatModRaporDurum(id, durum){
+  if(!id) return null;
+  for(let i = chatReports.length - 1; i >= 0; i--){
+    if(chatReports[i].id === id){ chatReports[i].durum = durum; return chatReports[i]; }
+  }
+  return null;
+}
+function chatModRaporlar(ws, msg){
+  const u = chatModYetki(ws); if(!u) return;
+  let n = Number(msg && msg.limit);
+  if(!isFinite(n) || n <= 0 || n > CHAT_MOD_RAPOR_LIMIT) n = CHAT_MOD_RAPOR_LIMIT;
+  const liste = chatReports.slice(-n).map(function(r){
+    return {
+      id:        r.id,
+      ts:        r.ts,
+      sonTs:     r.sonTs,
+      reason:    r.reason,
+      scope:     r.scope,
+      reporter:  r.reporter,
+      reported:  r.reported,
+      message:   r.message,
+      count:     r.sayac,
+      status:    r.durum || 'bekliyor',
+      room:      r.room
+    };
+  }).reverse();
+  chatGonder(ws, { type:'chat_mod_reports', total: chatReports.length, items: liste });
+}
+function chatModRaporIsaretle(ws, msg){
+  const u = chatModYetki(ws); if(!u) return;
+  const durum = (msg && msg.status === 'islem_yapildi') ? 'islem_yapildi'
+              : (msg && msg.status === 'incelendi')     ? 'incelendi'
+              : (msg && msg.status === 'bekliyor')      ? 'bekliyor' : null;
+  if(!durum) return chatHata(ws, 'mod_status');
+  const r = chatModRaporDurum(msg && msg.reportId, durum);
+  if(!r) return chatHata(ws, 'mod_report');
+  chatGonder(ws, { type:'chat_mod_ok', action:'status', reportId: r.id, status: durum });
+}
+// Suresi dolmus moderasyon kayitlarini dusurur (chatTemizlik icinden).
+function chatModSupur(simdi){
+  chatModMute.forEach(function(k, a){ if(k.bitis && simdi >= k.bitis) chatModMute.delete(a); });
+  chatModBan.forEach(function(k, a){ if(k.bitis && simdi >= k.bitis) chatModBan.delete(a); });
+  chatKickBekleme.forEach(function(b, a){ if(simdi >= b) chatKickBekleme.delete(a); });
+  chatModDeneme.forEach(function(k, a){
+    if(!k.kilitBitis && (simdi - k.ilk) > CHAT_MOD_PENCERE_MS) chatModDeneme.delete(a);
+    else if(k.kilitBitis && simdi >= k.kilitBitis) chatModDeneme.delete(a);
+  });
+}
+console.log('Chat V2.1d moderation ready (mod ' + (CHAT_MOD_TOKEN ? 'env' : 'KAPALI') +
+            ', admin ' + (CHAT_ADMIN_TOKEN ? 'env' : 'KAPALI') + ')');
+
 function chatYonlendir(ws, ham){
   let msg;
   try{ msg = JSON.parse(ham); }catch(e){ return; }
@@ -1283,6 +1614,16 @@ function chatYonlendir(ws, ham){
     case 'chat_block':         chatBlokEkle(ws, msg); break;
     case 'chat_unblock':       chatBlokKaldir(ws, msg); break;
     case 'chat_block_list':    chatBlokListe(ws); break;
+    // CHAT V2.1d — moderasyon. HER komut chatModYetki() ile yeniden
+    // kontrol edilir; istemcinin rol iddiasina GUVENILMEZ.
+    case 'chat_mod_auth':      chatModAuth(ws, msg); break;
+    case 'chat_mod_reports':   chatModRaporlar(ws, msg); break;
+    case 'chat_mod_status':    chatModRaporIsaretle(ws, msg); break;
+    case 'chat_mod_mute':      chatModMuteUygula(ws, msg); break;
+    case 'chat_mod_unmute':    chatModUnmute(ws, msg); break;
+    case 'chat_mod_kick':      chatModKick(ws, msg); break;
+    case 'chat_mod_ban':       chatModBanla(ws, msg); break;
+    case 'chat_mod_unban':     chatModUnban(ws, msg); break;
     // Uygulama seviyesi chat heartbeat. Mevcut heartbeat blogu
     // DEGISTIRILMEDI; zaten her mesaj ws.lastAppMsg'i tazeliyor.
     case 'chat_ping':          chatGonder(ws, { type:'chat_pong', ts: Date.now() }); break;
@@ -1294,7 +1635,17 @@ function chatYonlendir(ws, ham){
 // ── Baglanti kancalari — MEVCUT BLOK DEGISTIRILMEDI ──────────────────
 // wss bir EventEmitter oldugu icin ikinci bir 'connection' dinleyicisi
 // eklenebilir; mevcut dinleyici aynen calismaya devam eder.
-wss.on('connection', function(ws){
+wss.on('connection', function(ws, req){
+  // [V2.1d] Brute-force sayaci icin IP'nin HMAC ozeti tutulur; HAM IP
+  // hicbir yerde saklanmaz ve log'a yazilmaz.
+  try{
+    const ham0 = (req && req.headers && req.headers['x-forwarded-for'])
+      ? String(req.headers['x-forwarded-for']).split(',')[0].trim()
+      : ((req && req.socket && req.socket.remoteAddress) || '');
+    ws.__chatIpHash = ham0
+      ? chatCrypto.createHmac('sha256', CHAT_SID_SECRET).update(ham0).digest('hex').slice(0, 16)
+      : 'bilinmeyen';
+  }catch(e){ ws.__chatIpHash = 'bilinmeyen'; }
   ws.on('message', function(ham){ chatYonlendir(ws, ham); });
   // Ikinci bir 'close' dinleyicisi: oyun tarafindaki close blogunun
   // erken 'return'u bunu ETKILEMEZ, listener'lar bagimsizdir.
