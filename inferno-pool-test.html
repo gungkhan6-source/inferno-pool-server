@@ -1820,6 +1820,7 @@ en: {
   'chat.block':'BLOCK',
   'chat.unblock':'UNBLOCK',
   'chat.blockedUser':'{nick} is blocked. Private messages are off in both directions.',
+  'chat.blockedByUser':'⚠ This user blocked you. You can\'t send private messages.',
   'chat.unblockedUser':'{nick} is unblocked. You can message each other again.',
   'chat.mod':'⚙ MOD',
   'chat.modTitle':'MODERATOR PANEL',
@@ -2058,6 +2059,7 @@ tr: {
   'chat.block':'ENGELLE',
   'chat.unblock':'ENGELİ KALDIR',
   'chat.blockedUser':'{nick} engellendi. Özel mesajlar iki yönde de kapalı.',
+  'chat.blockedByUser':'⚠ Bu kullanıcı seni engelledi. Özel mesaj gönderemezsin.',
   'chat.unblockedUser':'{nick} engeli kaldırıldı. Yeniden mesajlaşabilirsiniz.',
   'chat.mod':'⚙ MOD',
   'chat.modTitle':'MODERATÖR PANELİ',
@@ -2296,6 +2298,7 @@ ru: {
   'chat.block':'ЗАБЛОКИРОВАТЬ',
   'chat.unblock':'РАЗБЛОКИРОВАТЬ',
   'chat.blockedUser':'{nick} заблокирован. Личные сообщения отключены в обе стороны.',
+  'chat.blockedByUser':'⚠ Этот пользователь заблокировал вас. Вы не можете отправлять личные сообщения.',
   'chat.unblockedUser':'{nick} разблокирован. Вы снова можете переписываться.',
   'chat.mod':'⚙ МОД',
   'chat.modTitle':'ПАНЕЛЬ МОДЕРАТОРА',
@@ -5855,6 +5858,13 @@ function chatMsgIsle(m){
     case 'chat_block_ok':
       chatSistemYaz(m.blocked ? 'chat.blockedUser' : 'chat.unblockedUser',
                     { nick: m.nick });
+      break;
+    // [BLOCK BILDIRIMI] Engellenen tarafa gelen TEK SEFERLIK sistem uyarisi.
+    // Yalnizca ekrana sistem satiri olarak yazilir: global tampona veya DM
+    // gecmisine GIRMEZ, hicbir yerde saklanmaz. Metin secili dile gore t()
+    // ile uretilir; pakette metin gelmez, bu yuzden XSS yuzeyi yoktur.
+    case 'chat_blocked_by':
+      chatSistemYaz('chat.blockedByUser');
       break;
     // [V2.1c] Rapor onayi: tekrar eden rapor ayri kayit acmaz, sayac artar.
     case 'chat_report':

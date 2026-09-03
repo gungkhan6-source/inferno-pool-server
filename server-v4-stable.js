@@ -1156,7 +1156,8 @@ function chatBlokEkle(ws, msg){
   let harita = chatBloklar.get(u.sid);
   if(!harita){ harita = new Map(); chatBloklar.set(u.sid, harita); }
   const anahtar = chatBlokAnahtar(h);
-  if(!harita.has(anahtar)){
+  const yeniEngel = !harita.has(anahtar);          // tekrar engellemede bildirim YOK
+  if(yeniEngel){
     if(harita.size >= CHAT_BLOK_KISI_MAX) return chatHata(ws, 'block_limit');
     chatBlokSayac++;
   }
@@ -1164,6 +1165,17 @@ function chatBlokEkle(ws, msg){
   chatBlokTavanUygula();
   chatGonder(ws, { type:'chat_block_ok', nick: h.nick, blocked: true });
   chatBlokListesiGonder(ws, u);
+  // [BLOCK BILDIRIMI] Hedef CEVRIMICI ise, YALNIZCA engelin kuruldugu anda
+  // tek bir sistem bildirimi gonderilir. Bu bir chat_message veya DM DEGILDIR:
+  // global akisa yayilmaz, global/DM gecmisine YAZILMAZ ve hicbir yerde
+  // saklanmaz. Hedef cevrimdisiysa kuyruk OLUSTURULMAZ (RAM-only korunur);
+  // reconnect sonrasi tekrar gonderilmez cunku bildirim yalnizca burada,
+  // yeni engel kurulurken uretilir. Metin ISTEMCIDE t() ile secili dile gore
+  // olusturulur; pakette metin ve gereksiz bilgi TASINMAZ.
+  if(yeniEngel){
+    const hedefWs = chatSoketBul(h.nickAlt);
+    if(hedefWs && hedefWs !== ws) chatGonder(hedefWs, { type:'chat_blocked_by' });
+  }
 }
 
 function chatBlokKaldir(ws, msg){
