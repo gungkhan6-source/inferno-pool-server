@@ -566,6 +566,29 @@ font-family:sans-serif;
   font-family:'Rajdhani',sans-serif;font-size:0.68rem;letter-spacing:1px;white-space:nowrap;
   background:rgba(120,60,0,0.18);border:1px solid rgba(255,136,0,0.32);color:rgba(255,200,150,0.9);}
 .chat-blok:hover{background:rgba(255,100,0,0.24);color:#fff;}
+/* [CHAT V2.1c] DM basligindaki raporla dugmesi + neden secim paneli. */
+.chat-rapor-btn{flex:none;display:none;padding:6px 12px;border-radius:5px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.68rem;letter-spacing:1px;white-space:nowrap;
+  text-transform:uppercase;
+  background:rgba(60,60,120,0.18);border:1px solid rgba(150,150,255,0.28);
+  color:rgba(200,200,255,0.9);}
+.chat-rapor-btn:hover{background:rgba(90,90,180,0.28);color:#fff;}
+.chat-rapor{position:absolute;inset:0;z-index:5;display:none;
+  align-items:center;justify-content:center;background:rgba(4,0,10,0.82);}
+.chat-rapor.acik{display:flex;}
+.chat-rapor-kutu{width:min(360px,88%);background:var(--pn);
+  border:1px solid rgba(255,136,0,0.3);border-radius:10px;padding:18px;
+  display:flex;flex-direction:column;gap:8px;box-shadow:0 0 30px rgba(255,68,0,0.2);}
+.chat-rapor-baslik{font-family:'Cinzel Decorative',serif;font-size:0.8rem;letter-spacing:1px;
+  color:var(--gd);margin-bottom:6px;word-break:break-word;overflow-wrap:anywhere;}
+.chat-rapor-neden{width:100%;text-align:left;padding:9px 12px;border-radius:5px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.76rem;letter-spacing:0.6px;
+  background:transparent;border:1px solid rgba(255,100,0,0.2);color:rgba(255,255,255,0.72);}
+.chat-rapor-neden:hover{background:rgba(255,100,0,0.18);border-color:var(--em);color:#fff;}
+.chat-rapor-iptal{margin-top:6px;padding:8px 12px;border-radius:5px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.7rem;letter-spacing:1px;
+  background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);
+  color:rgba(255,255,255,0.55);}
 .chat-blok.acik{background:rgba(180,0,0,0.2);border-color:rgba(255,80,80,0.4);
   color:rgba(255,170,170,0.95);}
 .chat-sayac{font-family:'Rajdhani',sans-serif;font-size:0.72rem;letter-spacing:1px;
@@ -637,7 +660,8 @@ font-family:sans-serif;
   .chat-baslik{font-size:0.7rem;letter-spacing:1px;flex:0 1 auto;max-width:26%;}
   .chat-baglam{font-size:0.7rem;letter-spacing:1px;flex:1 1 auto;}
   .chat-sayac{display:none;}          /* [V2.1b] yerini engelle dugmesi alir */
-  .chat-blok{padding:5px 9px;font-size:0.62rem;letter-spacing:0.5px;}
+  .chat-blok,.chat-rapor-btn{padding:5px 8px;font-size:0.6rem;letter-spacing:0.3px;}
+  .chat-baslik{max-width:20%;}          /* [V2.1c] iki dugmeye yer acilir */
   .chat-govde{flex-direction:column;}
   .chat-yan{width:100%;flex:none;flex-direction:row;align-items:center;gap:8px;
     border-right:none;border-bottom:1px solid rgba(255,136,0,0.14);
@@ -1753,6 +1777,18 @@ en: {
   'chat.unblock':'UNBLOCK',
   'chat.blockedUser':'{nick} is blocked. Private messages are off in both directions.',
   'chat.unblockedUser':'{nick} is unblocked. You can message each other again.',
+  'chat.reportTitle':'Report {nick}',
+  'chat.reasonSpam':'Spam',
+  'chat.reasonHarass':'Insult / harassment',
+  'chat.reasonInappropriate':'Inappropriate content',
+  'chat.reasonScam':'Scam',
+  'chat.reasonOther':'Other',
+  'chat.reportedAgain':'Report noted. This player was already reported by you.',
+  'chat.errReasonInvalid':'Pick a valid reason',
+  'chat.errReportRate':'Too fast. Try again in {n} s',
+  'chat.errReportLimit':'Hourly report limit reached ({n})',
+  'chat.errReportTarget':'Player not found',
+  'chat.errReportSelf':'You cannot report yourself',
   'chat.errDmBlocked':'You blocked this player. Unblock to send messages.',
   'chat.errDmUnavailable':'This message could not be delivered',
   'chat.errBlockLimit':'Block list is full (100)',
@@ -1949,6 +1985,18 @@ tr: {
   'chat.unblock':'ENGELİ KALDIR',
   'chat.blockedUser':'{nick} engellendi. Özel mesajlar iki yönde de kapalı.',
   'chat.unblockedUser':'{nick} engeli kaldırıldı. Yeniden mesajlaşabilirsiniz.',
+  'chat.reportTitle':'{nick} raporla',
+  'chat.reasonSpam':'Spam',
+  'chat.reasonHarass':'Hakaret / taciz',
+  'chat.reasonInappropriate':'Uygunsuz içerik',
+  'chat.reasonScam':'Dolandırıcılık',
+  'chat.reasonOther':'Diğer',
+  'chat.reportedAgain':'Rapor not edildi. Bu oyuncuyu zaten raporlamıştın.',
+  'chat.errReasonInvalid':'Geçerli bir neden seç',
+  'chat.errReportRate':'Çok hızlı. {n} sn sonra tekrar dene',
+  'chat.errReportLimit':'Saatlik rapor sınırına ulaştın ({n})',
+  'chat.errReportTarget':'Oyuncu bulunamadı',
+  'chat.errReportSelf':'Kendini raporlayamazsın',
   'chat.errDmBlocked':'Bu oyuncuyu engelledin. Mesaj için engeli kaldır.',
   'chat.errDmUnavailable':'Bu mesaj iletilemedi',
   'chat.errBlockLimit':'Engel listesi dolu (100)',
@@ -2145,6 +2193,18 @@ ru: {
   'chat.unblock':'РАЗБЛОКИРОВАТЬ',
   'chat.blockedUser':'{nick} заблокирован. Личные сообщения отключены в обе стороны.',
   'chat.unblockedUser':'{nick} разблокирован. Вы снова можете переписываться.',
+  'chat.reportTitle':'Пожаловаться на {nick}',
+  'chat.reasonSpam':'Спам',
+  'chat.reasonHarass':'Оскорбление / травля',
+  'chat.reasonInappropriate':'Недопустимый контент',
+  'chat.reasonScam':'Мошенничество',
+  'chat.reasonOther':'Другое',
+  'chat.reportedAgain':'Жалоба учтена. Вы уже жаловались на этого игрока.',
+  'chat.errReasonInvalid':'Выберите причину',
+  'chat.errReportRate':'Слишком быстро. Повторите через {n} с',
+  'chat.errReportLimit':'Достигнут часовой лимит жалоб ({n})',
+  'chat.errReportTarget':'Игрок не найден',
+  'chat.errReportSelf':'Нельзя пожаловаться на себя',
   'chat.errDmBlocked':'Вы заблокировали этого игрока. Снимите блокировку.',
   'chat.errDmUnavailable':'Сообщение не доставлено',
   'chat.errBlockLimit':'Список блокировки полон (100)',
@@ -5034,6 +5094,9 @@ const CHAT_HATA_ANAHTAR = {
   dm_blocked:'chat.errDmBlocked', dm_unavailable:'chat.errDmUnavailable',
   block_limit:'chat.errBlockLimit', block_target:'chat.errBlockTarget',
   block_self:'chat.errBlockSelf',
+  reason_invalid:'chat.errReasonInvalid', report_rate:'chat.errReportRate',
+  report_limit:'chat.errReportLimit',    report_target:'chat.errReportTarget',
+  report_self:'chat.errReportSelf',
   unknown_type:'chat.errGeneric'
 };
 
@@ -5067,6 +5130,66 @@ function chatBlokluMu(nick){
     if(String(CHAT.blokListesi[i]).toLocaleLowerCase() === k) return true;
   }
   return false;
+}
+// [V2.1c] Rapor nedenleri. Anahtarlar SUNUCUDAKI liste ile birebir ayni;
+// sunucu gecersiz nedeni 'reason_invalid' ile reddeder.
+const CHAT_RAPOR_NEDENLERI = [
+  { kod:'spam',          anahtar:'chat.reasonSpam' },
+  { kod:'harassment',    anahtar:'chat.reasonHarass' },
+  { kod:'inappropriate', anahtar:'chat.reasonInappropriate' },
+  { kod:'scam',          anahtar:'chat.reasonScam' },
+  { kod:'other',         anahtar:'chat.reasonOther' }
+];
+// Panel acikken raporlanacak baglam. Kullanici verisi HICBIR ZAMAN
+// HTML olarak yorumlanmaz: yalnizca createTextNode ile yazilir.
+let CHAT_RAPOR_BAGLAM = null;
+
+function chatRaporPaneliKapat(){
+  const p = document.getElementById('chat-rapor');
+  if(p) p.className = 'chat-rapor';
+  CHAT_RAPOR_BAGLAM = null;
+}
+function chatRaporPaneliAc(nick, metin, kapsam){
+  if(!nick) return;
+  const p = document.getElementById('chat-rapor');
+  const b = document.getElementById('chat-rapor-baslik');
+  const kok = document.getElementById('chat-rapor-nedenler');
+  const ip = document.getElementById('chat-rapor-iptal');
+  if(!p || !b || !kok || !ip) return;
+  CHAT_RAPOR_BAGLAM = { nick: String(nick), text: metin ? String(metin) : '',
+                        scope: (kapsam === 'dm') ? 'dm' : 'global' };
+  while(b.firstChild) b.removeChild(b.firstChild);
+  b.appendChild(document.createTextNode(t('chat.reportTitle', { nick: String(nick) })));
+  while(kok.firstChild) kok.removeChild(kok.firstChild);
+  CHAT_RAPOR_NEDENLERI.forEach(function(nd){
+    const d = document.createElement('button');
+    d.className = 'chat-rapor-neden';
+    d.type = 'button';
+    d.appendChild(document.createTextNode(t(nd.anahtar)));
+    d.onclick = function(){ chatRaporGonder(nd.kod); };
+    kok.appendChild(d);
+  });
+  while(ip.firstChild) ip.removeChild(ip.firstChild);
+  ip.appendChild(document.createTextNode(t('common.cancel')));
+  ip.onclick = chatRaporPaneliKapat;
+  p.className = 'chat-rapor acik';
+}
+function chatRaporGonder(neden){
+  const g = CHAT_RAPOR_BAGLAM;
+  chatRaporPaneliKapat();
+  if(!g) return;
+  chatWsGonder({ type:'chat_report', nick: g.nick, text: g.text,
+                 reason: neden, scope: g.scope });
+}
+function chatRaporDugmesiCiz(){
+  const b = document.getElementById('chat-rapor-btn'); if(!b) return;
+  if(!CHAT.dmHedef){ b.style.display = 'none'; return; }
+  b.style.display = 'inline-block';
+  while(b.firstChild) b.removeChild(b.firstChild);
+  b.appendChild(document.createTextNode(t('chat.report')));
+  b.onclick = function(){
+    if(CHAT.dmHedef) chatRaporPaneliAc(CHAT.dmHedef, '', 'dm');
+  };
 }
 function chatBlokDugmesiCiz(){
   const b = document.getElementById('chat-blok'); if(!b) return;
@@ -5168,8 +5291,10 @@ function chatMesajYaz(nick, metin, ts){
     const r = document.createElement('span');
     r.className = 'chat-arac'; r.textContent = '⚑';
     r.title = t('chat.report');
-    r.onclick = function(){ chatWsGonder({type:'chat_report', nick:nick, text:metin});
-                            chatSistemYaz('chat.reported'); };
+    // [V2.1c] Dogrudan gondermek yerine NEDEN secimi acilir.
+    r.onclick = function(){
+      chatRaporPaneliAc(nick, metin, CHAT.dmHedef ? 'dm' : 'global');
+    };
     const b = document.createElement('span');
     b.className = 'chat-arac'; b.textContent = '⊘';
     b.title = t('chat.block');
@@ -5241,6 +5366,7 @@ function chatOdalariCiz(){
       CHAT.dmHedef ? t('chat.dmWith', { nick: CHAT.dmHedef }) : t('chat.roomGlobal')));
   }
   chatBlokDugmesiCiz();          // [V2.1b] DM'de engelle/kaldir dugmesi
+  chatRaporDugmesiCiz();         // [V2.1c] DM'de raporla dugmesi
   // Acik 1:1 sohbet ayri bir girdi olarak gosterilir.
   if(CHAT.dmHedef){
     const d = document.createElement('button');
@@ -5348,6 +5474,7 @@ function chatBaglantiKapat(){
   // CHAT V2: gorunum ve gecici tamponlar sifirlanir (kalici depolama yok).
   CHAT.dmHedef = null; CHAT.dmOkunmamis = {}; CHAT.globalTampon = [];
   CHAT.blokListesi = [];         // [V2.1b] yerel kopya; asil liste sunucuda
+  chatRaporPaneliKapat();        // [V2.1c] acik kalan rapor paneli kapatilir
   // [V2.1a] SID jetonu BILEREK silinmez: ayni tarayicidan tekrar girisde
   // kimlik surer. Jeton bir sirdir degildir; icinde nick veya kisisel veri yoktur.
   if(_chatYeniden){ clearTimeout(_chatYeniden); _chatYeniden = null; }
@@ -5456,8 +5583,11 @@ function chatMsgIsle(m){
       chatSistemYaz(m.blocked ? 'chat.blockedUser' : 'chat.unblockedUser',
                     { nick: m.nick });
       break;
-    case 'chat_pong':
+    // [V2.1c] Rapor onayi: tekrar eden rapor ayri kayit acmaz, sayac artar.
     case 'chat_report':
+      if(m.ok) chatSistemYaz(m.duplicate ? 'chat.reportedAgain' : 'chat.reported');
+      break;
+    case 'chat_pong':
     case 'chat_block_notice':
       break;
   }
@@ -5640,6 +5770,7 @@ if(document.readyState === 'loading'){
       <div class="chat-baslik" data-i18n="chat.title">INFERNO POOL COMMUNITY</div>
       <div class="chat-baglam" id="chat-baglam"></div>
       <button class="chat-blok" type="button" id="chat-blok"></button>
+      <button class="chat-rapor-btn" type="button" id="chat-rapor-btn"></button>
       <div class="chat-sayac"><span data-i18n="chat.onlinePlayers">ONLINE PLAYERS</span>: <span id="chat-sayi">0</span></div>
       <button class="chat-kapat" type="button" id="chat-kapat" data-i18n="common.close">CLOSE</button>
     </div>
@@ -5656,6 +5787,15 @@ if(document.readyState === 'loading'){
     </div>
 
     <!-- 2) Sohbet paneli -->
+    <!-- [CHAT V2.1c] Rapor nedeni secimi. Icerik JS ile TEXT NODE olarak
+         doldurulur; innerHTML KULLANILMAZ. -->
+    <div class="chat-rapor" id="chat-rapor">
+      <div class="chat-rapor-kutu">
+        <div class="chat-rapor-baslik" id="chat-rapor-baslik"></div>
+        <div id="chat-rapor-nedenler"></div>
+        <button class="chat-rapor-iptal" type="button" id="chat-rapor-iptal"></button>
+      </div>
+    </div>
     <div class="chat-govde" id="chat-govde" style="display:none">
       <div class="chat-yan">
         <div class="chat-yan-baslik" data-i18n="chat.rooms">ROOMS</div>

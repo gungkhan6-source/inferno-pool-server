@@ -691,18 +691,59 @@ function chatMesaj(ws, msg){
                        text:kayit.text, ts:kayit.ts });
 }
 
+// [V2.1c] Nedenli rapor. Eski surum neden tasimiyor, tekrarli raporlari
+// ayirt etmiyor ve akis siniri uygulamiyordu; ikisi de burada eklendi.
+// Tampon siniri (CHAT_RAPOR_MAX = 200) ve RAM-only mimari DEGISMEDI.
 function chatRapor(ws, msg){
   const u = chatUsers.get(ws);
   if(!u) return chatHata(ws, 'not_joined');
-  ChatStore.addReport({
-    timestamp: Date.now(),
-    reporter:  u.nick,
-    reported:  chatNormalize(msg && msg.nick).slice(0, CHAT_NICK_MAX),
-    message:   chatNormalize(msg && msg.text).slice(0, CHAT_MESAJ_MAX),
-    room:      u.oda
-  });
-  console.log('CHAT REPORT', u.nick, '->', (msg && msg.nick) || '?', 'room', u.oda);
-  chatGonder(ws, { type:'chat_report', ok:true });
+  const simdi = Date.now();
+
+  const neden = (msg && typeof msg.reason === 'string') ? msg.reason : '';
+  if(!chatRaporNedenGecerli(neden)) return chatHata(ws, 'reason_invalid');
+
+  const h = chatRaporHedef(u, msg && msg.nick);
+  if(h.hata) return chatHata(ws, h.hata);
+
+  const sayac = chatRaporSayacAl(u.sid);
+  const lim = chatRaporLimit(sayac, simdi);
+  if(lim) return chatHata(ws, lim.hata, lim.kalan);
+
+  const kapsam = (msg && msg.scope === 'dm') ? 'dm' : 'global';
+  const metin  = chatNormalize(msg && msg.text).slice(0, CHAT_MESAJ_MAX);
+
+  // Ayni raporcu -> ayni hedef, 60 sn icinde: YENI KAYIT ACILMAZ, sayac artar.
+  const acik = chatRaporTekrarBul(u.sid, h.nickAlt, simdi);
+  let tekrar = false;
+  if(acik){
+    acik.sayac++;
+    acik.sonTs = simdi;
+    if(metin) acik.message = metin;      // en son baglam saklanir
+    tekrar = true;
+  } else {
+    ChatStore.addReport({
+      ts:          simdi,
+      ilkTs:       simdi,
+      sonTs:       simdi,
+      sayac:       1,
+      reason:      neden,
+      scope:       kapsam,
+      reporter:    u.nick,
+      reporterSid: u.sid,
+      reported:    h.nick,
+      reportedAlt: h.nickAlt,
+      reportedSid: h.sid || null,
+      message:     metin,
+      room:        u.oda
+    });
+  }
+  sayac.sonMs = simdi;
+  sayac.saat.push(simdi);
+
+  // Log KISA tutulur: nick + neden + kapsam. Mesaj govdesi log'a yazilmaz.
+  console.log('CHAT REPORT', u.nick, '->', h.nick, '[' + neden + '/' + kapsam + ']',
+              tekrar ? '(tekrar)' : '(yeni)');
+  chatGonder(ws, { type:'chat_report', ok:true, reason: neden, duplicate: tekrar });
 }
 
 // BLOCK sunucuda TUTULMAZ; istemci tarafinda localStorage ile yapilacak.
@@ -872,6 +913,8 @@ function chatTemizlik(){
   chatSidSupur(simdi);
   // [V2.1b] Suresi dolmus engel kayitlari ayni supurmede dusurulur.
   chatBlokSupur(simdi);
+  // [V2.1c] Rapor akis sayaclari ayni supurmede sadelestirilir.
+  chatRaporSupur(simdi);
   const dSinir = simdi - CHAT_DM_TTL_MS;
   chatDM.forEach(function(k, id){
     chatDMSupur(k);
@@ -1129,6 +1172,95 @@ function chatBlokSupur(simdi){
       if(kayit.ts < sinir){ harita.delete(anahtar); chatBlokSayac--; }
     });
     if(harita.size === 0) chatBloklar.delete(sahip);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CHAT V2.1c — RAPORLAMA (NEDENLI)                              [V2.1c]
+// ═══════════════════════════════════════════════════════════════════════
+// AMAC: mevcut rapor akisini gercekten kullanilabilir hale getirmek.
+// Rapor artik NEDEN tasir, tekrarli raporlar ayri kayit acmaz (sayac
+// artar) ve raporcu basina akis sinirlari vardir.
+//
+// DEPOLAMA: mevcut RAM tamponu (CHAT_RAPOR_MAX = 200) AYNEN korunur.
+// Yeni veritabani, dosya veya kalici depolama YOKTUR.
+//
+// KISISEL VERI: kayitta IP, konum, tarayici bilgisi TUTULMAZ. Yalnizca
+// moderasyon icin gereken baglam saklanir: nickler, SID'in ilk 8
+// karakteri (ayni kisiyi eslestirmek icin), oda, kapsam (global/dm),
+// neden, zaman damgalari ve raporlanan mesaj metni.
+//
+// KIMLIK: raporcu, V2.1a'daki imzali SID ile taninir; boylece akis
+// sinirlari reconnect ile sifirlanmaz. Block sistemi ile hicbir
+// baglantisi yoktur: rapor DM'i veya global'i ENGELLEMEZ.
+const CHAT_RAPOR_NEDENLERI  = ['spam','harassment','inappropriate','scam','other'];
+const CHAT_RAPOR_HIZ_MS     = 10000;          // raporcu basina en az aralik
+const CHAT_RAPOR_SAAT_MS    = 60 * 60 * 1000; // saatlik pencere
+const CHAT_RAPOR_SAAT_MAX   = 10;             // pencerede en fazla rapor
+const CHAT_RAPOR_TEKRAR_MS  = 60000;          // ayni cift icin tekrar penceresi
+const CHAT_RAPOR_SAYAC_MAX  = 2000;           // sayac tablosu tavani (LRU)
+
+// raporcuSid -> { sonMs, saat:[ts,...] }
+const chatRaporSayaclar = new Map();
+
+function chatRaporNedenGecerli(r){
+  return typeof r === 'string' && CHAT_RAPOR_NEDENLERI.indexOf(r) >= 0;
+}
+// Raporcunun akis durumunu dondurur (LRU: dokunulan kayit sona alinir).
+function chatRaporSayacAl(sid){
+  let k = chatRaporSayaclar.get(sid);
+  if(k) chatRaporSayaclar.delete(sid);
+  else  k = { sonMs: 0, saat: [] };
+  chatRaporSayaclar.set(sid, k);
+  while(chatRaporSayaclar.size > CHAT_RAPOR_SAYAC_MAX){
+    const enEski = chatRaporSayaclar.keys().next();
+    if(enEski.done) break;
+    chatRaporSayaclar.delete(enEski.value);
+  }
+  return k;
+}
+// Akis sinirlari: 1 rapor / 10 sn ve 10 rapor / saat.
+// Donen deger: null = gecebilir, aksi halde hata kodu.
+function chatRaporLimit(k, simdi){
+  if(k.sonMs && (simdi - k.sonMs) < CHAT_RAPOR_HIZ_MS){
+    return { hata:'report_rate', kalan: Math.ceil((CHAT_RAPOR_HIZ_MS - (simdi - k.sonMs)) / 1000) };
+  }
+  k.saat = k.saat.filter(function(t){ return (simdi - t) < CHAT_RAPOR_SAAT_MS; });
+  if(k.saat.length >= CHAT_RAPOR_SAAT_MAX){
+    return { hata:'report_limit', kalan: CHAT_RAPOR_SAAT_MAX };
+  }
+  return null;
+}
+// Ayni raporcu -> ayni hedef cifti icin acik kayit (60 sn icinde).
+function chatRaporTekrarBul(raporcuSid, hedefAlt, simdi){
+  for(let i = chatReports.length - 1; i >= 0; i--){
+    const r = chatReports[i];
+    if(r.reporterSid === raporcuSid && r.reportedAlt === hedefAlt){
+      return ((simdi - r.sonTs) < CHAT_RAPOR_TEKRAR_MS) ? r : null;
+    }
+  }
+  return null;
+}
+// Rapor hedefini cozer. Nick kurallari chat_join ile AYNIDIR; hedef
+// cevrimdisi olsa bile rapor alinabilir (mesaj sonrasi ayrilmis olabilir).
+function chatRaporHedef(u, hamNick){
+  let nick = chatNormalize(hamNick);
+  try{ nick = nick.normalize('NFKC'); }catch(e){}
+  if(!nick) return { hata:'report_target' };
+  const uz = chatNickUzunluk(nick);
+  if(uz < chatNickAltSinir(nick) || uz > CHAT_NICK_MAX) return { hata:'report_target' };
+  if(!CHAT_NICK_DESEN.test(nick)) return { hata:'report_target' };
+  const anahtar = chatNickAnahtar(nick);
+  if(anahtar === u.nickAlt) return { hata:'report_self' };
+  const hedefWs = chatSoketBul(anahtar);
+  const hedefU = hedefWs ? chatUsers.get(hedefWs) : null;
+  return { sid: hedefU ? hedefU.sid : null, nickAlt: anahtar,
+           nick: hedefU ? hedefU.nick : nick };
+}
+function chatRaporSupur(simdi){
+  chatRaporSayaclar.forEach(function(k, sid){
+    k.saat = k.saat.filter(function(t){ return (simdi - t) < CHAT_RAPOR_SAAT_MS; });
+    if(!k.saat.length && (simdi - k.sonMs) > CHAT_RAPOR_SAAT_MS) chatRaporSayaclar.delete(sid);
   });
 }
 
