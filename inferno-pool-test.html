@@ -5166,8 +5166,125 @@ try{ _yandexBaslat(); }catch(e){}
 //   * Mobil pakette gelistirme/test sirasinda YALNIZCA test reklam kimlikleri
 //     kullanilir; production kimligi bu asamada EKLENMEZ.
 AD.register('pixidus', { isAvailable: function(){ return false; } });
-AD.register('android', { isAvailable: function(){ return false; } });
 AD.register('unknown', { isAvailable: function(){ return false; } });
+
+// ── ANDROID KOPRU ADAPTERI [ASAMA V2.2] ───────────────────────────────
+// Native Android projesi BU DEPODA YOKTUR. Burada hicbir AdMob SDK'si,
+// script veya reklam birimi kimligi BULUNMAZ; web tarafi native'e yalnizca
+// "midgame" / "rewarded" TUR ADI gonderir. Gercek kimlikler (app id, ad
+// unit id) native tarafta kalir.
+//
+// SOZLESME
+//   Web -> native (senkron, @JavascriptInterface):
+//     window.AndroidBridge.adReady(tur)        -> boolean
+//     window.AndroidBridge.showAd(tur, istekId)-> void
+//   Native -> web (TEK giris noktasi):
+//     window.InfernoAndroid.onAdEvent(istekId, olay, ayrinti)
+//     olay: 'started' | 'finished' | 'rewarded' | 'dismissed' | 'error'
+//
+// Kopru YOKSA isAvailable() false doner; AD katmani
+// { shown:false, reason:'unavailable' } uretir ve masaustu/portal
+// davranisi HIC degismez.
+//
+// DAYANIKLILIK: her istek benzersiz istekId ile eslenir. Bilinmeyen veya
+// GEC gelen istekId sessizce yok sayilir; ayni istek icin ikinci terminal
+// olay ETKISIZDIR (idempotent). Native hic cevap vermezse 45 sn sonra
+// timeout ile cozulur, yani oyun akisi hicbir kosulda kilitlenmez.
+const _androidIstekler = new Map();     // istekId -> istek kaydi
+let _androidSayac = 0;
+
+// Kopru nesnesi yalnizca KULLANILABILIR ise dondurulur.
+function _androidKopru(){
+  try{
+    const b = window.AndroidBridge;
+    return (b && typeof b.showAd === 'function') ? b : null;
+  }catch(e){ return null; }
+}
+// adReady sozlesme disi davranirsa (yok / firlatiyor / bool degil) HAZIR DEGIL.
+function _androidHazir(tur){
+  const b = _androidKopru();
+  if(!b) return false;
+  try{ return (typeof b.adReady === 'function') ? (b.adReady(tur) === true) : false; }
+  catch(e){ return false; }
+}
+
+// Native geri cagrimlarinin TEK giris noktasi.
+window.InfernoAndroid = window.InfernoAndroid || {};
+window.InfernoAndroid.onAdEvent = function(istekId, olay, ayrinti){
+  const k = _androidIstekler.get(String(istekId));
+  if(!k) return;                       // bilinmeyen VEYA coktan bitmis istek
+  switch(String(olay)){
+    case 'started':
+      k.basladi = true; _adDuraklat(); break;
+    // Odul YALNIZCA gercek 'rewarded' geri cagrimi geldiyse verilir.
+    case 'rewarded':
+      k.odullendi = true; break;
+    case 'finished':
+      k.bitir(k.rewardedMi
+        ? (k.odullendi ? { shown:true, reason:'ok' } : { shown:false, reason:'not_rewarded' })
+        : { shown:true, reason:'ok' });
+      break;
+    case 'dismissed':
+      k.bitir(k.rewardedMi
+        ? (k.odullendi ? { shown:true, reason:'ok' } : { shown:false, reason:'not_rewarded' })
+        : (k.basladi ? { shown:true, reason:'dismissed' } : { shown:false, reason:'not_shown' }));
+      break;
+    case 'error':
+      k.bitir({ shown:false, reason:'error' }); break;
+    default:
+      break;                           // tanimsiz olay: yok sayilir
+  }
+};
+
+// Tek yardimci: midgame ve rewarded ayni yasam dongusunu paylasir.
+// ASLA reject etmez, HER ZAMAN tek kez cozer, ses/oyun durumunu geri verir.
+function _androidReklamIste(tur){
+  return new Promise(function(cozumle){
+    const b = _androidKopru();
+    if(!b) return cozumle({ shown:false, reason:'unavailable' });
+    if(!_androidHazir(tur)) return cozumle({ shown:false, reason:'unavailable' });
+
+    const istekId = 'a' + (++_androidSayac) + '_' + Date.now().toString(36);
+    let bitti = false, zamanlayici = null;
+    const kayit = {
+      rewardedMi: (tur === 'rewarded'),
+      basladi: false,
+      odullendi: false,
+      bitir: function(sonuc){
+        if(bitti) return;              // duplicate/gec geri cagrim: ETKISIZ
+        bitti = true;
+        if(zamanlayici){ clearTimeout(zamanlayici); zamanlayici = null; }
+        _androidIstekler.delete(istekId);
+        _adDevam();
+        cozumle(sonuc);
+      }
+    };
+    _androidIstekler.set(istekId, kayit);
+    // Mevcut emniyet suresi yeniden kullanilir (45 sn).
+    zamanlayici = setTimeout(function(){ kayit.bitir({ shown:false, reason:'timeout' }); },
+                             AD_CG_ZAMAN_ASIMI);
+    try{
+      b.showAd(tur, istekId);
+    }catch(e){
+      kayit.bitir({ shown:false, reason:'error' });
+    }
+  });
+}
+
+AD.register('android', {
+  // Kopru yoksa KESINLIKLE false. Kopru varsa en az bir tur hazir olmali.
+  isAvailable: function(){
+    if(!_androidKopru()) return false;
+    return _androidHazir('midgame') || _androidHazir('rewarded');
+  },
+  // Duraklatma/devam 'started' ve terminal olaylar uzerinden yurur;
+  // bu kancalar yalnizca emniyet icindir (idempotent).
+  beforeAd: function(){ return Promise.resolve(); },
+  afterAd:  function(){ _adDevam(); return Promise.resolve(); },
+  showMidgame:  function(){ return _androidReklamIste('midgame'); },
+  // Rewarded YALNIZCA AD.showRewarded uzerinden, kullanici acikca isterse.
+  showRewarded: function(){ return _androidReklamIste('rewarded'); }
+});
 
 // ═══════════════════════════════════════════════════════════════════════
 // CHAT V1 — ISTEMCI                                    [ASAMA 4]
