@@ -1176,10 +1176,15 @@ function chatBlokEkle(ws, msg){
   // saklanmaz. Hedef cevrimdisiysa kuyruk OLUSTURULMAZ (RAM-only korunur);
   // reconnect sonrasi tekrar gonderilmez cunku bildirim yalnizca burada,
   // yeni engel kurulurken uretilir. Metin ISTEMCIDE t() ile secili dile gore
-  // olusturulur; pakette metin ve gereksiz bilgi TASINMAZ.
+  // olusturulur; pakette METIN TASINMAZ, yalnizca engelleyenin nick'i gider.
+  // [KARAR C-ii] Nick eklendi: engellenen kisi kimin engelledigini gorur ve
+  // baska bir DM ekranindayken yanlis kisiyi sanmaz. Nick istemcide
+  // createTextNode ile yazilir; HTML olarak yorumlanmaz.
   if(yeniEngel){
     const hedefWs = chatSoketBul(h.nickAlt);
-    if(hedefWs && hedefWs !== ws) chatGonder(hedefWs, { type:'chat_blocked_by' });
+    if(hedefWs && hedefWs !== ws){
+      chatGonder(hedefWs, { type:'chat_blocked_by', nick: u.nick });
+    }
   }
 }
 

@@ -665,6 +665,27 @@ font-family:sans-serif;
 .chat-metin{color:rgba(255,255,255,0.82);}
 .chat-sistem{color:rgba(255,255,255,0.34);font-style:italic;font-size:0.78rem;}
 .chat-hata{color:#ff7766;}
+/* [BLOCK UYARISI] Akisin USTUNDE, akistan BAGIMSIZ serit. #chat-akis'in
+   icinde OLMADIGI icin Global/DM gecisindeki chatAkisBosalt() onu silmez. */
+.chat-uyari{display:none;align-items:center;gap:10px;flex:none;margin:10px 20px 0;
+  padding:9px 12px;border-radius:6px;background:rgba(190,20,20,0.20);
+  border:1px solid rgba(255,70,60,0.60);color:#ffb9b2;
+  font-family:'Rajdhani',sans-serif;font-size:0.8rem;line-height:1.35;}
+.chat-uyari-metin{flex:1;min-width:0;word-break:break-word;overflow-wrap:anywhere;}
+.chat-uyari-kapat{flex:none;background:none;border:0;padding:0 2px;cursor:pointer;
+  color:#ffb9b2;font-size:0.9rem;line-height:1;}
+.chat-uyari-kapat:hover{color:#fff;}
+/* [OKUNMAMIS DM] Kucuk kirmizi daire; 2+ mesajda sayac rozeti olur.
+   Animasyon yalnizca opacity/transform kullanir (reflow yok). */
+.chat-okunmamis{margin-left:8px;display:inline-block;width:8px;height:8px;
+  border-radius:50%;background:#ff3b30;box-shadow:0 0 6px rgba(255,59,48,0.7);
+  vertical-align:middle;animation:chat-nabiz 1.8s ease-in-out infinite;}
+.chat-okunmamis.sayili{width:auto;min-width:15px;height:15px;padding:0 4px;
+  border-radius:8px;font-family:'Rajdhani',sans-serif;font-size:0.58rem;
+  line-height:15px;text-align:center;color:#fff;letter-spacing:0.3px;}
+@keyframes chat-nabiz{0%,100%{opacity:1;transform:scale(1);}
+                      50%{opacity:0.5;transform:scale(0.8);}}
+@media (prefers-reduced-motion: reduce){.chat-okunmamis{animation:none;}}
 .chat-arac{margin-left:8px;font-size:0.72rem;color:rgba(255,255,255,0.28);cursor:pointer;}
 .chat-arac:hover{color:var(--gd);}
 .chat-alt{display:flex;gap:10px;padding:12px 20px;border-top:1px solid rgba(255,136,0,0.18);
@@ -1820,7 +1841,7 @@ en: {
   'chat.block':'BLOCK',
   'chat.unblock':'UNBLOCK',
   'chat.blockedUser':'{nick} is blocked. Private messages are off in both directions.',
-  'chat.blockedByUser':'⚠ This user blocked you. You can\'t send private messages.',
+  'chat.blockedByUser':'⚠ {nick} blocked you. You can\'t send private messages.',
   'chat.unblockedUser':'{nick} is unblocked. You can message each other again.',
   'chat.mod':'⚙ MOD',
   'chat.modTitle':'MODERATOR PANEL',
@@ -2064,7 +2085,7 @@ tr: {
   'chat.block':'ENGELLE',
   'chat.unblock':'ENGELİ KALDIR',
   'chat.blockedUser':'{nick} engellendi. Özel mesajlar iki yönde de kapalı.',
-  'chat.blockedByUser':'⚠ Bu kullanıcı seni engelledi. Özel mesaj gönderemezsin.',
+  'chat.blockedByUser':'⚠ {nick} seni engelledi. Özel mesaj gönderemezsin.',
   'chat.unblockedUser':'{nick} engeli kaldırıldı. Yeniden mesajlaşabilirsiniz.',
   'chat.mod':'⚙ MOD',
   'chat.modTitle':'MODERATÖR PANELİ',
@@ -2308,7 +2329,7 @@ ru: {
   'chat.block':'ЗАБЛОКИРОВАТЬ',
   'chat.unblock':'РАЗБЛОКИРОВАТЬ',
   'chat.blockedUser':'{nick} заблокирован. Личные сообщения отключены в обе стороны.',
-  'chat.blockedByUser':'⚠ Этот пользователь заблокировал вас. Вы не можете отправлять личные сообщения.',
+  'chat.blockedByUser':'⚠ {nick} заблокировал вас. Вы не можете отправлять личные сообщения.',
   'chat.unblockedUser':'{nick} разблокирован. Вы снова можете переписываться.',
   'chat.mod':'⚙ МОД',
   'chat.modTitle':'ПАНЕЛЬ МОДЕРАТОРА',
@@ -5158,6 +5179,7 @@ AD.register('unknown', { isAvailable: function(){ return false; } });
 const CHAT_EKRAN_MAX   = 100;      // DOM'da tutulan en fazla mesaj
 const CHAT_PING_MS     = 10000;    // uygulama seviyesi chat ping
 const CHAT_YENIDEN_MS  = 3000;     // yeniden baglanma araligi
+const CHAT_UYARI_MS    = 20000;    // block uyari seridinin ekranda kalma suresi
 // Yeniden katilim: eski kaydin sunucudan dusmesi olcumlerde ~6-12 sn surdu
 // (Render/Cloudflare kapanma gecikmesi). 8 x 2.5 sn = 20 sn pencere.
 const CHAT_KATIL_MS    = 2500;     // yeniden katilim denemeleri arasi
@@ -5568,6 +5590,27 @@ function chatSistemYaz(anahtar, degiskenler){
   d.appendChild(document.createTextNode(t(anahtar, degiskenler)));
   a.appendChild(d); chatKirp(); a.scrollTop = a.scrollHeight;
 }
+// [BLOCK UYARISI] Serit #chat-akis'in DISINDADIR: goruntu degisince
+// (chatAkisBosalt) SILINMEZ, Global/DM gecisinde ekranda kalir. Bu bir
+// chat_message veya DM DEGILDIR; globalTampon'a ve DM gecmisine YAZILMAZ,
+// hicbir yerde saklanmaz. Metin secili dile gore t() ile uretilir; blocker
+// nick'i createTextNode ile yazilir, HTML olarak yorumlanmaz.
+let _chatUyariZaman = null;
+function chatUyariGoster(nick){
+  const k = document.getElementById('chat-uyari');
+  const m = document.getElementById('chat-uyari-metin');
+  if(!k || !m) return;
+  while(m.firstChild) m.removeChild(m.firstChild);
+  m.appendChild(document.createTextNode(t('chat.blockedByUser', { nick: String(nick || '') })));
+  k.style.display = 'flex';
+  if(_chatUyariZaman) clearTimeout(_chatUyariZaman);
+  _chatUyariZaman = setTimeout(chatUyariGizle, CHAT_UYARI_MS);
+}
+function chatUyariGizle(){
+  const k = document.getElementById('chat-uyari');
+  if(k) k.style.display = 'none';
+  if(_chatUyariZaman){ clearTimeout(_chatUyariZaman); _chatUyariZaman = null; }
+}
 function chatHataYaz(kod, ek){
   const a = chatAkisEleman(); if(!a) return;
   const anahtar = CHAT_HATA_ANAHTAR[kod] || 'chat.errGeneric';
@@ -5629,10 +5672,17 @@ function chatKullanicilariCiz(liste){
     // yanindaki dugmede (chat-arac) durmaya devam eder.
     d.title = t('chat.dmWith', { nick: nick });
     d.onclick = function(){ if(nick !== CHAT.nick) chatDMAc(nick); };
-    if(CHAT.dmOkunmamis[nick]){
+    // [OKUNMAMIS DM] Kirmizi nokta; 2+ okunmamis mesajda sayac rozeti.
+    // Sayac YALNIZCA CHAT.dmOkunmamis'ten gelir: global mesaj, kendi
+    // mesajin ve engel nedeniyle reddedilen DM bu sayaci artirmaz.
+    const okunmamis = CHAT.dmOkunmamis[nick] || 0;
+    if(okunmamis){
       const r = document.createElement('span');
-      r.className = 'chat-arac';
-      r.appendChild(document.createTextNode(' \u25cf'));    // okunmamis noktasi
+      r.className = 'chat-okunmamis' + (okunmamis > 1 ? ' sayili' : '');
+      if(okunmamis > 1){
+        r.appendChild(document.createTextNode(okunmamis > 9 ? '9+' : String(okunmamis)));
+      }
+      r.title = String(okunmamis);
       d.appendChild(r);
     }
     k.appendChild(d);
@@ -5779,6 +5829,7 @@ function chatBaglantiKapat(){
   CHAT.katildiOnce = false;          // sonraki acilis YENI bir ilk giristir
   // CHAT V2: gorunum ve gecici tamponlar sifirlanir (kalici depolama yok).
   CHAT.dmHedef = null; CHAT.dmOkunmamis = {}; CHAT.globalTampon = [];
+  chatUyariGizle();               // [BLOCK UYARISI] serit acik kalmasin
   CHAT.blokListesi = [];         // [V2.1b] yerel kopya; asil liste sunucuda
   chatRaporPaneliKapat();        // [V2.1c] acik kalan rapor paneli kapatilir
   chatModPaneliKapat();          // [V2.1d] moderator paneli kapatilir
@@ -5891,12 +5942,13 @@ function chatMsgIsle(m){
       chatSistemYaz(m.blocked ? 'chat.blockedUser' : 'chat.unblockedUser',
                     { nick: m.nick });
       break;
-    // [BLOCK BILDIRIMI] Engellenen tarafa gelen TEK SEFERLIK sistem uyarisi.
-    // Yalnizca ekrana sistem satiri olarak yazilir: global tampona veya DM
-    // gecmisine GIRMEZ, hicbir yerde saklanmaz. Metin secili dile gore t()
-    // ile uretilir; pakette metin gelmez, bu yuzden XSS yuzeyi yoktur.
+    // [BLOCK BILDIRIMI] Engellenen tarafa gelen TEK SEFERLIK uyari. Artik
+    // akis satiri DEGIL, akistan bagimsiz uyari seridi olarak gosterilir:
+    // global tampona ve DM gecmisine GIRMEZ, hicbir yerde saklanmaz, kuyruk
+    // olusturmaz. Pakette yalnizca blocker nick'i gelir; metin istemcide
+    // t() ile uretilir ve createTextNode ile yazilir.
     case 'chat_blocked_by':
-      chatSistemYaz('chat.blockedByUser');
+      chatUyariGoster(m.nick);
       break;
     // [V2.1c] Rapor onayi: tekrar eden rapor ayri kayit acmaz, sayac artar.
     case 'chat_report':
@@ -6090,6 +6142,8 @@ function chatKur(){
   if(yolla) yolla.onclick = chatMesajGonder;
   const tmz = document.getElementById('chat-temizle');
   if(tmz) tmz.onclick = chatGlobalTemizle;
+  const uk = document.getElementById('chat-uyari-kapat');
+  if(uk) uk.onclick = chatUyariGizle;
   const gi = document.getElementById('chat-giris');
   if(gi) gi.onkeydown = function(e){ if(e.key === 'Enter') chatMesajGonder(); };
 }
@@ -6183,6 +6237,10 @@ if(document.readyState === 'loading'){
         <div class="chat-kullanicilar" id="chat-kullanicilar"></div>
       </div>
       <div class="chat-sag">
+        <div class="chat-uyari" id="chat-uyari">
+          <span class="chat-uyari-metin" id="chat-uyari-metin"></span>
+          <button class="chat-uyari-kapat" type="button" id="chat-uyari-kapat">✕</button>
+        </div>
         <div class="chat-akis" id="chat-akis"></div>
         <div class="chat-alt">
           <input class="chat-giris" id="chat-giris" type="text" maxlength="250"
