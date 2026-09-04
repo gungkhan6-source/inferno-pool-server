@@ -16,6 +16,17 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dk);font-famil
 #screen-intro,#screen-menu,#screen-game,#screen-over,#screen-shop{
   position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:10;}
 .active{display:flex!important;}
+/* [M1] KISA EKRAN (yatay telefon): menu kutusu 572px, gorunur alan ~411px.
+   justify-content:center tasmayi UST ve ALT'a esit boler; ustteki kisim
+   kaydirmayla bile erisilemez olur. Bu yuzden hizalama flex-start'a alinir
+   ve kutu margin:auto ile ortalanir - sigdiginda ortali gorunum korunur,
+   sigmadiginda tepeden baslar ve akis kaydirilir. Masaustu/tablet
+   gorunumu DEGISMEZ: kural yalnizca kisa ekranlarda gecerlidir. */
+@media (max-height:620px){
+  #screen-menu{overflow-y:auto;overflow-x:hidden;justify-content:flex-start;
+    -webkit-overflow-scrolling:touch;}
+  #screen-menu>.mb{margin:auto;flex:0 0 auto;}
+}
 
 /* INTRO */
 #screen-intro{z-index:20;}
@@ -195,6 +206,34 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dk);font-famil
   /* inline style="min-height:16px" tasidiklari icin !important gerekli.
      Bos oldugunda 0; top cebe girdikce cipler icin dogal olarak buyur. */
   #sunk-panel-1,#sunk-panel-2{min-height:0!important;margin:0!important;}
+
+  /* [T1] DIKEY ALAN KAZANIMI. Olcum: 914x411'de footer'in 52px'inin
+     ~50px'ini #skin-bar, header'in 54px'ini de oyuncu bloklarindaki
+     tipografi belirliyordu. Masa YUKSEKLIKLE sinirli oldugu icin burada
+     kazanilan her piksel masayi 1.85 katiyla genisletir. Hicbir oge
+     GIZLENMEZ; yalnizca kucultulur. */
+  /* DIKKAT: temel .skin-th kurali (86x38) bu medya blogundan SONRA
+     geldigi icin ayni ozgullukteki bir .skin-th secicisi KAZANAMAZ -
+     blogun basindaki 54x22 kurali da bu yuzden hicbir zaman uygulanmamis.
+     #skin-bar ile ozgulluk yukseltilir. */
+  #skin-bar .skin-th{width:40px;height:16px;}
+  /* 20px olcumde yetmedi: #skin-bar overflow-x:auto oldugu icin bazi
+     motorlarda yatay kaydirma cubugu ~10px yer ayiriyor ve 16px'lik
+     kucuk resimler USTTEN kirpiliyordu (olculen: clientHeight 10px).
+     28px = 16 (resim) + 2 (padding) + 10 (kaydirma cubugu). Dokunmatik
+     cihazlarda cubuk yer kaplamadigi icin fazlalik gorunmez. */
+  #skin-bar{max-height:28px;}
+  #screen-game{padding:0;}
+  .gh-score{font-size:0.82rem;}
+  .gh-name{font-size:0.42rem;}
+  .gh-el{font-size:0.42rem;}
+  .gc-row{font-size:0.44rem;}
+  .gh-timer{font-size:0.66rem;}
+
+  /* [M2] Oyun ekrani kisa ekranda KAYDIRILMAZ. overflow:auto, olcek bir an
+     bayat kaldiginda (rotasyon, tarayici cubuklari) masayi kaydirilabilir
+     hale getirebiliyordu; masa zaten viewport'a sigacak sekilde olceklenir. */
+  #screen-game{overflow:hidden;}
 }
 #power-wrap{width:96px;height:9px;background:rgba(0,0,0,0.5);border-radius:5px;
   border:1px solid rgba(255,100,0,0.18);overflow:hidden;flex-shrink:0;}
@@ -1238,13 +1277,20 @@ function computeViewSize(){
   const hdrH = hdr ? hdr.offsetHeight : 0;
   const ftrH = ftr ? ftr.offsetHeight : 0;
 
-  const gutter = vw >= 900 ? VIEW_GUTTER : 16;
+  // [T2] KISA LANDSCAPE MOBIL DALI. Olcum (914x411): masa YUKSEKLIKLE
+  // sinirli; genislik hic baglayici degil. 914px genisligindeki bir telefon
+  // vw>=900 oldugu icin masaustu dalina dusuyor ve 76px'lik yan bosluk +
+  // %82 frac gereksiz yere uygulaniyordu. Kisa ekranda ikisi de kaldirilir
+  // ve emniyet payi 20 -> 6 dusurulur. MASAUSTU/TABLET DALI DEGISMEDI.
+  const kisaYatay = vh <= 560;
+  const gutter = kisaYatay ? 16 : (vw >= 900 ? VIEW_GUTTER : 16);
   const availW = Math.max(200, vw - gutter);
-  const availH = Math.max(140, vh - hdrH - ftrH - 20);
+  const availH = Math.max(140, vh - hdrH - ftrH - (kisaYatay ? 6 : 20));
 
   // Hedef kompozisyon: masaustunde viewport genisliginin ~%72'si
   let frac;
-  if      (vw >= 1600) frac = 0.72;
+  if      (kisaYatay)  frac = 1.00;   // kisa yatay mobil: mevcut alanin tamami
+  else if (vw >= 1600) frac = 0.72;
   else if (vw >= 1200) frac = 0.74;
   else if (vw >=  900) frac = 0.82;
   else                 frac = 1.00;   // tablet / mobil: mevcut alanin tamami
