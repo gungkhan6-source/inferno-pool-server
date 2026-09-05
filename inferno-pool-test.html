@@ -253,6 +253,25 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dk);font-famil
   background-position:center;background-color:rgba(0,0,0,0.55);transition:all 0.2s;flex-shrink:0;position:relative;}
 .skin-th:hover{border-color:rgba(255,150,0,0.45);transform:scale(1.06);}
 .skin-th.active{border-color:#ffcc00;box-shadow:0 0 9px rgba(255,200,0,0.5);}
+/* [ETKINLIK] Gorev satiri. Magazadaki .si kalibiyla ayni olcekte kalir. */
+#screen-event{position:fixed;inset:0;display:none;align-items:center;
+  justify-content:center;flex-direction:column;background:rgba(0,0,0,0.9);z-index:26;}
+.ev-satir{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:8px;
+  border-radius:8px;background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.06);}
+.ev-satir.tamam{border-color:rgba(0,200,70,0.35);background:rgba(0,200,70,0.05);}
+.ev-cue{width:64px;height:22px;flex:none;background-size:contain;background-repeat:no-repeat;
+  background-position:center;background-color:rgba(0,0,0,0.5);border-radius:4px;}
+.ev-orta{flex:1;min-width:0;}
+.ev-ad{font-size:0.72rem;font-weight:700;letter-spacing:0.5px;margin-bottom:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ev-sayi{font-size:0.6rem;font-weight:700;color:var(--cn);flex:none;min-width:44px;text-align:right;}
+.event-not{font-size:0.55rem;color:rgba(255,255,255,0.35);margin-top:8px;text-align:center;}
+@media (max-height:560px){
+  .ev-satir{padding:6px 9px;margin-bottom:5px;gap:7px;}
+  .ev-cue{width:52px;height:17px;}
+  .ev-ad{font-size:0.62rem;margin-bottom:2px;}
+  .ev-sayi{font-size:0.54rem;min-width:38px;}
+}
 /* [SEZON] Etkinligi acik istakalarda kucuk rozet. Yalnizca gorseldir;
    kilit karari cueAcikMi() ile verilir. */
 .skin-th.sezon{border-color:rgba(0,220,120,0.55);box-shadow:0 0 7px rgba(0,220,120,0.35);}
@@ -383,6 +402,8 @@ font-family:sans-serif;
         <button class="lang-btn" type="button" data-lang-sec="en"><span class="lang-bayrak">🇬🇧</span><span data-i18n="settings.langEn">English</span></button>
         <button class="lang-btn" type="button" data-lang-sec="ru"><span class="lang-bayrak">🇷🇺</span><span data-i18n="settings.langRu">Русский</span></button>
       </div>
+      <!-- [ETKINLIK] Yalnizca aktif sezon varken gorunur; refreshMenu() ayarlar. -->
+      <button id="menu-event" style="display:none" data-i18n="event.button">🎯 EVENT</button>
       <button id="menu-online" onclick="startOnlineMode()" data-i18n="menu.playOnline">🌐 PLAY ONLINE</button>
     </div>
   </div>
@@ -397,6 +418,20 @@ font-family:sans-serif;
       <button class="shop-close" id="shop-close">✕ CLOSE</button>
     </div>
     <div id="shop-list"></div>
+  </div>
+</div>
+
+<!-- [ETKINLIK] Magaza ekraninin (.sb) ayni kalibi: max-height:92vh +
+     overflow-y:auto oldugu icin mobil yatayda kendiliginden kaydirilir. -->
+<div id="screen-event">
+  <div class="sb">
+    <div class="sh">
+      <div class="st" id="event-baslik">EVENT</div>
+      <div class="sc" id="event-kalan"></div>
+      <button class="shop-close" id="event-close">✕ CLOSE</button>
+    </div>
+    <div id="event-list"></div>
+    <div class="event-not" id="event-not"></div>
   </div>
 </div>
 
@@ -1312,25 +1347,50 @@ const SFX_STRIKE=new Audio('data:audio/mpeg;base64,//PkZAAdnfD8A2WGwqAcHdQAAJOJA
 const SEZONLAR = [
   { id:'halloween', ad:'season.halloween', tur:'yillik',
     bas:{ay:10,gun:25}, bit:{ay:11,gun:2},
-    cues:['pumpkin_inferno','ghost_flame','blood_moon','haunted_bone'] },
+    cues:['pumpkin_inferno','ghost_flame','blood_moon','haunted_bone'] ,
+    gorevler:[
+      { id:'hw1', kosul:'mac_oyna',  hedef:3,  odul:'pumpkin_inferno' },
+      { id:'hw2', kosul:'mac_kazan', hedef:2,  odul:'ghost_flame'     },
+      { id:'hw3', kosul:'top_bat',   hedef:30, odul:'blood_moon'      },
+      { id:'hw4', kosul:'bot_yen',   hedef:1,  odul:'haunted_bone'    } ],
+  },
 
   // YIL ASAN ARALIK: bas > bit oldugu icin kosul "bas'tan sonra VEYA
   // bit'ten once" olarak degerlendirilir (bkz. sezonAktifMi).
   { id:'noel', ad:'season.newyear', tur:'yillik',
     bas:{ay:12,gun:15}, bit:{ay:1,gun:6},
-    cues:['candy_cane','frozen_christmas','winter_star'] },
+    cues:['candy_cane','frozen_christmas','winter_star'] ,
+    gorevler:[
+      { id:'nl1', kosul:'mac_oyna',  hedef:3,  odul:'candy_cane'       },
+      { id:'nl2', kosul:'mac_kazan', hedef:2,  odul:'winter_star'      },
+      { id:'nl3', kosul:'top_bat',   hedef:30, odul:'frozen_christmas' } ],
+  },
 
   { id:'sevgililer', ad:'season.valentines', tur:'yillik',
     bas:{ay:2,gun:10}, bit:{ay:2,gun:18},
-    cues:['heartbreaker','love_diamond','rose_flame'] },
+    cues:['heartbreaker','love_diamond','rose_flame'] ,
+    gorevler:[
+      { id:'sv1', kosul:'mac_oyna',  hedef:3,  odul:'heartbreaker' },
+      { id:'sv2', kosul:'mac_kazan', hedef:2,  odul:'love_diamond' },
+      { id:'sv3', kosul:'top_bat',   hedef:25, odul:'rose_flame'   } ],
+  },
 
   { id:'stpatrick', ad:'season.stpatrick', tur:'yillik',
     bas:{ay:3,gun:14}, bit:{ay:3,gun:20},
-    cues:['celtic_gold','emerald_luck'] },
+    cues:['celtic_gold','emerald_luck'] ,
+    gorevler:[
+      { id:'sp1', kosul:'mac_oyna',  hedef:3,  odul:'celtic_gold'  },
+      { id:'sp2', kosul:'mac_kazan', hedef:2,  odul:'emerald_luck' } ],
+  },
 
   { id:'yaz', ad:'season.summer', tur:'yillik',
     bas:{ay:6,gun:1}, bit:{ay:8,gun:31},
-    cues:['ocean','sunset','tropical'] },
+    cues:['ocean','sunset','tropical'] ,
+    gorevler:[
+      { id:'yz1', kosul:'mac_oyna',  hedef:5,  odul:'ocean'    },
+      { id:'yz2', kosul:'mac_kazan', hedef:3,  odul:'sunset'   },
+      { id:'yz3', kosul:'top_bat',   hedef:50, odul:'tropical' } ],
+  },
 
   // AY TAKVIMI: her yil ~11 gun kayar, sabit ay/gun ile ifade EDILEMEZ.
   // Araliklar T.C. Diyanet Isleri Baskanligi resmi dini gunler takviminden
@@ -1344,12 +1404,22 @@ const SEZONLAR = [
     araliklar:[ {bas:'2027-02-08', bit:'2027-03-11'},
                 {bas:'2028-01-28', bit:'2028-02-28'},
                 {bas:'2029-01-16', bit:'2029-02-16'} ],
-    cues:['crescent_moon','eid_glow','golden_night'] },
+    cues:['crescent_moon','eid_glow','golden_night'] ,
+    gorevler:[
+      { id:'rm1', kosul:'mac_oyna',  hedef:3,  odul:'crescent_moon' },
+      { id:'rm2', kosul:'mac_kazan', hedef:2,  odul:'eid_glow'      },
+      { id:'rm3', kosul:'top_bat',   hedef:30, odul:'golden_night'  } ],
+  },
 
   // Duzensiz takvim: her turnuva icin aralik elle eklenir.
   { id:'buyukspor', ad:'season.bigsport', tur:'tarihli',
     araliklar:[ {bas:'2026-06-11', bit:'2026-07-19'} ],
-    cues:['champion','golden_goal','stadium_flame'] },
+    cues:['champion','golden_goal','stadium_flame'] ,
+    gorevler:[
+      { id:'bs1', kosul:'mac_oyna',  hedef:3,  odul:'champion'      },
+      { id:'bs2', kosul:'mac_kazan', hedef:2,  odul:'golden_goal'   },
+      { id:'bs3', kosul:'top_bat',   hedef:30, odul:'stadium_flame' } ],
+  },
 ];
 
 // istaka -> sezon id (tek kaynak: SEZONLAR)
@@ -1408,6 +1478,116 @@ function cueSezonAktifMi(k, g){
   if(!sid) return false;
   const s = sezonBul(sid);
   return !!(s && sezonAktifMi(s, g));
+}
+
+// ── ETKINLIK GOREV / ODUL SISTEMI ────────────────────────────────────
+// Akis: etkinlik -> gorevler -> ilerleme -> odul -> KALICI cue sahipligi.
+//
+// DEPO AYRI: ilerleme 'inferno_ev' anahtarinda tutulur, PROFILE (inferno_p)
+// DOKUNULMAZ. Boylece sema hatasi olsa bile coin/level/owned verisi saglam
+// kalir. Kazanilan cue ise P.owned'a yazilir; cueAcikMi() zaten
+// "P.owned VEYA sezon aktif" dedigi icin kalici sahiplik ile gecici
+// etkinlik erisimi KENDILIGINDEN ayrilir - o fonksiyon DEGISMEDI.
+//
+// DONEM: yillik etkinlikler her yil tekrar ettigi icin ilerleme donem
+// basina sifirlanir (2026 Halloween -> 2027 Halloween). Kazanilmis cue
+// SIFIRLANMAZ; P.owned kalicidir ve ikinci kez odul verilmez.
+const EV_ANAHTAR = 'inferno_ev';
+const EV_XP_ODULU = false;   // v1: etkinlik coin/XP VERMEZ; ekonomi ayri kalir
+
+function evYukle(){
+  try{
+    const d = localStorage.getItem(EV_ANAHTAR);
+    if(d){ const o = JSON.parse(d); if(o && o.s) return o; }
+  }catch(e){}
+  return { v:1, s:{}, sonGun:0 };
+}
+function evKaydet(){ try{ localStorage.setItem(EV_ANAHTAR, JSON.stringify(EV)); }catch(e){} }
+const EV = evYukle();
+
+// Donem kimligi: yillik -> yil; tarihli -> aktif araligin baslangici.
+function evDonem(s, g){
+  g = g || _bugun();
+  if(s.tur === 'tarihli'){
+    const n = _ymd(g);
+    const a = (s.araliklar || []).filter(function(x){
+      return n >= _ymd(_tariheCevir(x.bas)) && n <= _ymd(_tariheCevir(x.bit));
+    })[0];
+    return a ? a.bas : '';
+  }
+  // Yil asan aralikta (15 Ara - 6 Oca) Ocak gunleri ONCEKI yilin donemidir.
+  if(_ag(s.bas) > _ag(s.bit) && _ag(g) <= _ag(s.bit)) return String(g.y - 1);
+  return String(g.y);
+}
+// Sezon durumunu dondurur; donem degistiyse ilerlemeyi SIFIRLAR.
+function evDurum(s, g){
+  const d = evDonem(s, g);
+  let k = EV.s[s.id];
+  if(!k || k.donem !== d){ k = { donem:d, p:{}, v:[] }; EV.s[s.id] = k; evKaydet(); }
+  return k;
+}
+// Saat geri alindi mi? (basit hile caydiricisi)
+// Gorulen EN BUYUK gun saklanir; cihaz tarihi geriye alinirsa ilerleme
+// YAZILMAZ. Kanit degil, caydiricidir (bkz. tasarim raporu).
+function evSaatGecerliMi(g){
+  g = g || _bugun();
+  const n = _ymd(g);
+  if(EV.sonGun && n < EV.sonGun) return false;
+  if(n > (EV.sonGun || 0)){ EV.sonGun = n; evKaydet(); }
+  return true;
+}
+// Odul: hedefe ulasildi, daha once VERILMEDI ve zaten sahip DEGIL.
+function evOdulVer(s, gorev, k){
+  if(k.v.indexOf(gorev.id) >= 0) return null;              // tekrar odul YOK
+  if((k.p[gorev.id] || 0) < gorev.hedef) return null;
+  k.v.push(gorev.id);
+  evKaydet();
+  if(P.owned.indexOf(gorev.odul) < 0){                     // cift kayit YOK
+    P.owned.push(gorev.odul);
+    saveP();
+  }
+  return gorev.odul;
+}
+// TEK GIRIS NOKTASI: mac sonunda cagrilir, aktif sezonlarin gorevlerini besler.
+function evIlerlet(kosul, miktar, baglam){
+  if(!miktar || miktar <= 0) return [];
+  const g = _bugun();
+  if(!evSaatGecerliMi(g)) return [];
+  const kazanilan = [];
+  let degisti = false;
+  aktifSezonlar(g).forEach(function(s){
+    if(!s.gorevler) return;
+    const k = evDurum(s, g);
+    s.gorevler.forEach(function(gv){
+      if(gv.kosul !== kosul) return;
+      if(k.v.indexOf(gv.id) >= 0) return;                  // tamamlanmis
+      if(gv.zorluk && (!baglam || baglam.zorluk !== gv.zorluk)) return;
+      const onceki = k.p[gv.id] || 0;
+      const simdi  = Math.min(gv.hedef, onceki + miktar);
+      if(simdi !== onceki){ k.p[gv.id] = simdi; degisti = true; }
+      const odul = evOdulVer(s, gv, k);
+      if(odul) kazanilan.push({ sezon:s, gorev:gv, cue:odul });
+    });
+  });
+  // ODUL KAZANILMASA DA KAYDET: aksi halde 2/3 gibi yarim ilerleme sayfa
+  // yenilenince kaybolurdu (yalnizca odul aninda yazmak yetmiyor).
+  if(degisti || kazanilan.length) evKaydet();
+  return kazanilan;
+}
+// UI ozeti: aktif sezonun gorevleri + ilerleme + durum.
+function evOzet(g){
+  g = g || _bugun();
+  const s = aktifSezonlar(g)[0];
+  if(!s || !s.gorevler) return null;
+  const k = evDurum(s, g);
+  return {
+    sezon: s,
+    gorevler: s.gorevler.map(function(gv){
+      const p = Math.min(gv.hedef, k.p[gv.id] || 0);
+      return { gorev:gv, ilerleme:p, tamam:(k.v.indexOf(gv.id) >= 0),
+               sahip:(P.owned.indexOf(gv.odul) >= 0) };
+    })
+  };
 }
 const SHOP_DEF=[{"id": "cosmic_eclipse", "name": "Cosmic Eclipse", "price": 0, "force": 5, "aim": 5, "spin": 5, "emoji": "\ud83c\udf0c"}, {"id": "royal_diamond", "name": "Royal Diamond", "price": 500, "force": 6, "aim": 7, "spin": 6, "emoji": "\ud83d\udc8e"}, {"id": "emerald_serpent", "name": "Emerald Serpent", "price": 800, "force": 7, "aim": 8, "spin": 7, "emoji": "\ud83d\udc0d"}, {"id": "golden_phoenix", "name": "Golden Phoenix", "price": 1200, "force": 8, "aim": 6, "spin": 7, "emoji": "\ud83d\udd25"}, {"id": "frost_king", "name": "Frost King", "price": 1500, "force": 8.5, "aim": 9, "spin": 6, "emoji": "\u2744"}, {"id": "thunder_strike", "name": "Thunder Strike", "price": 2000, "force": 9, "aim": 7, "spin": 8, "emoji": "\u26a1"}, {"id": "dragon_bone", "name": "Dragon Bone", "price": 3000, "force": 9.5, "aim": 8, "spin": 9, "emoji": "\ud83d\udc09"}, {"id": "neon_core", "name": "Neon Core", "price": 5000, "force": 10, "aim": 10, "spin": 10, "emoji": "\ud83d\udc99"}];
 // ═══════════════════════════════════════════════════════════
@@ -1901,6 +2081,16 @@ en: {
   'season.summer':'Summer',
   'season.ramadan':'Ramadan & Eid',
   'season.bigsport':'World Cup',
+  'event.button':'🎯 EVENT',
+  'event.title':'EVENT',
+  'event.none':'No active event right now.',
+  'event.done':'EARNED',
+  'event.local':'Progress is stored on this device.',
+  'event.won':'🏆 {sezon} cue earned - it is yours for good!',
+  'event.task.mac_oyna':'Play {n} matches',
+  'event.task.mac_kazan':'Win {n} matches',
+  'event.task.top_bat':'Pot {n} balls',
+  'event.task.bot_yen':'Beat the bot: {n}',
   // ── element adlari ──
   'elem.fire':'FIRE',
   'elem.ice':'ICE',
@@ -2169,6 +2359,16 @@ tr: {
   'season.summer':'Yaz',
   'season.ramadan':'Ramazan & Bayram',
   'season.bigsport':'Dünya Kupası',
+  'event.button':'🎯 ETKİNLİK',
+  'event.title':'ETKİNLİK',
+  'event.none':'Şu anda aktif etkinlik yok.',
+  'event.done':'KAZANILDI',
+  'event.local':'İlerleme bu cihazda saklanır.',
+  'event.won':'🏆 {sezon} istakası kazanıldı - artık kalıcı olarak senin!',
+  'event.task.mac_oyna':'{n} maç oyna',
+  'event.task.mac_kazan':'{n} maç kazan',
+  'event.task.top_bat':'{n} top bat',
+  'event.task.bot_yen':'Botu {n} kez yen',
   'elem.fire':'ATEŞ',
   'elem.ice':'BUZ',
   'elem.poison':'ZEHİR',
@@ -2423,6 +2623,16 @@ ru: {
   'season.summer':'Лето',
   'season.ramadan':'Рамадан и Эйд',
   'season.bigsport':'Чемпионат мира',
+  'event.button':'🎯 СОБЫТИЕ',
+  'event.title':'СОБЫТИЕ',
+  'event.none':'Сейчас нет активных событий.',
+  'event.done':'ПОЛУЧЕНО',
+  'event.local':'Прогресс хранится на этом устройстве.',
+  'event.won':'🏆 Кий «{sezon}» получен - навсегда ваш!',
+  'event.task.mac_oyna':'Сыграйте матчей: {n}',
+  'event.task.mac_kazan':'Выиграйте матчей: {n}',
+  'event.task.top_bat':'Забейте шаров: {n}',
+  'event.task.bot_yen':'Победите бота: {n}',
   'elem.fire':'ОГОНЬ',
   'elem.ice':'ЛЁД',
   'elem.poison':'ЯД',
@@ -2829,6 +3039,16 @@ function refreshMenu(){
   i18nKirilSinifi(el('menu-level'), svyMetin);   // dinamik metin: sinifi elle ata
   el('xp-bar').style.width=Math.min(100,Math.round(P.xp/(P.level*300)*100))+'%';
   el('hs-val').textContent=P.hs;
+  // [ETKINLIK] Buton yalnizca gorevi olan aktif bir sezon varken gorunur.
+  // Etiket data-i18n='event.button' ile yazilir; burada YALNIZCA gorunurluk
+  // ayarlanir. Sezon adini butona yazmak setLang() sonrasi eski dilde
+  // kalirdi (i18nUygula refreshMenu'yu cagirmaz) - sezon adi ekran
+  // basliginda gosterilir.
+  const _evBtn = document.getElementById('menu-event');
+  if(_evBtn){
+    const _oz = (typeof evOzet === 'function') ? evOzet() : null;
+    _evBtn.style.display = _oz ? 'block' : 'none';
+  }
 }
 refreshMenu();
 
@@ -2862,6 +3082,56 @@ function renderShop(){
 }
 function buyCue(id,price){if(P.coins<price)return;P.coins-=price;P.owned.push(id);P.equipped=id;selectedSkin=id;applyCueStats();saveP();renderShop();refreshMenu();toast2('PURCHASED!');sfxPU();}
 function equipCue(id){P.equipped=id;selectedSkin=id;applyCueStats();saveP();renderShop();refreshSkinBar();sfxPU();}
+// [ETKINLIK] Gorev listesini cizer. Tum metinler createTextNode ile yazilir.
+function renderEvent(){
+  const kok = document.getElementById('event-list'); if(!kok) return;
+  while(kok.firstChild) kok.removeChild(kok.firstChild);
+  const ozet = evOzet();
+  const bas = document.getElementById('event-baslik');
+  const kalan = document.getElementById('event-kalan');
+  const not = document.getElementById('event-not');
+  if(!ozet){
+    if(bas) bas.textContent = t('event.title');
+    if(kalan) kalan.textContent = '';
+    const b = document.createElement('div');
+    b.className = 'event-not';
+    b.appendChild(document.createTextNode(t('event.none')));
+    kok.appendChild(b);
+    if(not) not.textContent = '';
+    return;
+  }
+  if(bas) bas.textContent = t(ozet.sezon.ad);
+  if(kalan) kalan.textContent = '';
+  ozet.gorevler.forEach(function(x){
+    const d = document.createElement('div');
+    d.className = 'ev-satir' + (x.tamam || x.sahip ? ' tamam' : '');
+    const g = document.createElement('div');
+    g.className = 'ev-cue';
+    if(ASSET_CUES[x.gorev.odul]) g.style.backgroundImage = 'url(' + ASSET_CUES[x.gorev.odul] + ')';
+    d.appendChild(g);
+    const orta = document.createElement('div');
+    orta.className = 'ev-orta';
+    const ad = document.createElement('div');
+    ad.className = 'ev-ad';
+    ad.appendChild(document.createTextNode(
+      t('event.task.' + x.gorev.kosul, { n: x.gorev.hedef })));
+    orta.appendChild(ad);
+    const tr = document.createElement('div');
+    tr.className = 'track';
+    const fl = document.createElement('div');
+    fl.className = 'fill fire';
+    fl.style.width = Math.round(100 * x.ilerleme / x.gorev.hedef) + '%';
+    tr.appendChild(fl); orta.appendChild(tr);
+    d.appendChild(orta);
+    const sy = document.createElement('div');
+    sy.className = 'ev-sayi';
+    sy.appendChild(document.createTextNode(
+      (x.tamam || x.sahip) ? t('event.done') : (x.ilerleme + '/' + x.gorev.hedef)));
+    d.appendChild(sy);
+    kok.appendChild(d);
+  });
+  if(not) not.textContent = t('event.local');
+}
 function refreshSkinBar(){
   // SURESI DOLMUS SEZONLUK ISTAKA KORUMASI: etkinlik bittiginde donatilmis
   // istaka artik kullanilabilir degilse guvenli varsayilana donulur.
@@ -4785,6 +5055,30 @@ function endGame(winner,reason){
   const score=sk*100+Math.max(0,280-sh*5);
   if(score>P.hs) P.hs=score;
   addCoins(coins); addXP(xp);
+  // [ETKINLIK] Gorev ilerlemesi. Bu satirlar 'if(G.phase===\'over\') return;'
+  // kontrolunden SONRA oldugu icin cift sayim olmaz; yarida birakilan mac
+  // (backToMenu) endGame'i hic cagirmadigi icin sayilmaz.
+  try{
+    const _evOnline = G.onlineMode, _evBot = (G.mode === 'bot');
+    // 'mac_kazan' YALNIZCA bota veya cevrimici rakibe karsi sayilir; ayni
+    // cihazdaki 2 kisilik macta her sonuc "galibiyet" olurdu.
+    const _benKazandim = _evOnline ? (winner === G.mySlot) : (_evBot && winner === 0);
+    let _kaz = evIlerlet('mac_oyna', 1);
+    if(_benKazandim){
+      _kaz = _kaz.concat(evIlerlet('mac_kazan', 1));
+      if(_evBot) _kaz = _kaz.concat(evIlerlet('bot_yen', 1, { zorluk:G.diff }));
+    }
+    // Toplar mac sonunda TOPLU sayilir: her cep icin ayri cagri yerine tek
+    // seferde, boylece yarim mac sayilmaz.
+    const _benimSlot = _evOnline ? G.mySlot : 0;
+    _kaz = _kaz.concat(evIlerlet('top_bat', G.sunk[_benimSlot] || 0));
+    if(_kaz.length){
+      refreshSkinBar();
+      const _c = _kaz[_kaz.length - 1];
+      // Sezon adi zaten kayitta duruyor (s.ad); id -> anahtar cevirisi GEREKMEZ.
+      setTimeout(function(){ toast2(t('event.won', { sezon: t(_c.sezon.ad) })); }, 900);
+    }
+  }catch(e){}
   let overTitle;
   if(G.onlineMode){
     overTitle = winner===G.mySlot ? '🏆 YOU WIN!' : '💀 YOU LOSE!';
@@ -4822,13 +5116,14 @@ function showScreen(n){
   G.phase=n;
   var ls=document.getElementById('loading-screen');
   if(ls) ls.style.display='none';
-  ['intro','menu','game','over','shop','online','lb'].forEach(s=>{
+  ['intro','menu','game','over','shop','online','lb','event'].forEach(s=>{
     const sc=document.getElementById('screen-'+s);
     if(sc) sc.classList.toggle('active',s===n);
   });
   if(n==='game') layoutTable();
   if(n==='menu') refreshMenu();
   if(n==='shop') renderShop();
+  if(n==='event') renderEvent();
 }
 
 // ── Menu Wiring ──
@@ -6538,6 +6833,10 @@ function chatKur(){
   if(tmz) tmz.onclick = chatGlobalTemizle;
   const uk = document.getElementById('chat-uyari-kapat');
   if(uk) uk.onclick = chatUyariGizle;
+  const ev = document.getElementById('menu-event');
+  if(ev) ev.onclick = function(){ showScreen('event'); };
+  const evk = document.getElementById('event-close');
+  if(evk) evk.onclick = function(){ showScreen('menu'); };
   const gi = document.getElementById('chat-giris');
   if(gi) gi.onkeydown = function(e){ if(e.key === 'Enter') chatMesajGonder(); };
 }
