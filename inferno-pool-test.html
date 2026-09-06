@@ -350,6 +350,45 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dk);font-famil
   background-position:center;background-color:rgba(0,0,0,0.55);transition:all 0.2s;flex-shrink:0;position:relative;}
 .skin-th:hover{border-color:rgba(255,150,0,0.45);transform:scale(1.06);}
 .skin-th.active{border-color:#ffcc00;box-shadow:0 0 9px rgba(255,200,0,0.5);}
+/* [PROFIL 5b] HUD oyuncu panelindeki kimlik satiri. Mevcut skor /
+   sira / timer / cep paneli duzenine DOKUNMAZ; yalnizca .gh-name'in
+   USTUNE kompakt bir satir ekler. Yalnizca ONLINE macta gorunur. */
+.gh-kimlik{display:none;align-items:center;gap:4px;margin-bottom:2px;max-width:100%;}
+.gh-player.online .gh-kimlik{display:flex;}
+.gh-avatar{width:18px;height:18px;border-radius:50%;flex:none;object-fit:cover;
+  background:rgba(255,255,255,0.06);border:1px solid rgba(255,150,0,0.35);}
+.gh-rozet{font-size:0.4rem;letter-spacing:0.6px;font-weight:700;padding:1px 4px;
+  border-radius:7px;white-space:nowrap;flex:none;
+  background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.16);
+  color:rgba(255,255,255,0.45);}
+.gh-rozet.platform{background:rgba(0,200,120,0.14);border-color:rgba(0,200,120,0.38);color:#7ce6b0;}
+@media (max-width:430px){
+  .gh-avatar{width:15px;height:15px;}
+  .gh-rozet{font-size:0.34rem;padding:1px 3px;letter-spacing:0.3px;}
+  .gh-kimlik{gap:3px;}
+}
+@media (max-height:560px){
+  .gh-avatar{width:14px;height:14px;}
+  .gh-rozet{font-size:0.32rem;padding:0 3px;}
+}
+/* [PROFIL 5b] Rakip kartindaki chat yer tutucusu. HENUZ CALISMIYOR:
+   tiklama bagli degil, chat_invite protokolu YOK. Yalnizca gorsel/UX
+   altyapisi hazir; islevsellik ayri bir adimda (sunucu izniyle) gelecek. */
+.gh-chat{font-size:0.4rem;letter-spacing:0.3px;padding:1px 5px;border-radius:7px;
+  border:1px dashed rgba(255,255,255,0.22);background:transparent;
+  color:rgba(255,255,255,0.32);cursor:default;white-space:nowrap;
+  min-width:0;max-width:78px;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;
+  display:none;}
+.gh-player.online.rakip .gh-chat{display:inline-block;}
+@media (max-width:430px){ .gh-chat{font-size:0.34rem;padding:0 4px;} }
+/* [YASAL] Menudeki uclu yasal kisayol satiri. */
+#menu-yasal{display:flex;gap:5px;margin-top:5px;}
+#menu-yasal button{flex:1;min-width:0;padding:6px 2px;border-radius:6px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.54rem;letter-spacing:1px;font-weight:600;
+  background:transparent;border:1px solid rgba(255,136,0,0.22);color:rgba(255,200,140,0.7);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#menu-yasal button:hover{background:rgba(255,120,0,0.12);color:#ffcc99;}
+@media (max-height:560px){ #menu-yasal button{font-size:0.46rem;padding:4px 2px;letter-spacing:0.5px;} }
 /* [SAHIPLIK] Aktarma kodu penceresi. */
 #screen-xfer{position:fixed;inset:0;z-index:70;display:none;align-items:center;
   justify-content:center;background:rgba(4,0,10,0.9);}
@@ -643,7 +682,12 @@ font-family:sans-serif;
         <button class="shop-btn" id="menu-shop" data-i18n="menu.shop">🎁 SHOP</button>
       </div>
       <button id="menu-challenge" onclick="var r='INF-'+Math.random().toString(36).substr(2,6).toUpperCase();var m=document.getElementById('screen-challenge');var l=document.getElementById('invite-link');var s=document.getElementById('invite-status');if(m)m.style.display='flex';if(l)l.textContent=location.href.split('?')[0]+'?room='+r;if(s)s.textContent='Send the link to your friend!';setTimeout(function(){if(window.onChallengeModalOpen)onChallengeModalOpen(r);},200);" style="width:100%;padding:11px;font-family:'Cinzel Decorative',serif;font-size:0.75rem;letter-spacing:2px;background:linear-gradient(135deg,#550099,#330066);border:1px solid rgba(150,0,255,0.4);color:#fff;border-radius:6px;cursor:pointer;box-shadow:0 0 14px rgba(100,0,255,0.3);margin-bottom:8px;transition:all 0.2s;" data-i18n="menu.invite">⚔ INVITE FRIEND</button>
-      <button id="menu-credits" onclick="legalAc('credits')" style="width:100%;padding:7px;font-family:'Rajdhani',sans-serif;font-size:0.62rem;letter-spacing:2px;background:transparent;border:1px solid rgba(255,136,0,0.22);color:rgba(255,200,140,0.75);border-radius:6px;cursor:pointer;" data-i18n="menu.credits">CREDITS</button>
+      <!-- [YASAL] Uc belge de OYUN ICINDE acilir (Yandex 3.5). -->
+      <div id="menu-yasal">
+        <button type="button" id="menu-privacy" data-i18n="menu.privacy">PRIVACY</button>
+        <button type="button" id="menu-terms" data-i18n="menu.terms">TERMS</button>
+        <button type="button" id="menu-credits" data-i18n="menu.credits2">CREDITS</button>
+      </div>
       <!-- [SIFIRLA] Veri silme hakki. Yalnizca menude gorunur. -->
       <button id="menu-reset" type="button" style="width:100%;padding:7px;font-family:'Rajdhani',sans-serif;font-size:0.62rem;letter-spacing:2px;background:transparent;border:1px solid rgba(255,80,0,0.22);color:rgba(255,150,120,0.7);border-radius:6px;cursor:pointer;margin-top:5px;" data-i18n="reset.button">RESET MY LOCAL DATA</button>
       <!-- [SAHIPLIK] Istaka aktarma. Hesap/e-posta gerektirmez. -->
@@ -677,9 +721,9 @@ font-family:sans-serif;
 <div id="screen-shop">
   <div class="sb">
     <div class="sh">
-      <div class="st">🎁 CUE SHOP</div>
+      <div class="st" data-i18n="shop.title">🎁 CUE SHOP</div>
       <div class="sc">💰 <span id="shop-coins">0</span></div>
-      <button class="shop-close" id="shop-close">✕ CLOSE</button>
+      <button class="shop-close" id="shop-close" data-i18n="common.closeX">✕ CLOSE</button>
     </div>
     <div id="shop-list"></div>
   </div>
@@ -694,7 +738,7 @@ font-family:sans-serif;
     <div class="sh">
       <div class="st" data-i18n="col.title">MY CUES</div>
       <div class="sc" id="col-sayac"></div>
-      <button class="shop-close" id="col-close">✕ CLOSE</button>
+      <button class="shop-close" id="col-close" data-i18n="common.closeX">✕ CLOSE</button>
     </div>
     <div id="col-arac">
       <input id="col-ara" type="text" data-i18n-ph="col.search" placeholder="Search">
@@ -712,7 +756,7 @@ font-family:sans-serif;
     <div class="sh">
       <div class="st" id="event-baslik">EVENT</div>
       <div class="sc" id="event-kalan"></div>
-      <button class="shop-close" id="event-close">✕ CLOSE</button>
+      <button class="shop-close" id="event-close" data-i18n="common.closeX">✕ CLOSE</button>
     </div>
     <div id="event-list"></div>
     <div class="event-not" id="event-not"></div>
@@ -729,6 +773,13 @@ font-family:sans-serif;
 
     <!-- PLAYER 1 -->
     <div class="gh-player" id="ghp1">
+      <!-- [PROFIL 5b] Kimlik satiri; yalnizca online macta gorunur. -->
+      <div class="gh-kimlik" id="ghp1-kimlik">
+        <img class="gh-avatar" id="ghp1-avatar" alt="" width="18" height="18">
+        <span class="gh-rozet" id="ghp1-rozet"></span>
+        <!-- [5b] Gorsel yer tutucu: HENUZ ISLEVSEL DEGIL. -->
+        <span class="gh-chat" id="ghp1-chat" data-i18n="profile.chatSoon" data-i18n-title="profile.chatSoonTip" aria-disabled="true"></span>
+      </div>
       <div class="gh-name">PLAYER 1</div>
       <div class="gh-score" id="gs1">0</div>
       <div class="gh-el" id="ge1" style="color:#ff6600">---</div>
@@ -744,6 +795,13 @@ font-family:sans-serif;
 
     <!-- PLAYER 2 -->
     <div class="gh-player" id="ghp2" style="align-items:flex-end">
+      <!-- [PROFIL 5b] Kimlik satiri; yalnizca online macta gorunur. -->
+      <div class="gh-kimlik" id="ghp2-kimlik">
+        <img class="gh-avatar" id="ghp2-avatar" alt="" width="18" height="18">
+        <span class="gh-rozet" id="ghp2-rozet"></span>
+        <!-- [5b] Gorsel yer tutucu: HENUZ ISLEVSEL DEGIL. -->
+        <span class="gh-chat" id="ghp2-chat" data-i18n="profile.chatSoon" data-i18n-title="profile.chatSoonTip" aria-disabled="true"></span>
+      </div>
       <div class="gh-name">PLAYER 2</div>
       <div class="gh-score" id="gs2">0</div>
       <div class="gh-el" id="ge2" style="color:#00aaff">---</div>
@@ -1455,6 +1513,10 @@ function startOnlineGame(seed, nick1, nick2) {
   drag.active=false; drag.power=0;
   el('ghp1').querySelector('.gh-name').textContent=nick1||'Player 1';
   el('ghp2').querySelector('.gh-name').textContent=nick2||'Player 2';
+  // [PROFIL 5b] Kimlik satirini ciz; profil henuz gelmediyse guvenli
+  // varsayilanla cizilir, geldiginde tekrar tazelenir.
+  try{ ghKimlikTazele(); }catch(e){}
+  try{ profilYukle().then(function(){ try{ ghKimlikTazele(); }catch(e){} }); }catch(e){}
   el('gs1').textContent='0'; el('gs2').textContent='0';
   el('ge1').textContent='---'; el('ge2').textContent='---';
   el('gc1').textContent='0'; el('gc2').textContent='0';
@@ -2740,6 +2802,23 @@ en: {
   'reset.confirm':'DELETE EVERYTHING',
   'reset.confirmAgain':'TAP AGAIN TO CONFIRM',
   'reset.done':'Local data deleted. Restarting…',
+  'common.closeX':'✕ CLOSE',
+  'profile.chatSoon':'💬 Chat',
+  'profile.chatSoonTip':'Chat invite — coming soon',
+  'profile.badgeGuest':'GUEST',
+  'profile.badgeCG':'CRAZYGAMES',
+  'profile.badgeYA':'YANDEX',
+  'profile.badgePX':'PIXIDUS',
+  'profile.guest':'Player',
+  'profile.you':'You',
+  'menu.privacy':'PRIVACY','menu.terms':'TERMS','menu.credits2':'CREDITS',
+  'cat.COUNTRY':'COUNTRY','cat.MYTHOLOGY':'MYTHOLOGY','cat.COSMIC':'COSMIC',
+  'cat.HORROR':'HORROR','cat.FANTASY':'FANTASY','cat.TECH':'TECH','cat.EVENT':'EVENT',
+  'rar.COMMON':'COMMON','rar.RARE':'RARE','rar.EPIC':'EPIC','rar.LEGENDARY':'LEGENDARY',
+  'stat.force':'FORCE','stat.aim':'AIM','stat.spin':'SPIN','shop.soon':'SOON',
+  'cr.title':'CREDITS','cr.balls':'3D BILLIARD BALLS','cr.by':'by','cr.source':'Source:',
+  'cr.license':'License:','cr.adapted':'Model adapted for this game (scale, orientation, rack layout). Attribution retained.',
+  'cr.rendering':'RENDERING',
   'legal.tabCredits':'CREDITS',
   'legal.tabPrivacy':'PRIVACY',
   'legal.tabTerms':'TERMS',
@@ -3110,6 +3189,23 @@ tr: {
   'reset.confirm':'HEPSİNİ SİL',
   'reset.confirmAgain':'ONAYLAMAK İÇİN TEKRAR BASIN',
   'reset.done':'Yerel veriler silindi. Yeniden başlatılıyor…',
+  'common.closeX':'✕ KAPAT',
+  'profile.chatSoon':'💬 Sohbet',
+  'profile.chatSoonTip':'Sohbet daveti — yakında',
+  'profile.badgeGuest':'MİSAFİR',
+  'profile.badgeCG':'CRAZYGAMES',
+  'profile.badgeYA':'YANDEX',
+  'profile.badgePX':'PIXIDUS',
+  'profile.guest':'Oyuncu',
+  'profile.you':'Sen',
+  'menu.privacy':'GİZLİLİK','menu.terms':'ŞARTLAR','menu.credits2':'KREDİLER',
+  'cat.COUNTRY':'ÜLKE','cat.MYTHOLOGY':'MİTOLOJİ','cat.COSMIC':'KOZMİK',
+  'cat.HORROR':'KORKU','cat.FANTASY':'FANTAZİ','cat.TECH':'TEKNOLOJİ','cat.EVENT':'ETKİNLİK',
+  'rar.COMMON':'SIRADAN','rar.RARE':'NADİR','rar.EPIC':'DESTANSI','rar.LEGENDARY':'EFSANEVİ',
+  'stat.force':'GÜÇ','stat.aim':'NİŞAN','stat.spin':'EFEKT','shop.soon':'YAKINDA',
+  'cr.title':'KREDİLER','cr.balls':'3D BİLARDO TOPLARI','cr.by':'yapan:','cr.source':'Kaynak:',
+  'cr.license':'Lisans:','cr.adapted':'Model bu oyun için uyarlandı (ölçek, yön, dizilim). Atif korunmuştur.',
+  'cr.rendering':'İŞLEME',
   'legal.tabCredits':'KREDİLER',
   'legal.tabPrivacy':'GİZLİLİK',
   'legal.tabTerms':'ŞARTLAR',
@@ -3466,6 +3562,23 @@ ru: {
   'reset.confirm':'УДАЛИТЬ ВСЁ',
   'reset.confirmAgain':'НАЖМИТЕ ЕЩЁ РАЗ ДЛЯ ПОДТВЕРЖДЕНИЯ',
   'reset.done':'Локальные данные удалены. Перезапуск…',
+  'common.closeX':'✕ ЗАКРЫТЬ',
+  'profile.chatSoon':'💬 Чат',
+  'profile.chatSoonTip':'Приглашение в чат — скоро',
+  'profile.badgeGuest':'ГОСТЬ',
+  'profile.badgeCG':'CRAZYGAMES',
+  'profile.badgeYA':'YANDEX',
+  'profile.badgePX':'PIXIDUS',
+  'profile.guest':'Игрок',
+  'profile.you':'Вы',
+  'menu.privacy':'ПРИВАТНОСТЬ','menu.terms':'УСЛОВИЯ','menu.credits2':'АВТОРЫ',
+  'cat.COUNTRY':'СТРАНЫ','cat.MYTHOLOGY':'МИФОЛОГИЯ','cat.COSMIC':'КОСМОС',
+  'cat.HORROR':'УЖАСЫ','cat.FANTASY':'ФЭНТЕЗИ','cat.TECH':'ТЕХНО','cat.EVENT':'СОБЫТИЯ',
+  'rar.COMMON':'ОБЫЧНЫЙ','rar.RARE':'РЕДКИЙ','rar.EPIC':'ЭПИЧЕСКИЙ','rar.LEGENDARY':'ЛЕГЕНДАРНЫЙ',
+  'stat.force':'СИЛА','stat.aim':'ТОЧНОСТЬ','stat.spin':'КРУТКА','shop.soon':'СКОРО',
+  'cr.title':'АВТОРЫ И ЛИЦЕНЗИИ','cr.balls':'3D БИЛЬЯРДНЫЕ ШАРЫ','cr.by':'автор:','cr.source':'Источник:',
+  'cr.license':'Лицензия:','cr.adapted':'Модель адаптирована для игры (масштаб, ориентация, расстановка). Атрибуция сохранена.',
+  'cr.rendering':'РЕНДЕРИНГ',
   'legal.tabCredits':'БЛАГОДАРНОСТИ',
   'legal.tabPrivacy':'КОНФИДЕНЦИАЛЬНОСТЬ',
   'legal.tabTerms':'УСЛОВИЯ',
@@ -3811,6 +3924,22 @@ function setLang(kod){
   try{ localStorage.setItem(I18N_ANAHTAR, kod); }catch(e){}
   try{ document.documentElement.setAttribute('data-lang', kod); }catch(e){}
   i18nUygula();
+  // [YERELLESTIRME] Dinamik uretilen metinler data-i18n tasimadigi icin
+  // i18nUygula() onlara dokunmaz; dil degisince ELLE yeniden cizilirler.
+  try{ if(typeof setOnlineStatus === 'function') setOnlineStatus(_sonOnlineDurum); }catch(e){}
+  try{ if(typeof colKatlariCiz === 'function') colKatlariCiz(); }catch(e){}
+  try{ if(typeof renderShop === 'function' &&
+          document.getElementById('screen-shop') &&
+          getComputedStyle(document.getElementById('screen-shop')).display !== 'none') renderShop(); }catch(e){}
+  try{ if(typeof renderCollection === 'function' &&
+          document.getElementById('screen-collection') &&
+          getComputedStyle(document.getElementById('screen-collection')).display !== 'none') renderCollection(); }catch(e){}
+  try{ if(typeof sosyalPaneliCiz === 'function') sosyalPaneliCiz(); }catch(e){}
+  // [PROFIL 5b] Rozet metinleri ceviriden gelir.
+  try{ if(typeof ghKimlikTazele === 'function') ghKimlikTazele(); }catch(e){}
+  // [PROFIL] Misafir adi ceviriden gelir; dil degisince guncellenir.
+  try{ if(typeof PROFIL !== 'undefined' && PROFIL._onbellek &&
+          PROFIL._onbellek.kaynak === 'guest'){ PROFIL._onbellek = profilVarsayilan(); } }catch(e){}
   return true;
 }
 
@@ -3959,9 +4088,9 @@ function renderShop(){
     const owned=P.owned.includes(def.id), eq=P.equipped===def.id;
     const div=document.createElement('div');
     div.className='si'+(eq?' eq':owned?' owned':'');
-    let btn=eq?'<div class="btn-eq">EQUIPPED</div>':
-              owned?`<button class="btn-use" onclick="equipCue('${def.id}')">EQUIP</button>`:
-              `<div class="price">💰${def.price}</div><button class="btn-buy"${P.coins>=def.price?'':' disabled'} onclick="buyCue('${def.id}',${def.price})">BUY</button>`;
+    let btn=eq?'<div class="btn-eq">'+t('shop.equipped')+'</div>':
+              owned?`<button class="btn-use" onclick="equipCue('${def.id}')">${t('shop.equip')}</button>`:
+              `<div class="price">💰${def.price}</div><button class="btn-buy"${P.coins>=def.price?'':' disabled'} onclick="buyCue('${def.id}',${def.price})">${t('shop.buy')}</button>`;
     // CUE VISUAL IMPROVEMENTS — vitrinde de 'screen' yalnizca gerekiyorsa.
     // Alfasi dogru olan istakalar artik gercek renkleriyle gorunur.
     const _blend = (CUE_SCREEN[def.id] === false) ? 'normal' : 'screen';
@@ -3969,9 +4098,9 @@ function renderShop(){
 <div class="si-info">
   <div class="si-name">${def.emoji} ${def.name}</div>
   <div class="bars">
-    <div class="bar-row"><span>FORCE</span><div class="track"><div class="fill fire" style="width:${def.force*10}%"></div></div></div>
-    <div class="bar-row"><span>AIM</span><div class="track"><div class="fill ice" style="width:${def.aim*10}%"></div></div></div>
-    <div class="bar-row soon-row"><span>SPIN</span><div class="track"><div class="fill shadow" style="width:${def.spin*10}%"></div></div><em class="soon-tag">SOON</em></div>
+    <div class="bar-row"><span>${t('stat.force')}</span><div class="track"><div class="fill fire" style="width:${def.force*10}%"></div></div></div>
+    <div class="bar-row"><span>${t('stat.aim')}</span><div class="track"><div class="fill ice" style="width:${def.aim*10}%"></div></div></div>
+    <div class="bar-row soon-row"><span>${t('stat.spin')}</span><div class="track"><div class="fill shadow" style="width:${def.spin*10}%"></div></div><em class="soon-tag">${t('shop.soon')}</em></div>
   </div>
 </div>
 <div class="si-act">${btn}</div>`;
@@ -4574,6 +4703,196 @@ function legalAc(sekme){
   e.style.display = 'flex';
 }
 
+// ════════════════════════════════════════════════════
+//  [PROFIL] Platform kimlik adapteri  — ADIM 5a
+// ════════════════════════════════════════════════════
+// SOZLESME
+//   profilAl()    -> { ad, avatar, kaynak }   SENKRON, asla null donmez
+//   profilYukle() -> Promise<{ ad, avatar, kaynak }>  platformu BIR KEZ sorar
+//
+//   kaynak: 'crazygames' | 'yandex' | 'pixidus' | 'guest'
+//           'guest' = platform kimlik vermedi VEYA oyuncu giris yapmamis
+//
+// KURALLAR
+//   * Platformun VERMEDIGI hicbir alan uydurulmaz.
+//   * Gercek ad, e-posta, IP veya baska ozel bilgi ISTENMEZ ve TUTULMAZ.
+//     Yalnizca platformun herkese acik gosterim adi ve avatar URL'si.
+//   * Yeni SDK YUKLENMEZ; yalnizca sayfada ZATEN varsa kullanilir.
+//   * Her cagri try/catch icinde; hata guvenli varsayilana duser.
+
+// Varsayilan avatar: GOMULU SVG (dis istek YOK, izleme YOK).
+const PROFIL_VARSAYILAN_AVATAR =
+  'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">' +
+    '<rect width="64" height="64" rx="32" fill="#2a1230"/>' +
+    '<circle cx="32" cy="25" r="11" fill="#ff8800" opacity="0.75"/>' +
+    '<path d="M12 60c0-11 9-19 20-19s20 8 20 19z" fill="#ff8800" opacity="0.75"/>' +
+    '</svg>');
+
+function profilVarsayilan(){
+  return { ad: t('profile.guest'), avatar: PROFIL_VARSAYILAN_AVATAR, kaynak: 'guest' };
+}
+
+// Adapterden gelen ham veriyi TEMIZLER. Eksik/bozuk alan -> varsayilan.
+// Avatar yalnizca https: veya data: ile baslayabilir (javascript: engellenir).
+function profilNormalize(ham, kaynak){
+  const v = profilVarsayilan();
+  if(!ham || typeof ham !== 'object') return v;
+  let ad = (typeof ham.ad === 'string') ? ham.ad.trim() : '';
+  // Platform bazen bos string veya 'null' doner; bunlar veri SAYILMAZ.
+  if(!ad || ad.toLowerCase() === 'null' || ad.toLowerCase() === 'undefined') return v;
+  if(ad.length > 24) ad = ad.slice(0, 24);
+  let avatar = (typeof ham.avatar === 'string') ? ham.avatar.trim() : '';
+  if(!/^(https:\/\/|data:image\/)/i.test(avatar)) avatar = PROFIL_VARSAYILAN_AVATAR;
+  return { ad: ad, avatar: avatar, kaynak: kaynak || 'guest' };
+}
+
+const PROFIL = {
+  _adapterler: {},
+  _onbellek: null,
+  _sozu: null,
+  // AD.register ile AYNI kalip.
+  register: function(id, uygulama){ if(id) this._adapterler[id] = uygulama || {}; },
+  _aktif: function(){
+    let p = 'web';
+    try{ p = (typeof AD !== 'undefined' && AD.platform) ? AD.platform() : 'web'; }catch(e){}
+    return this._adapterler[p] || null;
+  }
+};
+
+// SENKRON: UI bunu cagirir, ASLA beklemez.
+function profilAl(){
+  return PROFIL._onbellek ? PROFIL._onbellek : profilVarsayilan();
+}
+
+// ASENKRON: platformu BIR KEZ sorar, onbellegi doldurur.
+function profilYukle(){
+  if(PROFIL._sozu) return PROFIL._sozu;
+  PROFIL._sozu = new Promise(function(coz){
+    const a = PROFIL._aktif();
+    let kaynak = 'guest';
+    try{ kaynak = (typeof AD !== 'undefined' && AD.platform) ? AD.platform() : 'web'; }catch(e){}
+    if(!a || typeof a.getir !== 'function'){
+      PROFIL._onbellek = profilVarsayilan();
+      return coz(PROFIL._onbellek);
+    }
+    let sonuc;
+    try{ sonuc = a.getir(); }catch(e){ sonuc = null; }
+    Promise.resolve(sonuc)
+      .then(function(ham){ PROFIL._onbellek = profilNormalize(ham, kaynak); coz(PROFIL._onbellek); })
+      .catch(function(){ PROFIL._onbellek = profilVarsayilan(); coz(PROFIL._onbellek); });
+  });
+  return PROFIL._sozu;
+}
+
+// ── CRAZYGAMES ─────────────────────────────────────
+// Resmi SDK v3: CG_SDK.user.getUser() -> { username, profilePictureUrl }
+// Oyuncu giris yapmamissa null doner; o durumda guvenli varsayilana duseriz.
+// SDK YUKLENMEZ: yalnizca cgReady true ise (CrazyGames ortami) kullanilir.
+PROFIL.register('crazygames', {
+  getir: function(){
+    try{
+      if(typeof cgReady === 'undefined' || cgReady !== true) return null;
+      if(typeof CG_SDK === 'undefined' || !CG_SDK) return null;
+      const u = CG_SDK.user;
+      if(!u || typeof u.getUser !== 'function') return null;
+      return Promise.resolve(u.getUser()).then(function(k){
+        if(!k) return null;                       // giris yapilmamis
+        return { ad: k.username, avatar: k.profilePictureUrl };
+      }).catch(function(){ return null; });
+    }catch(e){ return null; }
+  }
+});
+
+// ── YANDEX ───────────────────────────────────────────
+// Resmi SDK: ysdk.getPlayer() -> player.getName() / player.getPhoto('medium')
+// Oyuncu yetkilendirmemisse SDK hata firlatir veya bos doner -> varsayilan.
+// KISISEL VERI ISTENMEZ: getPlayer varsayilan (scopes'suz) cagrilir.
+PROFIL.register('yandex', {
+  getir: function(){
+    try{
+      const y = (typeof _ysdk !== 'undefined') ? _ysdk : null;
+      if(!y || typeof y.getPlayer !== 'function') return null;
+      return Promise.resolve(y.getPlayer()).then(function(p){
+        if(!p) return null;
+        let ad = '', foto = '';
+        try{ ad = (typeof p.getName === 'function') ? p.getName() : ''; }catch(e){}
+        try{ foto = (typeof p.getPhoto === 'function') ? p.getPhoto('medium') : ''; }catch(e){}
+        if(!ad) return null;                      // yetkilendirilmemis
+        return { ad: ad, avatar: foto };
+      }).catch(function(){ return null; });
+    }catch(e){ return null; }
+  }
+});
+
+// ── PIXIDUS ─────────────────────────────────────────
+// Kimlik API'sinin bicimi hakkinda kamuya acik dokuman BULUNAMADI.
+// TAHMIN EDILMEZ: dal kayitli ama null doner (guvenli varsayilan).
+// Dokuman geldiginde YALNIZCA asagidaki govde doldurulacak; baska hicbir
+// yer degismeyecek.
+PROFIL.register('pixidus', {
+  getir: function(){ return null; }
+});
+
+// ── ANDROID / WEB / UNKNOWN ───────────────────────────
+// Hesap sistemi YOKTUR -> her zaman guvenli varsayilan.
+// (Facebook dali BILEREK yok: bu depoda Facebook entegrasyonu bulunmuyor.)
+PROFIL.register('android', { getir: function(){ return null; } });
+PROFIL.register('web',     { getir: function(){ return null; } });
+PROFIL.register('unknown', { getir: function(){ return null; } });
+
+// ── [PROFIL 5b] HUD kimlik satiri ─────────────────────────
+// KENDI panelim: profilAl() -> platform gercek veri verdiyse onu kullanir.
+// RAKIP paneli : ad protokolden gelir (gercek); avatar ve platform kaynagi
+//   KABLODAN GELMEZ, bu yuzden varsayilan avatar + 'misafir' rozeti
+//   gosterilir. Rakibin platform kimligi UYDURULMAZ.
+const PROFIL_ROZET = {
+  crazygames: 'profile.badgeCG',
+  yandex:     'profile.badgeYA',
+  pixidus:    'profile.badgePX',
+  guest:      'profile.badgeGuest'
+};
+function ghKimlikCiz(pid, profil, benMiyim){
+  const kap = document.getElementById(pid + '-kimlik');
+  const im  = document.getElementById(pid + '-avatar');
+  const rz  = document.getElementById(pid + '-rozet');
+  if(!kap || !im || !rz) return;
+  const p = profil || profilVarsayilan();
+  // Avatar yuklenemezse (CDN kapali, 404) sessizce varsayilana dus.
+  im.onerror = function(){ this.onerror = null; this.src = PROFIL_VARSAYILAN_AVATAR; };
+  im.src = p.avatar || PROFIL_VARSAYILAN_AVATAR;
+  const platformVar = (p.kaynak && p.kaynak !== 'guest');
+  rz.textContent = t(PROFIL_ROZET[p.kaynak] || 'profile.badgeGuest');
+  rz.className = 'gh-rozet' + (platformVar ? ' platform' : '');
+  // Kendi panelimde adi da platform verisiyle guncelle; rakibinkine
+  // DOKUNMA (onun adi protokolden gelir).
+  if(benMiyim && platformVar && p.ad){
+    const n = document.querySelector('#' + pid + ' .gh-name');
+    if(n) n.textContent = p.ad;
+  }
+}
+// Online macta iki paneli de tazeler. G.mySlot hangi panelin BEN oldugunu
+// soyler (slot 0 -> ghp1, slot 1 -> ghp2).
+function ghKimlikTazele(){
+  const p1 = document.getElementById('ghp1'), p2 = document.getElementById('ghp2');
+  if(!p1 || !p2) return;
+  const online = !!(typeof G !== 'undefined' && G && G.onlineMode);
+  p1.classList.toggle('online', online);
+  p2.classList.toggle('online', online);
+  if(!online){ p1.classList.remove('rakip'); p2.classList.remove('rakip'); return; }
+  let benimSlotum = 0;
+  try{ benimSlotum = (typeof G.mySlot === 'number') ? G.mySlot : 0; }catch(e){}
+  const benimPid  = benimSlotum === 1 ? 'ghp2' : 'ghp1';
+  const rakipPid  = benimSlotum === 1 ? 'ghp1' : 'ghp2';
+  // [5b] '.rakip' sinifi chat yer tutucusunun HANGI panelde gorunecegini belirler.
+  const bp = document.getElementById(benimPid), rp = document.getElementById(rakipPid);
+  if(bp) bp.classList.remove('rakip');
+  if(rp) rp.classList.add('rakip');
+  ghKimlikCiz(benimPid, profilAl(), true);
+  // Rakip icin elimizde YALNIZCA ad var; avatar/kaynak yok -> varsayilan.
+  ghKimlikCiz(rakipPid, profilVarsayilan(), false);
+}
+
 // ── [SOSYAL] Platform duyarli iletisim panelinin cizimi ─────────
 // disLinkVerilebilirMi() true ise <a>, degilse YALNIZCA metin dugumu
 // uretilir. Yandex/Pixidus/unknown'da DOM'da hicbir <a> bulunmaz.
@@ -4672,9 +4991,9 @@ function colSatir(k){
   const et = document.createElement('div'); et.className = 'col-etiket';
   const nd = document.createElement('span'); nd.className = 'col-nadir';
   nd.style.color = CUE_NADIR_RENK[m.nadir] || '#9aa0a6';
-  nd.appendChild(document.createTextNode(m.nadir || ''));
+  nd.appendChild(document.createTextNode(m.nadir ? t('rar.' + m.nadir) : ''));
   et.appendChild(nd);
-  et.appendChild(document.createTextNode('  ·  ' + (m.kat || '')));
+  et.appendChild(document.createTextNode('  ·  ' + (m.kat ? t('cat.' + m.kat) : '')));
   if(grup === 1) et.appendChild(document.createTextNode('  ·  ' + denemeKalanMetin()));
   orta.appendChild(et);
   d.appendChild(orta);
@@ -4708,7 +5027,7 @@ function colKatlariCiz(){
   ['ALL'].concat(CUE_KATEGORI).forEach(function(kat){
     const b = document.createElement('button');
     b.className = 'col-kat' + (COL_DURUM.kat===kat ? ' secili' : '');
-    b.appendChild(document.createTextNode(kat === 'ALL' ? t('col.all') : kat));
+    b.appendChild(document.createTextNode(kat === 'ALL' ? t('col.all') : t('cat.' + kat)));
     b.onclick = function(){ COL_DURUM.kat = kat; COL_DURUM.sayfa = 1; renderCollection(); };
     kok.appendChild(b);
   });
@@ -8515,8 +8834,15 @@ function chatKur(){
   const ac = document.getElementById('menu-adcoin');
   if(ac) ac.onclick = reklamCoinIste;
   try{ reklamCoinTazele(); }catch(e){}
+  // [PROFIL] Platform kimligini bir kez sor (UI beklemez).
+  try{ profilYukle(); }catch(e){}
   // [SOSYAL] Panel ilk cizim (platform politikasina gore).
   sosyalPaneliCiz();
+  // [YASAL] Uc kisayol, ilgili sekmeyi dogrudan acar.
+  [['menu-privacy','privacy'],['menu-terms','terms'],['menu-credits','credits']].forEach(function(p){
+    const b = document.getElementById(p[0]);
+    if(b) b.onclick = function(){ legalAc(p[1]); };
+  });
   // [SAHIPLIK] Aktarma penceresi.
   const xb = document.getElementById('menu-xfer');
   if(xb) xb.onclick = xferAc;
@@ -8721,7 +9047,7 @@ if(document.readyState === 'loading'){
 
 <div id="screen-credits" style="position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(4,0,10,0.88);">
   <div style="max-width:420px;width:88%;background:var(--pn);border:1px solid rgba(255,136,0,0.3);border-radius:10px;padding:20px;box-shadow:0 0 40px rgba(255,80,0,0.25);">
-    <div style="font-family:'Cinzel Decorative',serif;font-size:0.95rem;letter-spacing:3px;color:var(--gd);margin-bottom:14px;">CREDITS</div>
+    <div style="font-family:'Cinzel Decorative',serif;font-size:0.95rem;letter-spacing:3px;color:var(--gd);margin-bottom:14px;" data-i18n="cr.title">CREDITS</div>
     <!-- [YASAL] Sekme cubugu. Kredi icerigi ilk sekmede AYNEN kalir. -->
     <div id="legal-sek">
       <button class="legal-sek-b sel" type="button" id="legal-sek-credits" data-i18n="legal.tabCredits">CREDITS</button>
@@ -8731,15 +9057,15 @@ if(document.readyState === 'loading'){
     <div id="legal-pano-credits">
 
     <div style="font-size:0.78rem;line-height:1.6;color:rgba(255,255,255,0.85);">
-      <div style="color:var(--em);letter-spacing:1px;font-weight:700;margin-bottom:4px;">3D BILLIARD BALLS</div>
-      <div>by <strong>Yanez Designs</strong></div>
-      <div>Source: <a href="https://sketchfab.com/3d-models/billiard-balls-523ac862d2154a7e8c96b964fb7cb11f" target="_blank" rel="noopener noreferrer" style="color:var(--cn);">Sketchfab</a></div>
-      <div>License: Creative Commons Attribution (CC BY)</div>
-      <div style="color:rgba(255,255,255,0.45);font-size:0.68rem;margin-top:6px;">Model adapted for this game (scale, orientation, rack layout). Attribution retained.</div>
+      <div style="color:var(--em);letter-spacing:1px;font-weight:700;margin-bottom:4px;" data-i18n="cr.balls">3D BILLIARD BALLS</div>
+      <div><span data-i18n="cr.by">by</span> <strong>Yanez Designs</strong></div>
+      <div><span data-i18n="cr.source">Source:</span> <a href="https://sketchfab.com/3d-models/billiard-balls-523ac862d2154a7e8c96b964fb7cb11f" target="_blank" rel="noopener noreferrer" style="color:var(--cn);">Sketchfab</a></div>
+      <div><span data-i18n="cr.license">License:</span> Creative Commons Attribution (CC BY)</div>
+      <div style="color:rgba(255,255,255,0.45);font-size:0.68rem;margin-top:6px;" data-i18n="cr.adapted">Model adapted for this game (scale, orientation, rack layout). Attribution retained.</div>
     </div>
 
     <div style="margin-top:16px;font-size:0.78rem;line-height:1.6;color:rgba(255,255,255,0.85);">
-      <div style="color:var(--em);letter-spacing:1px;font-weight:700;margin-bottom:4px;">RENDERING</div>
+      <div style="color:var(--em);letter-spacing:1px;font-weight:700;margin-bottom:4px;" data-i18n="cr.rendering">RENDERING</div>
       <div>three.js &mdash; MIT License</div>
     </div>
 
@@ -8756,7 +9082,7 @@ if(document.readyState === 'loading'){
     </div>
 
     <button onclick="document.getElementById('screen-credits').style.display='none'"
-      style="margin-top:20px;width:100%;padding:10px;font-family:'Cinzel Decorative',serif;font-size:0.72rem;letter-spacing:2px;background:linear-gradient(135deg,#7a2200,#3a1000);border:1px solid rgba(255,136,0,0.4);color:#fff;border-radius:6px;cursor:pointer;">CLOSE</button>
+      style="margin-top:20px;width:100%;padding:10px;font-family:'Cinzel Decorative',serif;font-size:0.72rem;letter-spacing:2px;background:linear-gradient(135deg,#7a2200,#3a1000);border:1px solid rgba(255,136,0,0.4);color:#fff;border-radius:6px;cursor:pointer;" data-i18n="common.close">CLOSE</button>
   </div>
 </div>
 
