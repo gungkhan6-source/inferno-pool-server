@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+<!-- [PLATFORM] CrazyGames SDK burada YUKLENMEZ. Kosullu ve dinamik
+     olarak yalnizca CrazyGames ortaminda yuklenir; bkz. cgSdkYukle().
+     Sebep: Yandex kural 4.1 (ucuncu taraf reklam SDK yok) ve diger
+     platformlarda gereksiz dis istek olusmamasi. -->
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>INFERNO POOL</title>
 <style>
@@ -260,6 +263,86 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dk);font-famil
   background-position:center;background-color:rgba(0,0,0,0.55);transition:all 0.2s;flex-shrink:0;position:relative;}
 .skin-th:hover{border-color:rgba(255,150,0,0.45);transform:scale(1.06);}
 .skin-th.active{border-color:#ffcc00;box-shadow:0 0 9px rgba(255,200,0,0.5);}
+/* [SAHIPLIK] Aktarma kodu penceresi. */
+#screen-xfer{position:fixed;inset:0;z-index:70;display:none;align-items:center;
+  justify-content:center;background:rgba(4,0,10,0.9);}
+#xfer-kutu{max-width:400px;width:90%;background:var(--pn);border:1px solid rgba(255,150,0,0.4);
+  border-radius:10px;padding:20px;box-shadow:0 0 40px rgba(255,120,0,0.25);}
+#xfer-baslik{font-family:'Cinzel Decorative',serif;font-size:0.86rem;letter-spacing:2px;
+  color:var(--gd);margin-bottom:10px;}
+.xfer-aciklama{font-size:0.68rem;line-height:1.55;color:rgba(255,255,255,0.6);margin-bottom:12px;}
+.xfer-etiket{font-size:0.64rem;letter-spacing:1px;color:var(--em);margin-bottom:5px;}
+#xfer-kod{width:100%;padding:10px;border-radius:6px;font-family:ui-monospace,Consolas,monospace;
+  font-size:0.78rem;letter-spacing:1.5px;text-align:center;word-break:break-all;
+  background:rgba(0,0,0,0.4);border:1px solid rgba(255,170,0,0.3);color:#ffcc66;
+  user-select:all;-webkit-user-select:all;margin-bottom:8px;}
+#xfer-giris{width:100%;padding:9px;border-radius:6px;font-family:ui-monospace,Consolas,monospace;
+  font-size:0.72rem;letter-spacing:1px;text-align:center;text-transform:uppercase;
+  background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);color:#fff;
+  margin-bottom:8px;}
+#xfer-giris::placeholder{color:rgba(255,255,255,0.25);letter-spacing:1px;}
+.xfer-ayrac{height:1px;background:rgba(255,255,255,0.09);margin:14px 0 12px;}
+.xfer-btnler{display:flex;gap:8px;}
+.xfer-btnler button{flex:1;padding:9px 6px;border-radius:6px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.64rem;letter-spacing:1.4px;font-weight:600;}
+#xfer-kopyala,#xfer-geriyukle{background:rgba(255,150,0,0.16);border:1px solid rgba(255,170,0,0.42);color:#ffcc66;}
+#xfer-kapat{background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);}
+#xfer-sonuc{font-size:0.68rem;line-height:1.5;margin-top:10px;min-height:1.2em;color:rgba(255,255,255,0.75);}
+#xfer-sonuc.hata{color:#ff9a7a;} #xfer-sonuc.iyi{color:#7ce6b0;}
+@media (max-height:560px){
+  #xfer-kutu{padding:13px;} #xfer-baslik{font-size:0.72rem;margin-bottom:7px;}
+  .xfer-aciklama{font-size:0.58rem;margin-bottom:8px;} #xfer-kod{font-size:0.64rem;padding:7px;}
+  #xfer-giris{font-size:0.62rem;padding:7px;} .xfer-btnler button{font-size:0.56rem;padding:7px 4px;}
+  .xfer-ayrac{margin:9px 0 8px;}
+}
+/* [SIFIRLA] Yerel veri silme onay penceresi. */
+#screen-reset{position:fixed;inset:0;z-index:70;display:none;align-items:center;
+  justify-content:center;background:rgba(4,0,10,0.9);}
+#reset-kutu{max-width:380px;width:88%;background:var(--pn);border:1px solid rgba(255,80,0,0.45);
+  border-radius:10px;padding:20px;box-shadow:0 0 40px rgba(255,60,0,0.3);}
+#reset-baslik{font-family:'Cinzel Decorative',serif;font-size:0.88rem;letter-spacing:2px;
+  color:#ff8866;margin-bottom:12px;}
+.reset-uyari{font-size:0.72rem;line-height:1.6;color:rgba(255,255,255,0.78);margin-bottom:10px;}
+.reset-liste{font-size:0.68rem;line-height:1.6;color:rgba(255,255,255,0.55);
+  margin:0 0 12px 16px;padding:0;}
+.reset-liste li{margin-bottom:3px;}
+.reset-kalici{font-size:0.7rem;color:#ffb08a;background:rgba(255,60,0,0.12);
+  border:1px solid rgba(255,90,0,0.4);border-radius:6px;padding:8px 10px;margin-bottom:14px;}
+.reset-btnler{display:flex;gap:8px;}
+.reset-btnler button{flex:1;padding:10px 6px;border-radius:6px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.66rem;letter-spacing:1.5px;font-weight:600;}
+#reset-iptal{background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);}
+#reset-onay{background:linear-gradient(135deg,#8a2200,#4a1000);border:1px solid rgba(255,80,0,0.5);color:#ffd0bb;}
+#reset-onay[disabled]{opacity:0.45;cursor:not-allowed;}
+@media (max-height:560px){
+  #reset-kutu{padding:14px;} #reset-baslik{font-size:0.74rem;margin-bottom:8px;}
+  .reset-uyari{font-size:0.62rem;margin-bottom:7px;} .reset-liste{font-size:0.58rem;}
+  .reset-kalici{font-size:0.6rem;padding:6px 8px;margin-bottom:10px;}
+  .reset-btnler button{font-size:0.58rem;padding:8px 4px;}
+}
+/* [YASAL] Sekmeli yasal merkez. Mevcut kredi icerigi ilk sekmede
+   AYNEN durur; iki yeni sekme Gizlilik ve Sartlar metnini OYUN ICINDE
+   gosterir (Yandex 3.5: belgeler oyun icinde metin olarak bulunmali). */
+#legal-sek{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+.legal-sek-b{flex:1;min-width:0;padding:7px 4px;border-radius:6px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.6rem;letter-spacing:1.4px;font-weight:600;
+  background:rgba(255,120,0,0.06);border:1px solid rgba(255,150,0,0.22);
+  color:rgba(255,200,140,0.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.legal-sek-b.sel{background:rgba(255,100,0,0.2);border-color:var(--em);color:#fff;}
+.legal-pano{max-height:52vh;overflow-y:auto;padding-right:4px;
+  scrollbar-width:thin;scrollbar-color:rgba(255,100,0,0.25) transparent;}
+.legal-sat{font-size:0.72rem;line-height:1.6;color:rgba(255,255,255,0.75);margin-bottom:7px;
+  padding-left:12px;position:relative;}
+.legal-sat::before{content:'\25B8';position:absolute;left:0;color:var(--em);opacity:0.75;}
+.legal-vur{color:#ffd9a8;font-weight:600;}
+.legal-alt{margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);
+  font-size:0.62rem;color:rgba(255,255,255,0.4);}
+.legal-alt a{color:#7ec8ff;text-decoration:none;border-bottom:1px solid rgba(126,200,255,0.35);}
+@media (max-height:560px){
+  .legal-pano{max-height:44vh;}
+  .legal-sat{font-size:0.62rem;line-height:1.45;margin-bottom:5px;}
+  .legal-sek-b{font-size:0.52rem;padding:5px 3px;letter-spacing:1px;}
+}
 /* [KARSILAMA + RADYO] Mesaj akisinin USTUNDE statik panel. Akisin icinde
    DEGILDIR: chatKirp/chatAkisBosalt bu bloga dokunamaz, mesaj sayilmaz. */
 #chat-hos{flex:none;margin:0 14px 8px;padding:10px 12px;border-radius:8px;
@@ -268,6 +351,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dk);font-famil
   padding:2px 7px;border-radius:9px;margin-bottom:6px;
   background:rgba(255,170,0,0.16);border:1px solid rgba(255,170,0,0.38);color:#ffc861;}
 .chat-hos-satir{font-size:0.72rem;line-height:1.5;color:rgba(255,255,255,0.72);margin-bottom:3px;}
+.chat-sos-ad{color:#ffcc99;font-weight:600;}
 .chat-hos-satir a{color:#7ec8ff;text-decoration:none;border-bottom:1px solid rgba(126,200,255,0.35);}
 .chat-hos-satir a:hover{color:#a9dcff;}
 #chat-radyo{display:flex;align-items:center;gap:9px;margin-top:9px;padding-top:8px;
@@ -402,7 +486,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dk);font-famil
 .over-btn.sc{background:transparent;border-color:rgba(255,255,255,0.18);color:rgba(255,255,255,0.45);}
 .over-btn:hover{transform:scale(1.04);}
 </style>
-<!-- Firebase SDK (loaded from CDN, no install needed) -->
+<!-- [TEMIZLIK] Firebase SDK YUKLENMIYOR. Bu satirda vaktiyle CDN script
+     etiketleri vardi; kaldirilmislar. Yorum da yaniltici oldugu icin
+     guncellendi. -->
 
 </head>
 <body>
@@ -470,7 +556,11 @@ font-family:sans-serif;
         <button class="shop-btn" id="menu-shop" data-i18n="menu.shop">🎁 SHOP</button>
       </div>
       <button id="menu-challenge" onclick="var r='INF-'+Math.random().toString(36).substr(2,6).toUpperCase();var m=document.getElementById('screen-challenge');var l=document.getElementById('invite-link');var s=document.getElementById('invite-status');if(m)m.style.display='flex';if(l)l.textContent=location.href.split('?')[0]+'?room='+r;if(s)s.textContent='Send the link to your friend!';setTimeout(function(){if(window.onChallengeModalOpen)onChallengeModalOpen(r);},200);" style="width:100%;padding:11px;font-family:'Cinzel Decorative',serif;font-size:0.75rem;letter-spacing:2px;background:linear-gradient(135deg,#550099,#330066);border:1px solid rgba(150,0,255,0.4);color:#fff;border-radius:6px;cursor:pointer;box-shadow:0 0 14px rgba(100,0,255,0.3);margin-bottom:8px;transition:all 0.2s;" data-i18n="menu.invite">⚔ INVITE FRIEND</button>
-      <button id="menu-credits" onclick="document.getElementById('screen-credits').style.display='flex'" style="width:100%;padding:7px;font-family:'Rajdhani',sans-serif;font-size:0.62rem;letter-spacing:2px;background:transparent;border:1px solid rgba(255,136,0,0.22);color:rgba(255,200,140,0.75);border-radius:6px;cursor:pointer;" data-i18n="menu.credits">CREDITS</button>
+      <button id="menu-credits" onclick="legalAc('credits')" style="width:100%;padding:7px;font-family:'Rajdhani',sans-serif;font-size:0.62rem;letter-spacing:2px;background:transparent;border:1px solid rgba(255,136,0,0.22);color:rgba(255,200,140,0.75);border-radius:6px;cursor:pointer;" data-i18n="menu.credits">CREDITS</button>
+      <!-- [SIFIRLA] Veri silme hakki. Yalnizca menude gorunur. -->
+      <button id="menu-reset" type="button" style="width:100%;padding:7px;font-family:'Rajdhani',sans-serif;font-size:0.62rem;letter-spacing:2px;background:transparent;border:1px solid rgba(255,80,0,0.22);color:rgba(255,150,120,0.7);border-radius:6px;cursor:pointer;margin-top:5px;" data-i18n="reset.button">RESET MY LOCAL DATA</button>
+      <!-- [SAHIPLIK] Istaka aktarma. Hesap/e-posta gerektirmez. -->
+      <button id="menu-xfer" type="button" style="width:100%;padding:7px;font-family:'Rajdhani',sans-serif;font-size:0.62rem;letter-spacing:2px;background:transparent;border:1px solid rgba(255,170,0,0.22);color:rgba(255,200,140,0.75);border-radius:6px;cursor:pointer;margin-top:5px;" data-i18n="xfer.button">TRANSFER MY CUES</button>
         <!-- [ASAMA 4] Chat butonu. screen-menu ICINDE oldugu icin yalnizca
              menu ekrani aktifken gorunur; mac sirasinda DOM'da gorunmez.
              chatAc() ayrica G.phase kontrolu yapar (menu / over). -->
@@ -486,6 +576,9 @@ font-family:sans-serif;
       <!-- [KOLEKSIYON V2] -->
       <button id="menu-collection" data-i18n="col.button">🎴 MY CUES</button>
       <button id="menu-free" data-i18n="col.free">🎁 FREE CUE</button>
+      <!-- [EKONOMI] Odullu reklam -> jeton. Reklam gercekten
+           kullanilabilir DEGILSE gizlenir; oyun akisi etkilenmez. -->
+      <button id="menu-adcoin" type="button" style="display:none">🎬</button>
       <!-- [ETKINLIK] Yalnizca aktif sezon varken gorunur; refreshMenu() ayarlar. -->
       <button id="menu-event" style="display:none" data-i18n="event.button">🎯 EVENT</button>
       <button id="menu-online" onclick="startOnlineMode()" data-i18n="menu.playOnline">🌐 PLAY ONLINE</button>
@@ -970,8 +1063,57 @@ const el=id=>document.getElementById(id);
 
 let CG_SDK = null;
 let cgReady = false;
+
+// [PLATFORM] CrazyGames ortam tespiti. window.CrazyGames'e BAKMAZ: SDK
+// henuz yuklenmemis olabilir ve zaten "SDK var mi" sorusu ortami
+// belirlemez. Sirasiyla: acik override -> kendi alan adi -> iframe ust
+// kaynagi -> referrer.
+const CG_ALAN = /(^|\.)(crazygames\.[a-z.]{2,6}|cg-games\.com|1001juegos\.com)$/i;
+function _cgOrtamiMi(){
+  try{
+    if(typeof window.INFERNO_PLATFORM === 'string' && window.INFERNO_PLATFORM){
+      return window.INFERNO_PLATFORM === 'crazygames';
+    }
+    if(CG_ALAN.test((location.hostname || '').toLowerCase())) return true;
+    // Oyun iframe icinde sunuluyorsa ust kaynagi kontrol et.
+    try{
+      const ust = location.ancestorOrigins;
+      if(ust && ust.length){
+        for(let i = 0; i < ust.length; i++){
+          try{ if(CG_ALAN.test(new URL(ust[i]).hostname)) return true; }catch(e){}
+        }
+      }
+    }catch(e){}
+    if(document.referrer){
+      try{ if(CG_ALAN.test(new URL(document.referrer).hostname)) return true; }catch(e){}
+    }
+  }catch(e){}
+  return false;
+}
+
+// SDK'yi YALNIZCA CrazyGames ortaminda ve YALNIZCA BIR KEZ yukler.
+let _cgYuklemeSozu = null;
+function cgSdkYukle(){
+  if(_cgYuklemeSozu) return _cgYuklemeSozu;
+  _cgYuklemeSozu = new Promise(function(coz){
+    if(!_cgOrtamiMi()) return coz(false);
+    if(window.CrazyGames) return coz(true);          // zaten varsa tekrar yukleme
+    try{
+      const s = document.createElement('script');
+      s.src = 'https://sdk.crazygames.com/crazygames-sdk-v3.js';
+      s.async = true;
+      s.onload  = function(){ coz(true); };
+      s.onerror = function(){ coz(false); };         // basarisizlik OYUNU DURDURMAZ
+      document.head.appendChild(s);
+    }catch(e){ coz(false); }
+  });
+  return _cgYuklemeSozu;
+}
+
 async function initCrazyGames() {
   try {
+    const yuklendi = await cgSdkYukle();
+    if (!yuklendi) return;
     CG_SDK = window.CrazyGames?.SDK;
     if (!CG_SDK) return;
     await CG_SDK.init();
@@ -999,17 +1141,13 @@ function cgGameplayStop() {
 initCrazyGames();
 
 
-// ═══════════════════════════════════════════════════════════
-//  FIREBASE CONFIG — paste your config here after setup
-// ═══════════════════════════════════════════════════════════
-const FIREBASE_CONFIG = {
-  apiKey:            "AIzaSyCna0b0Bo174FIKX_w8c3Cm7LBOAI2pL9U",
-  authDomain:        "inferno-pool.firebaseapp.com",
-  projectId:         "inferno-pool",
-  storageBucket:     "inferno-pool.firebasestorage.app",
-  messagingSenderId: "470161023849",
-  appId:             "1:470161023849:web:2949cd0dac7978794dd3f8"
-};
+// [TEMIZLIK] FIREBASE CONFIG KALDIRILDI.
+// Firebase bu derlemede kullanilmiyor: SDK yuklenmiyor, FB_READY sabit
+// false, tum fb* fonksiyonlari no-op, calisma zamaninda window.firebase
+// undefined. Nesne hicbir yerde KULLANILMIYORDU ama gercek bir apiKey
+// iceriyordu ve bu dosya herkese acik sunuluyor.
+// Firebase ileride gercekten kullanilirsa: anahtar burada DEGIL sunucu
+// tarafinda tutulmali ve Firebase Console'dan alan adi kisiti konmalidir.
 
 // ── WebSocket Online Sistemi ──
 let WS = null;
@@ -1968,6 +2106,9 @@ function denemeBitir(){
 }
 // Deneme edilen istakayi KALICI satin alma (madde 6)
 function denemeSatinAl(k){
+  // [SAHIPLIK] Zaten sahip olunan istaka icin jeton DUSMEZ ve ikinci
+  // kayit EKLENMEZ (evOdulVer'deki korumanin aynisi).
+  if(P.owned.indexOf(k) >= 0) return false;
   const m = cueMeta(k);
   if(!m || m.fiyat == null || P.coins < m.fiyat) return false;
   P.coins -= m.fiyat; P.owned.push(k);
@@ -2481,6 +2622,64 @@ en: {
   'radio.live':'On air',
   'radio.soonToast':'📻 Inferno Radio is coming soon!',
   'radio.err':'📻 Radio could not start.',
+  'coin.button':'🎬 WATCH AD → +{n} COINS',
+  'coin.ok':'💰 +{n} coins added!',
+  'coin.fail':'Ad could not be shown. No coins were given.',
+  'coin.limit':'Daily ad limit reached. Coins are also earned from matches.',
+  'coin.left':'{n} left today',
+  'xfer.button':'🎴 TRANSFER MY CUES',
+  'xfer.title':'TRANSFER MY CUES',
+  'xfer.myCodeLbl':'Your code — write it down:',
+  'xfer.desc':'This code carries ONLY your cues. It does not carry coins, XP or level.',
+  'xfer.copy':'COPY',
+  'xfer.copied':'Code copied.',
+  'xfer.restoreLbl':'Have a code? Paste it here:',
+  'xfer.placeholder':'XXXX-XXXX-XXXX-…',
+  'xfer.restore':'RESTORE',
+  'xfer.ok':'✅ {n} cue restored.',
+  'xfer.already':'All cues in that code are already yours.',
+  'xfer.bad':'❌ Invalid code. Please check it and try again.',
+  'xfer.badVersion':'❌ This code is from an incompatible game version.',
+  'xfer.empty':'Enter a code first.',
+  'reset.button':'RESET MY LOCAL DATA',
+  'reset.title':'RESET LOCAL DATA',
+  'reset.intro':'This deletes everything this game has stored on this device:',
+  'reset.i1':'Coins, XP, level and best score',
+  'reset.i2':'Owned and equipped cues, and the 24-hour trial',
+  'reset.i3':'Event quest progress',
+  'reset.i4':'Chat nickname, session and your block / mute lists',
+  'reset.i5':'Language preference and the daily rewarded-ad counter',
+  'reset.permanent':'This cannot be undone. There is no account and no backup — the data cannot be restored.',
+  'reset.confirm':'DELETE EVERYTHING',
+  'reset.confirmAgain':'TAP AGAIN TO CONFIRM',
+  'reset.done':'Local data deleted. Restarting…',
+  'legal.tabCredits':'CREDITS',
+  'legal.tabPrivacy':'PRIVACY',
+  'legal.tabTerms':'TERMS',
+  'legal.updated':'Version 1.0 · 6 September 2026',
+  'legal.full':'Read the full document',
+  'legal.contact':'Contact: see the full document.',
+  'legal.pv1':'<b>No account, no login, no e-mail.</b> We collect no advertising ID, use no analytics and no cookies.',
+  'legal.pv2':'Your progress (coins, level, cues) is stored <b>only on this device</b> and is never sent to us.',
+  'legal.pv3':'If you use chat, your nickname and messages are processed temporarily on our server and are visible to other players.',
+  'legal.pv4':'Global messages are deleted after <b>6 hours</b>, direct messages after <b>24 hours</b>.',
+  'legal.pv5':'When you report someone, the reason, both nicknames and the reported message are kept temporarily for moderators.',
+  'legal.pv6':'Your IP address is <b>never stored raw</b>. Only an irreversible short digest is computed, used solely to slow down abuse.',
+  'legal.pv7':'There is <b>no database</b>. A server restart erases all messages, reports and penalties. <b>There are no permanent bans.</b>',
+  'legal.pv8':'You can erase everything on this device with <b>Reset My Local Data</b> in the menu.',
+  'legal.pv8b':'One more item is stored locally: your daily rewarded-ad counter (<code>inferno_ads</code>).',
+  'legal.pv9':'Watching ads is never required. A reward is granted only when an ad actually completes.',
+  'legal.pv10':'This game is not directed at children under 13.',
+  'legal.tm1':'By playing you accept these terms. The game is intended for players aged <b>13 and over</b>.',
+  'legal.tm2':'Coins and cues are <b>not real money</b>. They cannot be bought, sold, transferred or cashed out.',
+  'legal.tm3':'All progress is kept <b>only on this device</b>. If you clear it, it cannot be recovered.',
+  'legal.tm4':'Watching ads is <b>never required</b>; every cue can also be bought with coins earned from matches.',
+  'legal.tm5':'Forbidden in chat: harassment, hate speech, spam, scams, inappropriate content and impersonation.',
+  'legal.tm6':'Penalties: 30 s auto-mute, moderator mute up to 60 min, 60 s kick, temporary ban up to 24 h. <b>No permanent bans.</b>',
+  'legal.tm7':'You can report, block and mute other players from inside the game.',
+  'legal.tm8':'The game is provided “as is”; online features may be interrupted.',
+  'legal.tm9':'The terms of the platform you play on also apply.',
+  'legal.tm10':'The code, design and the name “Inferno Pool” belong to the developer.',
   'col.button':'🎴 MY CUES',
   'col.free':'🎁 FREE CUE',
   'col.freeUsedShort':'🎁 USED TODAY',
@@ -2793,6 +2992,64 @@ tr: {
   'radio.live':'Yayında',
   'radio.soonToast':'📻 Inferno Radio yakında yayında!',
   'radio.err':'📻 Radyo başlatılamadı.',
+  'coin.button':'🎬 REKLAM İZLE → +{n} JETON',
+  'coin.ok':'💰 +{n} jeton eklendi!',
+  'coin.fail':'Reklam gösterilemedi. Jeton verilmedi.',
+  'coin.limit':'Günlük reklam hakkı doldu. Jetonlar maçlardan da kazanılır.',
+  'coin.left':'bugün {n} hak',
+  'xfer.button':'🎴 ISTAKALARIMI TAŞI',
+  'xfer.title':'ISTAKALARIMI TAŞI',
+  'xfer.myCodeLbl':'Kodunuz — bir yere not edin:',
+  'xfer.desc':'Bu kod YALNIZCA ıstakalarınızı taşır. Jeton, XP veya seviye taşımaz.',
+  'xfer.copy':'KOPYALA',
+  'xfer.copied':'Kod kopyalandı.',
+  'xfer.restoreLbl':'Kodunuz var mı? Buraya yapıştırın:',
+  'xfer.placeholder':'XXXX-XXXX-XXXX-…',
+  'xfer.restore':'GERİ YÜKLE',
+  'xfer.ok':'✅ {n} ıstaka geri yüklendi.',
+  'xfer.already':'Bu koddaki tüm ıstakalar zaten sizde.',
+  'xfer.bad':'❌ Geçersiz kod. Lütfen kontrol edip tekrar deneyin.',
+  'xfer.badVersion':'❌ Bu kod uyumsuz bir oyun sürümünden.',
+  'xfer.empty':'Önce bir kod girin.',
+  'reset.button':'YEREL VERİLERİMİ SIFIRLA',
+  'reset.title':'YEREL VERİYİ SIFIRLA',
+  'reset.intro':'Bu işlem, oyunun bu cihazda sakladığı her şeyi siler:',
+  'reset.i1':'Jeton, XP, seviye ve en iyi skor',
+  'reset.i2':'Sahip olunan ve kuşanılan ıstakalar, 24 saatlik deneme',
+  'reset.i3':'Etkinlik görev ilerlemesi',
+  'reset.i4':'Sohbet takma adı, oturum ve engelleme / susturma listeleriniz',
+  'reset.i5':'Dil tercihi ve günlük ödüllü reklam sayacı',
+  'reset.permanent':'Bu işlem geri alınamaz. Hesap ve yedek yoktur — veriler geri getirilemez.',
+  'reset.confirm':'HEPSİNİ SİL',
+  'reset.confirmAgain':'ONAYLAMAK İÇİN TEKRAR BASIN',
+  'reset.done':'Yerel veriler silindi. Yeniden başlatılıyor…',
+  'legal.tabCredits':'KREDİLER',
+  'legal.tabPrivacy':'GİZLİLİK',
+  'legal.tabTerms':'ŞARTLAR',
+  'legal.updated':'Sürüm 1.0 · 6 Eylül 2026',
+  'legal.full':'Belgenin tamamını oku',
+  'legal.contact':'İletişim: tam belgeye bakın.',
+  'legal.pv1':'<b>Hesap yok, giriş yok, e-posta yok.</b> Reklam kimliği toplamıyoruz, analitik ve çerez kullanmıyoruz.',
+  'legal.pv2':'İlerlemeniz (jeton, seviye, ıstakalar) <b>yalnızca bu cihazda</b> saklanır; bize gönderilmez.',
+  'legal.pv3':'Sohbeti kullanırsanız takma adınız ve mesajlarınız sunucuda geçici olarak işlenir ve diğer oyuncular tarafından görülür.',
+  'legal.pv4':'Global mesajlar <b>6 saat</b>, özel mesajlar <b>24 saat</b> sonra silinir.',
+  'legal.pv5':'Birini şikayet ettiğinizde neden, iki takma ad ve şikayet edilen mesaj moderatörler için geçici olarak tutulur.',
+  'legal.pv6':'IP adresiniz <b>ham hâliyle saklanmaz</b>. Yalnızca geri döndürülemez kısa bir özet hesaplanır; tek amacı kötüye kullanımı yavaşlatmaktır.',
+  'legal.pv7':'<b>Veritabanı yoktur.</b> Sunucu yeniden başladığında tüm mesajlar, şikayetler ve cezalar silinir. <b>Kalıcı yasak yoktur.</b>',
+  'legal.pv8':'Bu cihazdaki her şeyi menüdeki <b>Yerel Verilerimi Sıfırla</b> ile silebilirsiniz.',
+  'legal.pv8b':'Yerel olarak bir şey daha tutulur: günlük ödüllü reklam sayacınız (<code>inferno_ads</code>).',
+  'legal.pv9':'Reklam izlemek hiçbir zaman zorunlu değildir. Ödül yalnızca reklam gerçekten tamamlandığında verilir.',
+  'legal.pv10':'Bu oyun 13 yaşın altındaki çocuklara yönelik değildir.',
+  'legal.tm1':'Oynayarak bu şartları kabul edersiniz. Oyun <b>13 yaş ve üzeri</b> içindir.',
+  'legal.tm2':'Jetonlar ve ıstakalar <b>gerçek para değildir</b>. Satın alınamaz, satılamaz, devredilemez ve nakde çevrilemez.',
+  'legal.tm3':'Tüm ilerleme <b>yalnızca bu cihazda</b> tutulur. Silerseniz geri getirilemez.',
+  'legal.tm4':'Reklam izlemek <b>zorunlu değildir</b>; her ıstaka maçlardan kazanılan jetonlarla da alınabilir.',
+  'legal.tm5':'Sohbette yasak: taciz, nefret söylemi, spam, dolandırıcılık, uygunsuz içerik ve kimliğe bürünme.',
+  'legal.tm6':'Yaptırımlar: 30 sn otomatik susturma, en fazla 60 dk moderatör susturması, 60 sn kick, en fazla 24 saat geçici yasak. <b>Kalıcı yasak yoktur.</b>',
+  'legal.tm7':'Diğer oyuncuları oyun içinden şikayet edebilir, engelleyebilir ve susturabilirsiniz.',
+  'legal.tm8':'Oyun “olduğu gibi” sunulur; çevrimiçi özellikler kesintiye uğrayabilir.',
+  'legal.tm9':'Oyunu oynadığınız platformun kendi şartları da ayrıca geçerlidir.',
+  'legal.tm10':'Kod, tasarım ve “Inferno Pool” adı geliştiriciye aittir.',
   'col.button':'🎴 ISTAKALARIM',
   'col.free':'🎁 ÜCRETSİZ ISTAKA',
   'col.freeUsedShort':'🎁 BUGÜN KULLANILDI',
@@ -3091,6 +3348,64 @@ ru: {
   'radio.live':'В эфире',
   'radio.soonToast':'📻 Inferno Radio скоро в эфире!',
   'radio.err':'📻 Не удалось запустить радио.',
+  'coin.button':'🎬 СМОТРЕТЬ РЕКЛАМУ → +{n} МОНЕТ',
+  'coin.ok':'💰 +{n} монет начислено!',
+  'coin.fail':'Рекламу не удалось показать. Монеты не начислены.',
+  'coin.limit':'Дневной лимит рекламы исчерпан. Монеты также дают за матчи.',
+  'coin.left':'сегодня {n}',
+  'xfer.button':'🎴 ПЕРЕНЕСТИ КИИ',
+  'xfer.title':'ПЕРЕНЕС КИЕВ',
+  'xfer.myCodeLbl':'Ваш код — запишите его:',
+  'xfer.desc':'Код переносит ТОЛЬКО кии. Монеты, XP и уровень не переносятся.',
+  'xfer.copy':'КОПИРОВАТЬ',
+  'xfer.copied':'Код скопирован.',
+  'xfer.restoreLbl':'Есть код? Вставьте сюда:',
+  'xfer.placeholder':'XXXX-XXXX-XXXX-…',
+  'xfer.restore':'ВОССТАНОВИТЬ',
+  'xfer.ok':'✅ Восстановлено киев: {n}.',
+  'xfer.already':'Все кии из кода уже у вас.',
+  'xfer.bad':'❌ Неверный код. Проверьте и повторите.',
+  'xfer.badVersion':'❌ Код из несовместимой версии игры.',
+  'xfer.empty':'Сначала введите код.',
+  'reset.button':'СБРОСИТЬ ЛОКАЛЬНЫЕ ДАННЫЕ',
+  'reset.title':'СБРОС ЛОКАЛЬНЫХ ДАННЫХ',
+  'reset.intro':'Будет удалено всё, что игра хранит на этом устройстве:',
+  'reset.i1':'Монеты, XP, уровень и рекорд',
+  'reset.i2':'Кии и 24-часовой тест',
+  'reset.i3':'Прогресс событий',
+  'reset.i4':'Ник в чате, сессия и списки блокировки / заглушения',
+  'reset.i5':'Язык и дневной счётчик рекламы',
+  'reset.permanent':'Действие необратимо. Аккаунта и резервной копии нет — данные не восстановить.',
+  'reset.confirm':'УДАЛИТЬ ВСЁ',
+  'reset.confirmAgain':'НАЖМИТЕ ЕЩЁ РАЗ ДЛЯ ПОДТВЕРЖДЕНИЯ',
+  'reset.done':'Локальные данные удалены. Перезапуск…',
+  'legal.tabCredits':'БЛАГОДАРНОСТИ',
+  'legal.tabPrivacy':'КОНФИДЕНЦИАЛЬНОСТЬ',
+  'legal.tabTerms':'УСЛОВИЯ',
+  'legal.updated':'Версия 1.0 · 6 сентября 2026',
+  'legal.full':'Прочитать полный документ',
+  'legal.contact':'Контакты: см. полный документ.',
+  'legal.pv1':'<b>Нет аккаунта, входа и e-mail.</b> Рекламный идентификатор, аналитика и cookie не используются.',
+  'legal.pv2':'Прогресс (монеты, уровень, кии) хранится <b>только на этом устройстве</b> и не передаётся нам.',
+  'legal.pv3':'В чате ваш ник и сообщения временно обрабатываются на сервере и видны другим игрокам.',
+  'legal.pv4':'Сообщения общего чата удаляются через <b>6 часов</b>, личные — через <b>24 часа</b>.',
+  'legal.pv5':'При жалобе причина, оба ника и спорное сообщение временно сохраняются для модераторов.',
+  'legal.pv6':'IP-адрес <b>не сохраняется в исходном виде</b>. Вычисляется только необратимый короткий хэш для защиты от злоупотреблений.',
+  'legal.pv7':'<b>Базы данных нет.</b> Перезапуск сервера удаляет все сообщения, жалобы и наказания. <b>Постоянных банов нет.</b>',
+  'legal.pv8':'Всё на этом устройстве можно удалить кнопкой <b>«Сбросить мои локальные данные»</b> в меню.',
+  'legal.pv8b':'Локально хранится ещё одно: ваш дневной счётчик рекламы за награду (<code>inferno_ads</code>).',
+  'legal.pv9':'Просмотр рекламы никогда не обязателен. Награда выдаётся только при фактическом завершении ролика.',
+  'legal.pv10':'Игра не предназначена для детей младше 13 лет.',
+  'legal.tm1':'Играя, вы принимаете эти условия. Игра для игроков <b>от 13 лет</b>.',
+  'legal.tm2':'Монеты и кии — <b>не реальные деньги</b>. Их нельзя купить, продать, передать или обналичить.',
+  'legal.tm3':'Весь прогресс хранится <b>только на этом устройстве</b>. После удаления восстановить его нельзя.',
+  'legal.tm4':'Просмотр рекламы <b>не обязателен</b>; любой кий можно купить за монеты из матчей.',
+  'legal.tm5':'В чате запрещены: травля, разжигание ненависти, спам, мошенничество, неприемлемый контент и выдача себя за другого.',
+  'legal.tm6':'Санкции: автозаглушение 30 с, заглушение модератором до 60 мин, kick 60 с, временный бан до 24 ч. <b>Постоянных банов нет.</b>',
+  'legal.tm7':'Жалоба, блокировка и заглушение доступны прямо в игре.',
+  'legal.tm8':'Игра предоставляется «как есть»; онлайн-функции могут прерываться.',
+  'legal.tm9':'Дополнительно действуют условия платформы, на которой вы играете.',
+  'legal.tm10':'Код, дизайн и название «Inferno Pool» принадлежат разработчику.',
   'col.button':'🎴 МОИ КИИ',
   'col.free':'🎁 БЕСПЛАТНЫЙ КИЙ',
   'col.freeUsedShort':'🎁 ИСПОЛЬЗОВАНО',
@@ -3517,6 +3832,7 @@ selectedSkin=P.equipped||'cosmic_eclipse';
 function addXP(n){P.xp+=n;const need=P.level*300;if(P.xp>=need&&P.level<10){P.level++;P.xp-=need;toast2('LEVEL UP! '+LEVELS[P.level-1]);}saveP();refreshMenu();}
 function addCoins(n){P.coins+=n;saveP();refreshMenu();}
 function refreshMenu(){
+  try{ reklamCoinTazele(); }catch(e){}   // [EKONOMI] dugme gorunurlugu
   el('menu-coins').textContent=P.coins;
   el('shop-coins').textContent=P.coins;
   // [ASAMA 2a] 'LVL' onadi ve seviye adi artik t() uzerinden gelir.
@@ -3576,7 +3892,7 @@ function renderShop(){
   });
   refreshSkinBar();
 }
-function buyCue(id,price){if(P.coins<price)return;P.coins-=price;P.owned.push(id);P.equipped=id;selectedSkin=id;applyCueStats();saveP();renderShop();refreshMenu();toast2('PURCHASED!');sfxPU();}
+function buyCue(id,price){if(P.owned.indexOf(id)>=0)return;if(P.coins<price)return;P.coins-=price;P.owned.push(id);P.equipped=id;selectedSkin=id;applyCueStats();saveP();renderShop();refreshMenu();toast2('PURCHASED!');sfxPU();}
 function equipCue(id){P.equipped=id;selectedSkin=id;applyCueStats();saveP();renderShop();refreshSkinBar();sfxPU();}
 // [ETKINLIK] Gorev listesini cizer. Tum metinler createTextNode ile yazilir.
 function renderEvent(){
@@ -3641,6 +3957,567 @@ function toastUI(mesaj, sure){
   clearTimeout(_uiToastTmr);
   _uiToastTmr = setTimeout(function(){ e.classList.remove('show'); }, sure || 2600);
 }
+// ── [EKONOMI] Odullu reklam karsiligi jeton ───────────────────
+// YAYIN KURALLARI:
+//   * Reklam izlemek oyunun oynanmasi icin ZORUNLU DEGILDIR. Bu dugme
+//     tamamen istege baglidir; gorunmedigi durumda oyunun hicbir
+//     bolumu kilitlenmez ve her istaka maclardan kazanilan jetonla
+//     satin alinabilir.
+//   * Reklam YALNIZCA kullanici bu dugmeye basarsa istenir
+//     (AD.showRewarded, kullaniciIstedi:true).
+//   * Jeton YALNIZCA reklam TAMAMLANDIGINDA verilir. Yandex tarafinda
+//     bu, adapterdeki onRewarded callback'ine karsilik gelir; onClose
+//     odul gelmemisse shown:false doner ve odul VERILMEZ.
+//
+// DENGE SAYILARI: yayin oncesi onaylanmali.
+const REKLAM_COIN_ODULU     = 150;
+const REKLAM_COIN_GUNLUK_MAX = 5;
+const REKLAM_ANAHTAR = 'inferno_ads';
+
+function reklamSayacYukle(){
+  try{
+    const d = localStorage.getItem(REKLAM_ANAHTAR);
+    if(d){ const o = JSON.parse(d); if(o && typeof o === 'object') return o; }
+  }catch(e){}
+  return { gun:'', sayi:0 };
+}
+function reklamSayacKaydet(){
+  try{ localStorage.setItem(REKLAM_ANAHTAR, JSON.stringify(REKLAM_SAYAC)); }catch(e){}
+}
+const REKLAM_SAYAC = reklamSayacYukle();
+
+function reklamGunAnahtari(){
+  const g = _bugun();
+  return g.y + '-' + g.ay + '-' + g.gun;
+}
+// Gun degistiyse sayaci sifirla (istemci saati; sunucu dogrulamasi YOK).
+function reklamSayacTazele(){
+  const bg = reklamGunAnahtari();
+  if(REKLAM_SAYAC.gun !== bg){
+    REKLAM_SAYAC.gun = bg;
+    REKLAM_SAYAC.sayi = 0;
+    reklamSayacKaydet();
+  }
+}
+function reklamKalanHak(){
+  reklamSayacTazele();
+  return Math.max(0, REKLAM_COIN_GUNLUK_MAX - (REKLAM_SAYAC.sayi || 0));
+}
+// Dugme YALNIZCA reklam gercekten kullanilabilir VE hak kaldiysa gorunur.
+function reklamCoinGosterilsinMi(){
+  try{
+    if(typeof AD === 'undefined' || !AD || typeof AD.isAvailable !== 'function') return false;
+    if(!AD.isAvailable()) return false;
+    return reklamKalanHak() > 0;
+  }catch(e){ return false; }
+}
+function reklamCoinTazele(){
+  const b = document.getElementById('menu-adcoin');
+  if(!b) return;
+  if(!reklamCoinGosterilsinMi()){ b.style.display = 'none'; return; }
+  b.style.display = '';
+  b.textContent = t('coin.button', { n: REKLAM_COIN_ODULU }) +
+                  '  \u00b7  ' + t('coin.left', { n: reklamKalanHak() });
+}
+function reklamCoinIste(){
+  if(reklamKalanHak() <= 0){ toastUI(t('coin.limit')); reklamCoinTazele(); return; }
+  if(typeof AD === 'undefined' || !AD || typeof AD.showRewarded !== 'function'){
+    toastUI(t('coin.fail')); return;
+  }
+  const b = document.getElementById('menu-adcoin');
+  if(b) b.disabled = true;
+  AD.showRewarded({
+    kullaniciIstedi: true,          // SOZLESME: kullanici acikca istedi
+    kaynak: 'coin_reward',
+    // onReward YALNIZCA adapter shown:true dondurdugunde calisir.
+    // Yandex'te bu, onRewarded callback'i gelmis demektir.
+    onReward: function(){
+      reklamSayacTazele();
+      REKLAM_SAYAC.sayi = (REKLAM_SAYAC.sayi || 0) + 1;
+      reklamSayacKaydet();
+      addCoins(REKLAM_COIN_ODULU);
+    }
+  }).then(function(r){
+    if(b) b.disabled = false;
+    if(r && r.shown === true){ toastUI(t('coin.ok', { n: REKLAM_COIN_ODULU })); }
+    else { toastUI(t('coin.fail')); }
+    reklamCoinTazele();
+  });
+}
+
+// ════════════════════════════════════════════════════
+//  [SAHIPLIK] ISTAKA SAHIPLIGI — bitmap, aktarma kodu, guvenli birlestirme
+// ════════════════════════════════════════════════════
+//
+// TASARIM KURALLARI
+//   * localStorage'daki P.owned ID DIZISI olarak KALIR. Bitmap yalnizca
+//     disari giden (bulut / aktarma kodu) formattir. Defterde bir hata
+//     olsa bile yerel dogruluk kaynagi BOZULAMAZ.
+//   * DEFTER DONDURULMUSTUR: sira asla degismez, yeni istaka yalnizca
+//     SONA eklenir, kaldirilan indeks TEKRAR KULLANILMAZ (mezar tasi).
+//   * Sahiplik GROW-ONLY'dir (kodda hicbir yerde owned'dan silme yok).
+//     Bu yuzden birlestirme = BIRLESIM (bitsel VEYA). Tekrar yazma
+//     zararsizdir, iki cihaz cakismaz, eski cihaz yeniyi ezemez.
+
+// ── DONDURULMUS DEFTER — SIRAYI DEGISTIRME ──────────────────────
+// Yeni istaka: YALNIZCA dizinin SONUNA ekle ve DEFTER_SURUM'u artir.
+// Bir istaka kaldirilirsa yuvasi null ile doldurulur, SILINMEZ.
+const CUE_DEFTER = [
+  'cosmic_eclipse','royal_diamond','emerald_serpent','golden_phoenix','frost_king','thunder_strike',
+  'dragon_bone','neon_core','champion','golden_goal','stadium_flame','blood_moon','ghost_flame',
+  'haunted_bone','pumpkin_inferno','candy_cane','frozen_christmas','winter_star','crescent_moon',
+  'eid_glow','golden_night','heartbreaker','love_diamond','rose_flame','celtic_gold','emerald_luck',
+  'ocean','sunset','tropical','astral_mezopotamya_sihirli_asasi','bermuda_ucgeni_firtina_asasi',
+  'dogon_kozmik_tilsim_asasi','isis_esintili_kozmik_asa','kozmik_horusun_altin_asasi',
+  'kozmik_kara_delik_asasi','magnetar_space_kozmik_asa_armasi','misir_esintili_kozmik_anubis_asasi',
+  'nebula_space_kozmik_asa_dusu','osirisin_kozmik_mistik_asasi','pulsar_uzay_asasi_amblemi',
+  'sobekin_kozmik_su_asasi','uzayli_kacirma_temali_kozmik_asa','sasta_daginin_kozmik_buyu_asasi',
+  'afrika_temali_altin_asa_emblemi','alman_imparatorluk_asasi_detaylari','am_armenia',
+  'asa_ceremonial_mexicana_de_oro','avustralya_temali_mucevherli_toren',
+  'belcika_temali_kraliyet_asasi','bulgaristanin_suslu_hanedan_asasi',
+  'cetro_ornamental_brasil_futebol_e_','danimarkanin_mucevherli_toren_asas',
+  'gronland_temali_gorkemli_toren_asa','hindistan_motifli_mucevherli_toren',
+  'hollanda_temali_gorkemli_scepter','hirvatistan_temali_gorkemli_toren_',
+  'irlanda_esintili_buyulu_kelt_asasi','irlanda_temali_mucevherli_toren_as',
+  'iskocyanin_islemeli_hanedan_asasi','ispanyol_temali_suslu_asa_ve_arma',
+  'israil_sembollu_gorkemli_asa','isvicre_temali_gorkemli_scepter',
+  'italya_esintili_barok_sihirli_asa','italyanin_yaldizli_seremonial_asas',
+  'k_k_t_c_temali_gorkemli_sembolik_a','kanada_temali_buyulu_toren_asasi',
+  'macaristan_temali_gorkemli_serecce','makedonyanin_altin_toren_asasi',
+  'misirin_altin_sonmezlik_asasi','sveriges_kungliga_heraldikscepter',
+  'tayland_temali_suslu_toren_asasi','tongkat_seremonial_budaya_indonesi',
+  'turkiye_temali_altin_sorguclu_asa','yunanistanin_altin_simgesi',
+  'cek_cumhuriyetinin_suslemeli_haned','emiratesin_mucevherli_toren_asasi',
+  'fransiz_kraliyet_asasi_ve_paris_su','izlanda_temali_mucevherli_toren_as',
+  'kolombiyanin_mucevherli_hanedan_as','kosta_rika_temali_gorkemli_asa',
+  'londrali_mucevherli_kraliyet_asasi','manananggal_temali_kanli_savas_asa',
+  'mucevherli_rus_imparatorluk_asasi','zindan_kilici_fantazi_amblemi',
+  'ammit_ruhlarin_misir_yargici','asili_hayaletin_lanetli_savas_asas',
+  'cadi_asasi_ve_neon_yesil_kristal','dybbukun_lanetli_ruh_muhru','gotik_kafatasi_ve_kristal_asasi',
+  'kanli_ay_kurt_mizragi','kismetes_tematikaju_gotik_asaegyve','olgoy_korkoyun_lanetli_savas_asasi',
+  'togo_ve_gana_vampir_adze_asasi','vampir_temali_gotik_bilardo_istaka',
+  'aswang_gece_avcisi_samanik_silahi','baton_de_billard_azteque_mexicain_',
+  'buyulu_ejderha_asasi_ve_tilsimlari','grootslang_serpent_scepteri',
+  'japon_temali_sakura_savas_asasi','mucevherli_inkanyamba_firtina_asas',
+  'nefertiti_motifli_misir_asasi','norvec_esintili_suslemeli_viking_a',
+  'penanggalanin_kanli_tilsimli_asasi','cin_temali_ejderha_asasi','futuristik_android_enerji_asasi',
+  'gelecegin_kodlari_holografik_siber'
+];
+const DEFTER_SURUM = 1;      // r
+const SEMA_SURUM   = 1;      // v
+const CUE_DEFTER_INDEKS = (function(){
+  const m = {};
+  for(let i = 0; i < CUE_DEFTER.length; i++){ if(CUE_DEFTER[i]) m[CUE_DEFTER[i]] = i; }
+  return m;
+})();
+
+// ── BITMAP ────────────────────────────────────────────
+const BITMAP_BAYT = Math.ceil(CUE_DEFTER.length / 8);   // 106 bit -> 14 bayt
+function sahiplikBitmapUret(idler){
+  const b = new Uint8Array(BITMAP_BAYT);
+  (idler || []).forEach(function(id){
+    const i = CUE_DEFTER_INDEKS[id];
+    // Defterde OLMAYAN id sessizce atlanir (ileride eklenmis istaka olabilir).
+    if(i === undefined) return;
+    b[i >> 3] |= (1 << (i & 7));
+  });
+  return b;
+}
+function sahiplikBitmapCoz(b){
+  const idler = [];
+  if(!b) return idler;
+  for(let i = 0; i < CUE_DEFTER.length; i++){
+    if((b[i >> 3] >> (i & 7)) & 1){ const ad = CUE_DEFTER[i]; if(ad) idler.push(ad); }
+  }
+  return idler;
+}
+
+// ── CROCKFORD BASE32 — okunabilir kod ───────────────────────
+// I, L, O, U harfleri YOK: 1/l/I ve 0/O karisikligi olmaz.
+const B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+function b32Kodla(bayt){
+  let bit = 0, deger = 0, s = '';
+  for(let i = 0; i < bayt.length; i++){
+    deger = (deger << 8) | bayt[i]; bit += 8;
+    while(bit >= 5){ s += B32[(deger >>> (bit - 5)) & 31]; bit -= 5; }
+  }
+  if(bit > 0) s += B32[(deger << (5 - bit)) & 31];
+  return s;
+}
+function b32Coz(metin){
+  let bit = 0, deger = 0; const cikti = [];
+  const t = String(metin || '').toUpperCase()
+    .replace(/[IL]/g, '1').replace(/O/g, '0')     // yaygin okuma hatalari
+    .replace(/[^0-9A-Z]/g, '');                   // tire/bosluk temizle
+  for(let i = 0; i < t.length; i++){
+    const v = B32.indexOf(t[i]);
+    if(v < 0) return null;                        // gecersiz karakter
+    deger = (deger << 5) | v; bit += 5;
+    if(bit >= 8){ cikti.push((deger >>> (bit - 8)) & 255); bit -= 8; }
+  }
+  return new Uint8Array(cikti);
+}
+
+// ── SAGLAMA TOPLAMI (FNV-1a 16 bit) ──────────────────────
+// Amac kriptografik guvenlik DEGIL; yanlis yazilmis kodun SESSIZCE
+// kabul edilmesini onlemek.
+function saglama16(bayt, uzunluk){
+  let h = 0x811c;
+  for(let i = 0; i < uzunluk; i++){
+    h ^= bayt[i];
+    h = (h * 0x0193) & 0xffff;
+  }
+  return h;
+}
+
+// ── AKTARMA KODU ───────────────────────────────────
+// Paket: [0] surum baytI (v<<4 | r) | [1..14] bitmap | [15..16] saglama
+// 17 bayt -> base32 -> 28 karakter -> 4'erli 7 grup halinde gosterilir.
+// SADECE ISTAKA TASIR: jeton, XP, seviye, reklam sayaci YOKTUR.
+function aktarmaKoduUret(idler){
+  const bm = sahiplikBitmapUret(idler || P.owned);
+  const paket = new Uint8Array(1 + BITMAP_BAYT + 2);
+  paket[0] = ((SEMA_SURUM & 15) << 4) | (DEFTER_SURUM & 15);
+  paket.set(bm, 1);
+  const h = saglama16(paket, 1 + BITMAP_BAYT);
+  paket[1 + BITMAP_BAYT]     = (h >> 8) & 255;
+  paket[1 + BITMAP_BAYT + 1] = h & 255;
+  const ham = b32Kodla(paket);
+  return ham.replace(/(.{4})/g, '$1-').replace(/-$/, '');   // XXXX-XXXX-...
+}
+// Cozumleme sonuclari: {ok:true, idler:[...]} | {ok:false, neden:'bad'|'version'}
+// Beklenen kod uzunlugu: 17 bayt -> ceil(17*8/5) = 28 karakter.
+const KOD_KARAKTER = Math.ceil((1 + BITMAP_BAYT + 2) * 8 / 5);
+function aktarmaKoduCoz(kod){
+  // Normalize et: buyuk harf, I/L->1, O->0, tire ve bosluklari at.
+  const duz = String(kod || '').toUpperCase()
+    .replace(/[IL]/g, '1').replace(/O/g, '0').replace(/[^0-9A-Z]/g, '');
+  // Uzunluk TAM olmali: eksik veya FAZLA karakter kabul EDILMEZ.
+  if(duz.length !== KOD_KARAKTER) return { ok:false, neden:'bad' };
+  const paket = b32Coz(duz);
+  if(!paket || paket.length !== 1 + BITMAP_BAYT + 2) return { ok:false, neden:'bad' };
+  // KANONIK BICIM: cozuleni yeniden kodla, girisle birebir ayni olmali.
+  // Bu, saglama toplamina girmeyen DOLGU bitleriyle oynamayi engeller.
+  if(b32Kodla(paket) !== duz) return { ok:false, neden:'bad' };
+  const h = saglama16(paket, 1 + BITMAP_BAYT);
+  const bekleneh = (paket[1 + BITMAP_BAYT] << 8) | paket[1 + BITMAP_BAYT + 1];
+  if(h !== bekleneh) return { ok:false, neden:'bad' };       // yanlis kod SESSIZ GECMEZ
+  const v = (paket[0] >> 4) & 15, r = paket[0] & 15;
+  // Tanimadigimiz defter surumu: COZMEYIZ. Yanlis esleme IMKANSIZ.
+  if(v !== SEMA_SURUM || r !== DEFTER_SURUM) return { ok:false, neden:'version' };
+  return { ok:true, idler: sahiplikBitmapCoz(paket.subarray(1, 1 + BITMAP_BAYT)) };
+}
+
+// ── GUVENLI BIRLESTIRME ────────────────────────────
+// Sahiplik: BIRLESIM. Asla silme, asla uzerine yazma. Tekrar eklenen
+// istaka duplicate URETMEZ (Set semantigi).
+// Doner: eklenen istaka sayisi.
+function sahiplikBirlestir(gelenIdler){
+  let eklenen = 0;
+  (gelenIdler || []).forEach(function(id){
+    if(CUE_DEFTER_INDEKS[id] === undefined) return;   // defter disi -> yok say
+    if(P.owned.indexOf(id) < 0){ P.owned.push(id); eklenen++; }
+  });
+  if(eklenen > 0) saveP();
+  return eklenen;
+}
+
+// ── JETON GUVENLIK ALANI ──────────────────────────
+// KODDA DOGRULANDI: jeton YALNIZCA istaka alirken harcanir (buyCue ve
+// denemeSatinAl). Bu yuzden su deger mesru oyunda ASLA AZALMAZ:
+//     k = mevcut_jeton + sahip_olunan_istakalarin_fiyat_toplami
+// Harcama degeri jetondan "harcanan"a tasir, TOPLAM sabit kalir.
+//
+// Birlestirme:
+//     k_yeni      = max(k_yerel, k_uzak)
+//     jeton_taban = k_yeni - harcanan(birlesik_sahiplik)
+//     jeton_son   = max(jeton_yerel, jeton_taban)      <- ASLA azaltma
+//
+// Mesru harcamada harcanan da arttigi icin taban dusuk kalir ve hicbir
+// jeton "geri sarilmaz". Yerel sifirlamada k_uzak yuksek oldugu icin
+// oyuncunun gercek bakiyesi geri gelir.
+// Fiyati bilinmeyen istaka 0 sayilir; bu tabanI YUKSELTEBILECEGI icin
+// tek riskli yondur, bu yuzden asagida bir tavan uygulanir.
+const JETON_TAVAN = 1000000;
+function harcanmisJeton(idler){
+  let toplam = 0;
+  (idler || []).forEach(function(id){
+    try{
+      const m = (typeof cueMeta === 'function') ? cueMeta(id) : null;
+      const f = m && typeof m.fiyat === 'number' ? m.fiyat : 0;
+      if(f > 0) toplam += f;
+    }catch(e){}
+  });
+  return toplam;
+}
+// Buluta/aktarima gidecek "yasam boyu kazanilan" degeri.
+function jetonGuvenlikDegeri(){
+  return Math.min(JETON_TAVAN, (P.coins || 0) + harcanmisJeton(P.owned));
+}
+// Uzak k degeriyle guvenli birlestirme. Doner: eklenen jeton (0 olabilir).
+function jetonGuvenlikBirlestir(uzakK){
+  const yerelK = jetonGuvenlikDegeri();
+  const k = Math.min(JETON_TAVAN, Math.max(yerelK, Number(uzakK) || 0));
+  const taban = k - harcanmisJeton(P.owned);
+  if(taban > (P.coins || 0)){
+    const ekle = taban - P.coins;
+    P.coins = taban;
+    saveP();
+    return ekle;
+  }
+  return 0;   // mesru harcama: hicbir sey geri sarilmaz
+}
+
+// ── BULUT PAKETI (ILERIDE kullanilacak; su an tasiyici YOK) ──────
+// Firebase / SDK.data / player.setData eklendiginde AYNEN bu paket yazilir.
+function sahiplikPaketiOlustur(){
+  const bm = sahiplikBitmapUret(P.owned);
+  let ikili = '';
+  for(let i = 0; i < bm.length; i++) ikili += String.fromCharCode(bm[i]);
+  return {
+    v: SEMA_SURUM,
+    r: DEFTER_SURUM,
+    f: 'b64',
+    o: btoa(ikili),                                   // 14 bayt -> 20 karakter
+    e: (CUE_DEFTER_INDEKS[P.equipped] !== undefined) ? CUE_DEFTER_INDEKS[P.equipped] : -1,
+    k: jetonGuvenlikDegeri(),
+    n: P.owned.length,
+    t: Date.now()
+  };
+}
+function sahiplikPaketiUygula(paket){
+  if(!paket || typeof paket !== 'object') return { ok:false, neden:'bad' };
+  if(paket.v !== SEMA_SURUM || paket.r !== DEFTER_SURUM) return { ok:false, neden:'version' };
+  let idler = [];
+  try{
+    const ham = atob(paket.o || '');
+    const b = new Uint8Array(ham.length);
+    for(let i = 0; i < ham.length; i++) b[i] = ham.charCodeAt(i);
+    idler = sahiplikBitmapCoz(b);
+  }catch(e){ return { ok:false, neden:'bad' }; }
+  const eklenen = sahiplikBirlestir(idler);
+  const jeton   = jetonGuvenlikBirlestir(paket.k);
+  return { ok:true, eklenen: eklenen, jeton: jeton };
+}
+
+// ── AKTARMA PENCERESI ────────────────────────────
+function xferSonuc(mesaj, sinif){
+  const e = document.getElementById('xfer-sonuc');
+  if(!e) return;
+  e.textContent = mesaj;                      // DAIMA textContent (XSS)
+  e.className = sinif || '';
+}
+function xferAc(){
+  const k = document.getElementById('xfer-kod');
+  if(k) k.textContent = aktarmaKoduUret(P.owned);
+  const g = document.getElementById('xfer-giris');
+  if(g) g.value = '';
+  xferSonuc('', '');
+  const e = document.getElementById('screen-xfer');
+  if(e) e.style.display = 'flex';
+}
+function xferKapat(){
+  const e = document.getElementById('screen-xfer');
+  if(e) e.style.display = 'none';
+}
+function xferKopyala(){
+  const k = document.getElementById('xfer-kod');
+  if(!k) return;
+  const metin = k.textContent;
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(metin).then(function(){ xferSonuc(t('xfer.copied'), 'iyi'); },
+                                               function(){ xferSecVeKopyala(k); });
+    } else { xferSecVeKopyala(k); }
+  }catch(e){ xferSecVeKopyala(k); }
+}
+function xferSecVeKopyala(dugum){
+  // Kopyalama izni yoksa en azindan metni SEC: oyuncu elle kopyalayabilir.
+  try{
+    const s = window.getSelection(), r = document.createRange();
+    r.selectNodeContents(dugum); s.removeAllRanges(); s.addRange(r);
+    xferSonuc(t('xfer.copied'), 'iyi');
+  }catch(e){}
+}
+function xferGeriYukle(){
+  const g = document.getElementById('xfer-giris');
+  const kod = g ? g.value.trim() : '';
+  if(!kod){ xferSonuc(t('xfer.empty'), 'hata'); return; }
+  const s = aktarmaKoduCoz(kod);
+  if(!s.ok){
+    xferSonuc(t(s.neden === 'version' ? 'xfer.badVersion' : 'xfer.bad'), 'hata');
+    return;
+  }
+  const eklenen = sahiplikBirlestir(s.idler);      // BIRLESIM: asla silmez
+  if(eklenen > 0){
+    xferSonuc(t('xfer.ok', { n: eklenen }), 'iyi');
+    try{ refreshMenu(); refreshSkinBar(); }catch(e){}
+    try{ if(typeof renderCollection === 'function') renderCollection(); }catch(e){}
+  } else {
+    xferSonuc(t('xfer.already'), '');
+  }
+}
+
+// ── [SIFIRLA] Yerel veri silme ────────────────────────────
+// GDPR/KVKK "silme hakki": kullanicinin cihazindaki tüm oyun verisini
+// tek hamlede kaldirir. Gizlilik metnindeki 8 anahtarla BIREBIR aynidir;
+// localStorage.clear() KULLANILMAZ ki ayni kaynaktaki baska veriye
+// dokunulmasin.
+const SIFIRLA_ANAHTARLAR = [
+  'inferno_p',            // jeton, XP, seviye, skor, istakalar
+  'inferno_ev',           // etkinlik ilerlemesi
+  'inferno_trial',        // 24 saatlik deneme
+  'inferno_lang',         // dil tercihi
+  'inferno_chat_nick',    // sohbet takma adi
+  'inferno_chat_sid',     // sohbet oturum jetonu
+  'inferno_chat_block',   // engelleme listesi
+  'inferno_chat_mute',    // susturma listesi
+  'inferno_ads'           // gunluk odullu reklam sayaci
+];
+let _sifirlaOnaylandi = false;
+
+function sifirlaAc(){
+  _sifirlaOnaylandi = false;
+  const b = document.getElementById('reset-onay');
+  if(b){ b.textContent = t('reset.confirm'); b.disabled = false; }
+  const e = document.getElementById('screen-reset');
+  if(e) e.style.display = 'flex';
+}
+function sifirlaKapat(){
+  _sifirlaOnaylandi = false;
+  const e = document.getElementById('screen-reset');
+  if(e) e.style.display = 'none';
+}
+function sifirlaUygula(){
+  // Ilk basis: yalnizca ikinci onaya gecer, HICBIR SEY SILINMEZ.
+  if(!_sifirlaOnaylandi){
+    _sifirlaOnaylandi = true;
+    const b = document.getElementById('reset-onay');
+    if(b) b.textContent = t('reset.confirmAgain');
+    return;
+  }
+  let silinen = 0;
+  SIFIRLA_ANAHTARLAR.forEach(function(a){
+    try{ if(localStorage.getItem(a) !== null){ localStorage.removeItem(a); silinen++; } }catch(e){}
+  });
+  const b = document.getElementById('reset-onay');
+  if(b){ b.disabled = true; b.textContent = t('reset.done'); }
+  // Bellekte yuklu P / EV / DENEME nesneleri eski degerleri geri
+  // yazabilecegi icin temiz baslangic SART.
+  setTimeout(function(){ try{ location.reload(); }catch(e){} }, 700);
+  return silinen;
+}
+
+// ── [YASAL] Platform duyarli dis link politikasi ─────────────────
+// Yandex Games kural 8.4.2: oyundan DISARI link (gelistirici sitesi,
+// magaza, ortak site...) YASAK. Kural 8.4.4: kullaniciyi dis siteye
+// yonlendirmek YASAK. Kural 8.4.2 istisnasi: "URL olmadan firma adini
+// gostermek" serbest -> o platformlarda <a> HIC URETILMEZ, yalnizca
+// metin gosterilir. Pixidus icin kamuya acik dokuman bulunamadigi icin
+// EN KISITLI davranis (metin) guvenli varsayilan olarak secildi.
+const DIS_LINK_POLITIKA = {
+  crazygames: true,
+  android:    true,
+  web:        true,
+  yandex:     false,
+  pixidus:    false,
+  unknown:    false
+};
+function disLinkVerilebilirMi(){
+  try{
+    const p = (typeof AD !== 'undefined' && AD && typeof AD.platform === 'function')
+      ? AD.platform() : 'web';
+    return DIS_LINK_POLITIKA[p] === true;
+  }catch(e){ return false; }
+}
+
+// ── [YASAL] Sekmeli yasal merkez ───────────────────────────
+// Gizlilik ve Sartlar metni OYUN ICINE gomulu; hicbir platformda dis
+// belgeye erisim ZORUNLU degildir (Yandex 3.5).
+const LEGAL_GIZLILIK = ['pv1','pv2','pv3','pv4','pv5','pv6','pv7','pv8','pv8b','pv9','pv10'];
+const LEGAL_SARTLAR  = ['tm1','tm2','tm3','tm4','tm5','tm6','tm7','tm8','tm9','tm10'];
+
+function legalSatirlariCiz(kap, anahtarlar){
+  if(!kap) return;
+  kap.innerHTML = '';
+  anahtarlar.forEach(function(a){
+    const d = document.createElement('div');
+    d.className = 'legal-sat';
+    // Metin i18n sozlugunden gelir (kullanici girdisi DEGIL); yalnizca
+    // <b> vurgusu icerir. Kullanici metni burada ASLA islenmez.
+    d.innerHTML = t('legal.' + a);
+    kap.appendChild(d);
+  });
+}
+
+function legalSekmeSec(ad){
+  ['credits','privacy','terms'].forEach(function(k){
+    const p = document.getElementById('legal-pano-' + k);
+    if(p) p.style.display = (k === ad) ? '' : 'none';
+    const b = document.getElementById('legal-sek-' + k);
+    if(b) b.classList.toggle('sel', k === ad);
+  });
+}
+
+function legalAc(sekme){
+  const e = document.getElementById('screen-credits');
+  if(!e) return;
+  legalSatirlariCiz(document.getElementById('legal-liste-privacy'), LEGAL_GIZLILIK);
+  legalSatirlariCiz(document.getElementById('legal-liste-terms'),  LEGAL_SARTLAR);
+  // Dis belge baglantilari: yalnizca politikanin izin verdigi
+  // platformlarda DUGUM OLARAK olusturulur.
+  ['privacy','terms'].forEach(function(k){
+    const kap = document.getElementById('legal-alt-' + k);
+    if(!kap) return;
+    kap.innerHTML = '';
+    const bilgi = document.createElement('span');
+    bilgi.textContent = t('legal.updated');
+    kap.appendChild(bilgi);
+    if(disLinkVerilebilirMi()){
+      kap.appendChild(document.createTextNode(' \u00b7 '));
+      const a = document.createElement('a');
+      a.href = k + '.html';
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = t('legal.full');
+      kap.appendChild(a);
+    }
+  });
+  legalSekmeSec(sekme || 'credits');
+  e.style.display = 'flex';
+}
+
+// ── [SOSYAL] Platform duyarli iletisim panelinin cizimi ─────────
+// disLinkVerilebilirMi() true ise <a>, degilse YALNIZCA metin dugumu
+// uretilir. Yandex/Pixidus/unknown'da DOM'da hicbir <a> bulunmaz.
+const SOSYAL_HESAPLAR = {
+  support: { ad: 'ConsoleTunes',    url: 'https://www.instagram.com/consoletunes/' },
+  dev:     { ad: 'NovaRec Studio',  url: 'https://www.instagram.com/novarecstudio/' }
+};
+function sosyalPaneliCiz(){
+  const izin = disLinkVerilebilirMi();
+  Object.keys(SOSYAL_HESAPLAR).forEach(function(rol){
+    const kap = document.getElementById('chat-sos-' + rol);
+    if(!kap) return;
+    const h = SOSYAL_HESAPLAR[rol];
+    kap.innerHTML = '';
+    if(izin){
+      const a = document.createElement('a');
+      a.href = h.url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = h.ad;          // marka adi; kullanici girdisi DEGIL
+      kap.appendChild(a);
+    } else {
+      // Yandex 8.4.2 istisnasi: URL olmadan firma adi gosterilebilir.
+      const s = document.createElement('span');
+      s.className = 'chat-sos-ad';
+      s.textContent = h.ad;
+      kap.appendChild(s);
+    }
+  });
+}
+
 // ── [RADYO] Inferno Radio ────────────────────────────────────────────
 // AKTIFLESTIRME: yalnizca RADIO_STREAM'e gecerli bir yayin URL'si yazmak
 // yeterlidir. Bos oldugu surece "yakinda yayinda" bildirimi gosterilir;
@@ -6116,11 +6993,19 @@ const AD = {
       } else {
         const ana = (location.hostname || '').toLowerCase();
         const ua  = (navigator.userAgent || '').toLowerCase();
-        if(window.CrazyGames)                                   p = 'crazygames';
-        else if(window.YaGames || ana.indexOf('yandex') >= 0)   p = 'yandex';
+        // SIRA ONEMLI. Onceden ilk kontrol window.CrazyGames idi; SDK her
+        // platformda yuklendigi icin Yandex'te bile 'crazygames' secilip
+        // Yandex reklam adapteri devre disi kaliyordu. Artik once portala
+        // OZGU isaretler, en sonda CrazyGames ORTAM tespiti gelir.
+        if(window.YaGames || ana.indexOf('yandex') >= 0)        p = 'yandex';
         else if(window.PixiDUS || window.Pixidus)               p = 'pixidus';
-        else if(window.AndroidBridge || window.InfernoAndroid ||
+        // window.InfernoAndroid BURADA KULLANILMAZ: onu native degil, bu
+        // sayfanin kendi kodu olusturur -> her ortamda true donerdi.
+        // Gercek isaretler: AndroidBridge (native enjeksiyon) veya WebView UA.
+        // Uygulama ayrica window.INFERNO_PLATFORM='android' enjekte eder.
+        else if(window.AndroidBridge ||
                 (ua.indexOf('android') >= 0 && ua.indexOf('wv') >= 0)) p = 'android';
+        else if(typeof _cgOrtamiMi === 'function' && _cgOrtamiMi()) p = 'crazygames';
         else                                                    p = 'web';
       }
     }catch(e){ p = 'web'; }
@@ -7539,6 +8424,33 @@ function chatKur(){
   if(tmz) tmz.onclick = chatGlobalTemizle;
   const uk = document.getElementById('chat-uyari-kapat');
   if(uk) uk.onclick = chatUyariGizle;
+  // [EKONOMI] Odullu reklam dugmesi.
+  const ac = document.getElementById('menu-adcoin');
+  if(ac) ac.onclick = reklamCoinIste;
+  try{ reklamCoinTazele(); }catch(e){}
+  // [SOSYAL] Panel ilk cizim (platform politikasina gore).
+  sosyalPaneliCiz();
+  // [SAHIPLIK] Aktarma penceresi.
+  const xb = document.getElementById('menu-xfer');
+  if(xb) xb.onclick = xferAc;
+  const xk = document.getElementById('xfer-kapat');
+  if(xk) xk.onclick = xferKapat;
+  const xc = document.getElementById('xfer-kopyala');
+  if(xc) xc.onclick = xferKopyala;
+  const xg = document.getElementById('xfer-geriyukle');
+  if(xg) xg.onclick = xferGeriYukle;
+  // [SIFIRLA] Menu dugmesi ve onay penceresi.
+  const sb = document.getElementById('menu-reset');
+  if(sb) sb.onclick = sifirlaAc;
+  const si = document.getElementById('reset-iptal');
+  if(si) si.onclick = sifirlaKapat;
+  const so = document.getElementById('reset-onay');
+  if(so) so.onclick = sifirlaUygula;
+  // [YASAL] Sekme dugmeleri.
+  ['credits','privacy','terms'].forEach(function(k){
+    const b = document.getElementById('legal-sek-' + k);
+    if(b) b.onclick = function(){ legalSekmeSec(k); };
+  });
   const rb = document.getElementById('chat-radyo-btn');
   if(rb) rb.onclick = radyoDegistir;
   const ev = document.getElementById('menu-event');
@@ -7657,11 +8569,11 @@ if(document.readyState === 'loading'){
           <div class="chat-hos-satir" data-i18n="chat.welcome3">📻 Inferno Radio is coming soon!</div>
           <div class="chat-hos-satir">
             <span data-i18n="chat.supportLbl">🛠️ Support, bug reports or suggestions:</span>
-            <a id="chat-lnk-console" href="https://www.instagram.com/consoletunes/" target="_blank" rel="noopener noreferrer">ConsoleTunes</a>
+            <span id="chat-sos-support"></span>
           </div>
           <div class="chat-hos-satir">
             <span data-i18n="chat.devLbl">💻 Our software and apps:</span>
-            <a id="chat-lnk-nova" href="https://www.instagram.com/novarecstudio/" target="_blank" rel="noopener noreferrer">NovaRec Studio</a>
+            <span id="chat-sos-dev"></span>
           </div>
           <div id="chat-radyo">
             <span class="chat-radyo-ad" data-i18n="radio.title">📻 INFERNO RADIO</span>
@@ -7680,9 +8592,56 @@ if(document.readyState === 'loading'){
   </div>
 </div>
 
+<!-- [SAHIPLIK] Aktarma kodu. Kod YALNIZCA istaka tasir. -->
+<div id="screen-xfer">
+  <div id="xfer-kutu">
+    <div id="xfer-baslik" data-i18n="xfer.title">TRANSFER MY CUES</div>
+    <div class="xfer-aciklama" data-i18n="xfer.desc">This code carries ONLY your cues.</div>
+    <div class="xfer-etiket" data-i18n="xfer.myCodeLbl">Your code:</div>
+    <div id="xfer-kod"></div>
+    <div class="xfer-btnler"><button id="xfer-kopyala" type="button" data-i18n="xfer.copy">COPY</button></div>
+    <div class="xfer-ayrac"></div>
+    <div class="xfer-etiket" data-i18n="xfer.restoreLbl">Have a code?</div>
+    <input id="xfer-giris" type="text" autocomplete="off" autocapitalize="characters"
+           spellcheck="false" maxlength="64" data-i18n-ph="xfer.placeholder" placeholder="XXXX-XXXX-XXXX-...">
+    <div class="xfer-btnler">
+      <button id="xfer-geriyukle" type="button" data-i18n="xfer.restore">RESTORE</button>
+      <button id="xfer-kapat" type="button" data-i18n="common.close">CLOSE</button>
+    </div>
+    <div id="xfer-sonuc"></div>
+  </div>
+</div>
+
+<!-- [SIFIRLA] Yerel veri silme onayi. Iki adimli; ilk basis silmez. -->
+<div id="screen-reset">
+  <div id="reset-kutu">
+    <div id="reset-baslik" data-i18n="reset.title">RESET LOCAL DATA</div>
+    <div class="reset-uyari" data-i18n="reset.intro">This deletes everything this game has stored on this device:</div>
+    <ul class="reset-liste">
+      <li data-i18n="reset.i1">Coins, XP, level and best score</li>
+      <li data-i18n="reset.i2">Owned and equipped cues, and the 24-hour trial</li>
+      <li data-i18n="reset.i3">Event quest progress</li>
+      <li data-i18n="reset.i4">Chat nickname, session and your block / mute lists</li>
+      <li data-i18n="reset.i5">Language preference</li>
+    </ul>
+    <div class="reset-kalici" data-i18n="reset.permanent">This cannot be undone.</div>
+    <div class="reset-btnler">
+      <button id="reset-iptal" type="button" data-i18n="common.cancel">CANCEL</button>
+      <button id="reset-onay" type="button" data-i18n="reset.confirm">DELETE EVERYTHING</button>
+    </div>
+  </div>
+</div>
+
 <div id="screen-credits" style="position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(4,0,10,0.88);">
   <div style="max-width:420px;width:88%;background:var(--pn);border:1px solid rgba(255,136,0,0.3);border-radius:10px;padding:20px;box-shadow:0 0 40px rgba(255,80,0,0.25);">
     <div style="font-family:'Cinzel Decorative',serif;font-size:0.95rem;letter-spacing:3px;color:var(--gd);margin-bottom:14px;">CREDITS</div>
+    <!-- [YASAL] Sekme cubugu. Kredi icerigi ilk sekmede AYNEN kalir. -->
+    <div id="legal-sek">
+      <button class="legal-sek-b sel" type="button" id="legal-sek-credits" data-i18n="legal.tabCredits">CREDITS</button>
+      <button class="legal-sek-b" type="button" id="legal-sek-privacy" data-i18n="legal.tabPrivacy">PRIVACY</button>
+      <button class="legal-sek-b" type="button" id="legal-sek-terms" data-i18n="legal.tabTerms">TERMS</button>
+    </div>
+    <div id="legal-pano-credits">
 
     <div style="font-size:0.78rem;line-height:1.6;color:rgba(255,255,255,0.85);">
       <div style="color:var(--em);letter-spacing:1px;font-weight:700;margin-bottom:4px;">3D BILLIARD BALLS</div>
@@ -7695,6 +8654,18 @@ if(document.readyState === 'loading'){
     <div style="margin-top:16px;font-size:0.78rem;line-height:1.6;color:rgba(255,255,255,0.85);">
       <div style="color:var(--em);letter-spacing:1px;font-weight:700;margin-bottom:4px;">RENDERING</div>
       <div>three.js &mdash; MIT License</div>
+    </div>
+
+    </div><!-- /legal-pano-credits -->
+
+    <div id="legal-pano-privacy" style="display:none">
+      <div class="legal-pano"><div id="legal-liste-privacy"></div></div>
+      <div class="legal-alt" id="legal-alt-privacy"></div>
+    </div>
+
+    <div id="legal-pano-terms" style="display:none">
+      <div class="legal-pano"><div id="legal-liste-terms"></div></div>
+      <div class="legal-alt" id="legal-alt-terms"></div>
     </div>
 
     <button onclick="document.getElementById('screen-credits').style.display='none'"
