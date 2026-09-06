@@ -260,6 +260,17 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dk);font-famil
   background-position:center;background-color:rgba(0,0,0,0.55);transition:all 0.2s;flex-shrink:0;position:relative;}
 .skin-th:hover{border-color:rgba(255,150,0,0.45);transform:scale(1.06);}
 .skin-th.active{border-color:#ffcc00;box-shadow:0 0 9px rgba(255,200,0,0.5);}
+/* [BILDIRIM] Ekrandan BAGIMSIZ toast katmani. toast2()/#pot-t oyun ici
+   bildirimler icin AYNEN kalir; bu katman menu/koleksiyon gibi
+   #screen-game kapaliyken de gorunmesi gereken mesajlar icindir. */
+#ui-toast{position:fixed;left:50%;bottom:6%;transform:translateX(-50%) translateY(8px);
+  max-width:min(520px,90vw);padding:10px 16px;border-radius:8px;
+  background:rgba(20,6,32,0.96);border:1px solid rgba(255,170,0,0.45);
+  color:#ffcc66;font-size:0.72rem;letter-spacing:0.4px;text-align:center;
+  box-shadow:0 6px 26px rgba(0,0,0,0.6);z-index:60;
+  opacity:0;pointer-events:none;transition:opacity 0.22s,transform 0.22s;}
+#ui-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+@media (max-height:560px){ #ui-toast{font-size:0.62rem;padding:7px 12px;bottom:5%;} }
 /* [KOLEKSIYON V2] Magazadaki .sb kalibi; #skin-bar'a HIC dokunulmaz. */
 #screen-collection{position:fixed;inset:0;display:none;align-items:center;
   justify-content:center;flex-direction:column;background:rgba(0,0,0,0.92);z-index:27;}
@@ -468,6 +479,9 @@ font-family:sans-serif;
     <div id="shop-list"></div>
   </div>
 </div>
+
+<!-- [BILDIRIM] Ekrandan bagimsiz toast katmani -->
+<div id="ui-toast"></div>
 
 <!-- [KOLEKSIYON V2] Magaza (.sb) kalibi: max-height:92vh + overflow-y:auto -->
 <div id="screen-collection">
@@ -3548,6 +3562,18 @@ function renderEvent(){
   if(not) not.textContent = t('event.local');
 }
 
+// [BILDIRIM] Ekrandan bagimsiz toast. toast2()'den FARKI: hedef dugum
+// <body> seviyesinde oldugu icin #screen-game kapaliyken de gorunur.
+// Metin DAIMA textContent ile yazilir (XSS).
+let _uiToastTmr = null;
+function toastUI(mesaj, sure){
+  const e = document.getElementById('ui-toast');
+  if(!e){ try{ toast2(mesaj); }catch(x){} return; }   // dugum yoksa eski yola dus
+  e.textContent = String(mesaj == null ? '' : mesaj);
+  e.classList.add('show');
+  clearTimeout(_uiToastTmr);
+  _uiToastTmr = setTimeout(function(){ e.classList.remove('show'); }, sure || 2600);
+}
 // ── [KOLEKSIYON V2] Collection / My Cues ─────────────────────────────
 // LAZY LOAD: 106 satir birden DOM'a basilmaz. Sayfa basina COL_SAYFA
 // satir cizilir; listenin sonundaki nobetci IntersectionObserver ile
@@ -3692,16 +3718,16 @@ function renderCollection(){
 // onReward'i cagirir -> reklam tamamlanmadan ERISIM VERILMEZ.
 function freeCueAc(){
   if(denemeAktifMi()){
-    toast2(t('col.trialOn', { cue:(cueMeta(DENEME.cue).ad||DENEME.cue), kalan:denemeKalanMetin() }));
+    toastUI(t('col.trialOn', { cue:(cueMeta(DENEME.cue).ad||DENEME.cue), kalan:denemeKalanMetin() }));
     return;
   }
-  if(denemeBugunKullanildiMi()){ toast2(t('col.freeUsed')); return; }
+  if(denemeBugunKullanildiMi()){ toastUI(t('col.freeUsed')); return; }
   const aday = denemeAdayi();
-  if(!aday){ toast2(t('col.freeNone')); return; }
+  if(!aday){ toastUI(t('col.freeNone')); return; }
   const m = cueMeta(aday);
-  toast2(t('col.freeAsk', { cue:(m.ad||aday) }));
+  toastUI(t('col.freeAsk', { cue:(m.ad||aday) }));
   if(typeof AD === 'undefined' || !AD || typeof AD.showRewarded !== 'function'){
-    toast2(t('col.adFail')); return;
+    toastUI(t('col.adFail')); return;
   }
   AD.showRewarded({
     kullaniciIstedi: true,
@@ -3710,10 +3736,10 @@ function freeCueAc(){
   }).then(function(r){
     if(r && r.shown === true && denemeAktifMi(aday)){
       refreshMenu(); refreshSkinBar();
-      toast2(t('col.freeOk', { cue:(m.ad||aday) }));
+      toastUI(t('col.freeOk', { cue:(m.ad||aday) }));
       showScreen('collection');
     } else {
-      toast2(t('col.adFail'));
+      toastUI(t('col.adFail'));
     }
   });
 }
