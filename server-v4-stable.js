@@ -26,7 +26,12 @@ const httpServer = http.createServer((req, res) => {
     '.wav':'audio/wav',
     '.mp3':'audio/mpeg',
     '.svg':'image/svg+xml',
-    '.json':'application/json'
+    '.json':'application/json',
+    // Self-host edilen yazi tipleri (assets/fonts/web/). Bu tip
+    // olmadan woff2 dosyalari 'text/html' olarak servis ediliyordu.
+    '.woff2':'font/woff2',
+    '.woff':'font/woff',
+    '.txt':'text/plain; charset=utf-8'
   };
 
   try {
