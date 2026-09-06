@@ -260,6 +260,31 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dk);font-famil
   background-position:center;background-color:rgba(0,0,0,0.55);transition:all 0.2s;flex-shrink:0;position:relative;}
 .skin-th:hover{border-color:rgba(255,150,0,0.45);transform:scale(1.06);}
 .skin-th.active{border-color:#ffcc00;box-shadow:0 0 9px rgba(255,200,0,0.5);}
+/* [KARSILAMA + RADYO] Mesaj akisinin USTUNDE statik panel. Akisin icinde
+   DEGILDIR: chatKirp/chatAkisBosalt bu bloga dokunamaz, mesaj sayilmaz. */
+#chat-hos{flex:none;margin:0 14px 8px;padding:10px 12px;border-radius:8px;
+  background:rgba(255,120,0,0.05);border:1px solid rgba(255,150,0,0.20);}
+.chat-hos-rozet{display:inline-block;font-size:0.5rem;letter-spacing:1.2px;font-weight:700;
+  padding:2px 7px;border-radius:9px;margin-bottom:6px;
+  background:rgba(255,170,0,0.16);border:1px solid rgba(255,170,0,0.38);color:#ffc861;}
+.chat-hos-satir{font-size:0.72rem;line-height:1.5;color:rgba(255,255,255,0.72);margin-bottom:3px;}
+.chat-hos-satir a{color:#7ec8ff;text-decoration:none;border-bottom:1px solid rgba(126,200,255,0.35);}
+.chat-hos-satir a:hover{color:#a9dcff;}
+#chat-radyo{display:flex;align-items:center;gap:9px;margin-top:9px;padding-top:8px;
+  border-top:1px solid rgba(255,255,255,0.07);flex-wrap:wrap;}
+.chat-radyo-ad{font-size:0.66rem;font-weight:700;letter-spacing:1px;color:#ffb84d;flex:none;}
+#chat-radyo-btn{flex:none;font-size:0.58rem;letter-spacing:0.8px;padding:4px 11px;border-radius:5px;
+  cursor:pointer;background:rgba(255,150,0,0.16);border:1px solid rgba(255,170,0,0.42);color:#ffcc66;}
+#chat-radyo-btn:hover{background:rgba(255,150,0,0.26);}
+.chat-radyo-durum{font-size:0.56rem;color:rgba(255,255,255,0.38);flex:1;min-width:0;}
+@media (max-height:560px){
+  #chat-hos{margin:0 10px 6px;padding:7px 9px;}
+  .chat-hos-rozet{font-size:0.44rem;margin-bottom:4px;}
+  .chat-hos-satir{font-size:0.6rem;line-height:1.4;}
+  #chat-radyo{margin-top:6px;padding-top:6px;gap:6px;}
+  .chat-radyo-ad{font-size:0.56rem;} #chat-radyo-btn{font-size:0.5rem;padding:3px 8px;}
+  .chat-radyo-durum{font-size:0.48rem;}
+}
 /* [BILDIRIM] Ekrandan BAGIMSIZ toast katmani. toast2()/#pot-t oyun ici
    bildirimler icin AYNEN kalir; bu katman menu/koleksiyon gibi
    #screen-game kapaliyken de gorunmesi gereken mesajlar icindir. */
@@ -2442,6 +2467,20 @@ en: {
   'season.summer':'Summer',
   'season.ramadan':'Ramadan & Eid',
   'season.bigsport':'World Cup',
+  'chat.sysBadge':'SYSTEM · INFERNO POOL',
+  'chat.welcome1':'🔥 Welcome to Inferno Pool Global Chat!',
+  'chat.welcome2':'🎱 Chat with players from around the world, invite opponents and find new match partners.',
+  'chat.welcome3':'📻 Inferno Radio is coming soon! You will be able to use the PLAY button here to listen while you chat.',
+  'chat.supportLbl':'🛠️ Support, bug reports or suggestions:',
+  'chat.devLbl':'💻 Our software and app work:',
+  'radio.title':'📻 INFERNO RADIO',
+  'radio.play':'▶ PLAY',
+  'radio.stop':'■ STOP',
+  'radio.soon':'Coming soon',
+  'radio.ready':'Ready',
+  'radio.live':'On air',
+  'radio.soonToast':'📻 Inferno Radio is coming soon!',
+  'radio.err':'📻 Radio could not start.',
   'col.button':'🎴 MY CUES',
   'col.free':'🎁 FREE CUE',
   'col.freeUsedShort':'🎁 USED TODAY',
@@ -2740,6 +2779,20 @@ tr: {
   'season.summer':'Yaz',
   'season.ramadan':'Ramazan & Bayram',
   'season.bigsport':'Dünya Kupası',
+  'chat.sysBadge':'SİSTEM · INFERNO POOL',
+  'chat.welcome1':'🔥 Inferno Pool Global Sohbet’e hoş geldiniz!',
+  'chat.welcome2':'🎱 Dünyanın dört bir yanından oyuncularla sohbet edebilir, rakiplerinizi davet edebilir ve yeni maç arkadaşları edinebilirsiniz.',
+  'chat.welcome3':'📻 Inferno Radio yakında yayında! Sohbet ederken müzik dinlemek için burada OYNAT düğmesini kullanabileceksiniz.',
+  'chat.supportLbl':'🛠️ Destek, hata bildirimi veya önerileriniz için:',
+  'chat.devLbl':'💻 Yazılım ve uygulama çalışmalarımız:',
+  'radio.title':'📻 INFERNO RADIO',
+  'radio.play':'▶ OYNAT',
+  'radio.stop':'■ DURDUR',
+  'radio.soon':'Yakında yayında',
+  'radio.ready':'Hazır',
+  'radio.live':'Yayında',
+  'radio.soonToast':'📻 Inferno Radio yakında yayında!',
+  'radio.err':'📻 Radyo başlatılamadı.',
   'col.button':'🎴 ISTAKALARIM',
   'col.free':'🎁 ÜCRETSİZ ISTAKA',
   'col.freeUsedShort':'🎁 BUGÜN KULLANILDI',
@@ -3024,6 +3077,20 @@ ru: {
   'season.summer':'Лето',
   'season.ramadan':'Рамадан и Эйд',
   'season.bigsport':'Чемпионат мира',
+  'chat.sysBadge':'СИСТЕМА · INFERNO POOL',
+  'chat.welcome1':'🔥 Добро пожаловать в общий чат Inferno Pool!',
+  'chat.welcome2':'🎱 Общайтесь с игроками со всего мира, приглашайте соперников и находите новых партнёров для матчей.',
+  'chat.welcome3':'📻 Inferno Radio скоро в эфире! Здесь вы сможете нажать ПЛЕЙ, чтобы слушать музыку во время общения.',
+  'chat.supportLbl':'🛠️ Поддержка, ошибки или предложения:',
+  'chat.devLbl':'💻 Наши программы и приложения:',
+  'radio.title':'📻 INFERNO RADIO',
+  'radio.play':'▶ ПЛЕЙ',
+  'radio.stop':'■ СТОП',
+  'radio.soon':'Скоро в эфире',
+  'radio.ready':'Готово',
+  'radio.live':'В эфире',
+  'radio.soonToast':'📻 Inferno Radio скоро в эфире!',
+  'radio.err':'📻 Не удалось запустить радио.',
   'col.button':'🎴 МОИ КИИ',
   'col.free':'🎁 БЕСПЛАТНЫЙ КИЙ',
   'col.freeUsedShort':'🎁 ИСПОЛЬЗОВАНО',
@@ -3573,6 +3640,32 @@ function toastUI(mesaj, sure){
   e.classList.add('show');
   clearTimeout(_uiToastTmr);
   _uiToastTmr = setTimeout(function(){ e.classList.remove('show'); }, sure || 2600);
+}
+// ── [RADYO] Inferno Radio ────────────────────────────────────────────
+// AKTIFLESTIRME: yalnizca RADIO_STREAM'e gecerli bir yayin URL'si yazmak
+// yeterlidir. Bos oldugu surece "yakinda yayinda" bildirimi gosterilir;
+// hicbir dis kaynak istegi YAPILMAZ.
+const RADIO_STREAM = '';
+let _radyoSes = null;
+function radyoCalisiyorMu(){ return !!(_radyoSes && !_radyoSes.paused); }
+function radyoDegistir(){
+  if(!RADIO_STREAM){
+    toastUI(t('radio.soonToast'));
+    return;
+  }
+  try{
+    if(!_radyoSes){ _radyoSes = new Audio(RADIO_STREAM); _radyoSes.preload = 'none'; }
+    if(radyoCalisiyorMu()){ _radyoSes.pause(); }
+    else { _radyoSes.play().catch(function(){ toastUI(t('radio.err')); }); }
+  }catch(e){ toastUI(t('radio.err')); }
+  radyoDurumTazele();
+}
+function radyoDurumTazele(){
+  const b = document.getElementById('chat-radyo-btn');
+  const d = document.getElementById('chat-radyo-durum');
+  if(b) b.textContent = (RADIO_STREAM && radyoCalisiyorMu()) ? t('radio.stop') : t('radio.play');
+  if(d) d.textContent = RADIO_STREAM ? (radyoCalisiyorMu() ? t('radio.live') : t('radio.ready'))
+                                     : t('radio.soon');
 }
 // ── [KOLEKSIYON V2] Collection / My Cues ─────────────────────────────
 // LAZY LOAD: 106 satir birden DOM'a basilmaz. Sayfa basina COL_SAYFA
@@ -7446,6 +7539,8 @@ function chatKur(){
   if(tmz) tmz.onclick = chatGlobalTemizle;
   const uk = document.getElementById('chat-uyari-kapat');
   if(uk) uk.onclick = chatUyariGizle;
+  const rb = document.getElementById('chat-radyo-btn');
+  if(rb) rb.onclick = radyoDegistir;
   const ev = document.getElementById('menu-event');
   if(ev) ev.onclick = function(){ showScreen('event'); };
   const col = document.getElementById('menu-collection');
@@ -7554,6 +7649,25 @@ if(document.readyState === 'loading'){
         <div class="chat-uyari" id="chat-uyari">
           <span class="chat-uyari-metin" id="chat-uyari-metin"></span>
           <button class="chat-uyari-kapat" type="button" id="chat-uyari-kapat">✕</button>
+        </div>
+        <div class="chat-hos" id="chat-hos">
+          <div class="chat-hos-rozet" data-i18n="chat.sysBadge">SYSTEM · INFERNO POOL</div>
+          <div class="chat-hos-satir" data-i18n="chat.welcome1">🔥 Welcome to Inferno Pool Global Chat!</div>
+          <div class="chat-hos-satir" data-i18n="chat.welcome2">🎱 Chat with players worldwide, invite opponents and find new match partners.</div>
+          <div class="chat-hos-satir" data-i18n="chat.welcome3">📻 Inferno Radio is coming soon!</div>
+          <div class="chat-hos-satir">
+            <span data-i18n="chat.supportLbl">🛠️ Support, bug reports or suggestions:</span>
+            <a id="chat-lnk-nova" href="https://www.instagram.com/novarecstudio/" target="_blank" rel="noopener noreferrer">NovaRec Studio</a>
+          </div>
+          <div class="chat-hos-satir">
+            <span data-i18n="chat.devLbl">💻 Our software and apps:</span>
+            <a id="chat-lnk-console" href="https://www.instagram.com/consoletunes/" target="_blank" rel="noopener noreferrer">ConsoleTunes</a>
+          </div>
+          <div id="chat-radyo">
+            <span class="chat-radyo-ad" data-i18n="radio.title">📻 INFERNO RADIO</span>
+            <button id="chat-radyo-btn" type="button" data-i18n="radio.play">▶ PLAY</button>
+            <span class="chat-radyo-durum" id="chat-radyo-durum" data-i18n="radio.soon">Coming soon</span>
+          </div>
         </div>
         <div class="chat-akis" id="chat-akis"></div>
         <div class="chat-alt">
