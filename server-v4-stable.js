@@ -167,9 +167,17 @@ wss.on('connection', (ws) => {
         case 'find_match': findMatch(ws, msg); break;
         case 'relay':
         case 'rematch_request':
-        case 'rematch_accept':
         case 'rematch_decline':
           relay(ws, msg); break;
+        // [DAVET] Rematch AYNI odada yeni bir mactir; soketler degismedigi
+        // icin onceki macin cooldown'u aksi halde tasinirdi.
+        case 'rematch_accept': {
+          try{
+            const _oda = rooms.get(ws.roomId);
+            if(_oda){ davetMacSinirindaSifirla(_oda.host); davetMacSinirindaSifirla(_oda.guest); }
+          }catch(e){}
+          relay(ws, msg); break;
+        }
         case 'turn_end': turnEnd(ws, msg); break;
         // [DAVET] Sohbet kimligi mac SIRASINDA da kurulabilir; ws.chatSid
         // yalnizca find_match aninda yakalandigi icin burada TAZELENIR.
@@ -294,6 +302,17 @@ function davetBlokVar(a, b){
 }
 
 function davetHata(ws, kod){ send(ws, { type:'chat_invite_error', reason: kod }); }
+
+// [DAVET] YENI MAC SINIRI: onceki macin 45 sn'lik COOLDOWN kaydi yeni
+// maci kilitlemesin. Cooldown ayni mac ICINDE aynen calismaya devam
+// eder; yalnizca mac degistiginde temizlenir.
+// SAATLIK TAVAN (DAVET_SAATLIK_MAX) BILEREK KORUNUR: spam korumasi
+// mac sinirindan etkilenmez.
+function davetMacSinirindaSifirla(ws){
+  if(!ws) return;
+  const k = davetSayac.get(ws.id);
+  if(k && k.son && typeof k.son.clear === 'function') k.son.clear();
+}
 
 // ── chat_invite: daveti OLUSTUR ───────────────────────────
 function davetGonder(ws, msg){
@@ -469,6 +488,8 @@ function findMatch(ws, msg) {
     // hicbir kisisel alan (e-posta, IP, gercek ad) GONDERILMEZ.
     const hostProfil  = room.host.profil  || { ad:'', avatar:'', kaynak:'guest' };
     const guestProfil = room.guest.profil || { ad:'', avatar:'', kaynak:'guest' };
+    // [DAVET] Yeni mac: iki taraf da onceki macin cooldown'undan kurtulur.
+    try{ davetMacSinirindaSifirla(room.host); davetMacSinirindaSifirla(room.guest); }catch(e){}
     send(room.host,  {type:'game_start', slot:0, ballSeed:seed, hostNick:hostNick, guestNick:guestNick,
                       hostProfile:hostProfil, guestProfile:guestProfil});
     send(room.guest, {type:'game_start', slot:1, ballSeed:seed, hostNick:hostNick, guestNick:guestNick,

@@ -724,9 +724,9 @@ font-family:sans-serif;
            i18nUygula() hem metni yazar hem Kiril icin .i18n-kiril sinifini
            kendisi atar; ayri bir font mantigi gerekmez. -->
       <div class="lang-row" id="lang-row">
-        <button class="lang-btn" type="button" data-lang-sec="tr"><span class="lang-bayrak">🇹🇷</span><span data-i18n="settings.langTr">Türkçe</span></button>
-        <button class="lang-btn" type="button" data-lang-sec="ru"><span class="lang-bayrak">🇷🇺</span><span data-i18n="settings.langRu">Русский</span></button>
         <button class="lang-btn" type="button" data-lang-sec="en"><span class="lang-bayrak">🇬🇧</span><span data-i18n="settings.langEn">English</span></button>
+        <button class="lang-btn" type="button" data-lang-sec="ru"><span class="lang-bayrak">🇷🇺</span><span data-i18n="settings.langRu">Русский</span></button>
+        <button class="lang-btn" type="button" data-lang-sec="tr"><span class="lang-bayrak">🇹🇷</span><span data-i18n="settings.langTr">Türkçe</span></button>
       </div>
       <!-- [KOLEKSIYON V2] -->
       <button id="menu-collection" data-i18n="col.button">🎴 MY CUES</button>
@@ -1617,6 +1617,7 @@ function startOnlineGame(seed, nick1, nick2) {
   // kurulur; ilk davette 1-2 sn baglanti gecikmesi olabilir ve bu
   // sure 'inv.connecting' gostergesiyle kullaniciya bildirilir.
   _davetRakipDeneme = 0;
+  _davetKimlikYenileme = 0;   // yeni mac: self_invite kurtarmasi yeniden hakli
   el('gs1').textContent='0'; el('gs2').textContent='0';
   el('ge1').textContent='---'; el('ge2').textContent='---';
   el('gc1').textContent='0'; el('gc2').textContent='0';
@@ -2289,6 +2290,128 @@ function cueMeta(k){
 }
 function tumCueler(){ return Object.keys(ASSET_CUES); }
 
+// ── [CUE ADI I18N] Kullaniciya GOSTERILEN istaka adlari ─────────
+// 106/106 istaka icin TR/EN/RU. Bu tablo YALNIZCA GORUNEN adi belirler:
+// cue ID'si, asset yolu, nadirlik, fiyat ve sahiplik verisi DEGISMEZ.
+// cueMeta().ad teknik alan olarak yerinde kalir (geriye donuk uyum).
+const CUE_AD_I18N = {
+  afrika_temali_altin_asa_emblemi:{tr:'Afrika Altın Asa Amblemi',en:'African Golden Sceptre Emblem',ru:'Африканский золотой скипетр'},
+  alman_imparatorluk_asasi_detaylari:{tr:'Alman İmparatorluk Asası',en:'German Imperial Sceptre',ru:'Германский имперский скипетр'},
+  am_armenia:{tr:'Ermenistan Miras Asası',en:'Armenian Heritage Sceptre',ru:'Армянский наследный скипетр'},
+  asa_ceremonial_mexicana_de_oro:{tr:'Meksika Altın Tören Asası',en:'Mexican Golden Ceremonial Sceptre',ru:'Мексиканский золотой скипетр'},
+  avustralya_temali_mucevherli_toren:{tr:'Avustralya Mücevherli Tören Asası',en:'Australian Jewelled Sceptre',ru:'Австралийский самоцветный скипетр'},
+  belcika_temali_kraliyet_asasi:{tr:'Belçika Kraliyet Asası',en:'Belgian Royal Sceptre',ru:'Бельгийский королевский скипетр'},
+  bulgaristanin_suslu_hanedan_asasi:{tr:'Bulgaristan Hanedan Asası',en:'Bulgarian Dynastic Sceptre',ru:'Болгарский династический скипетр'},
+  cetro_ornamental_brasil_futebol_e_:{tr:'Brezilya Futbol Şöleni Asası',en:'Brazilian Football Festival Sceptre',ru:'Бразильский футбольный скипетр'},
+  danimarkanin_mucevherli_toren_asas:{tr:'Danimarka Mücevherli Tören Asası',en:'Danish Jewelled Sceptre',ru:'Датский самоцветный скипетр'},
+  gronland_temali_gorkemli_toren_asa:{tr:'Grönland Görkemli Tören Asası',en:'Greenland Majestic Sceptre',ru:'Гренландский величественный скипетр'},
+  hindistan_motifli_mucevherli_toren:{tr:'Hindistan Mücevherli Tören Asası',en:'Indian Jewelled Sceptre',ru:'Индийский самоцветный скипетр'},
+  hollanda_temali_gorkemli_scepter:{tr:'Hollanda Görkemli Asası',en:'Dutch Majestic Sceptre',ru:'Нидерландский величественный скипетр'},
+  hirvatistan_temali_gorkemli_toren_:{tr:'Hırvatistan Görkemli Tören Asası',en:'Croatian Majestic Sceptre',ru:'Хорватский церемониальный скипетр'},
+  irlanda_esintili_buyulu_kelt_asasi:{tr:'İrlanda Büyülü Kelt Asası',en:'Irish Enchanted Celtic Sceptre',ru:'Ирландский кельтский посох'},
+  irlanda_temali_mucevherli_toren_as:{tr:'İrlanda Mücevherli Tören Asası',en:'Irish Jewelled Sceptre',ru:'Ирландский самоцветный скипетр'},
+  iskocyanin_islemeli_hanedan_asasi:{tr:'İskoçya İşlemeli Hanedan Asası',en:'Scottish Engraved Sceptre',ru:'Шотландский гравированный скипетр'},
+  ispanyol_temali_suslu_asa_ve_arma:{tr:'İspanyol Süslü Asa ve Arma',en:'Spanish Ornate Sceptre and Crest',ru:'Испанский узорный скипетр с гербом'},
+  israil_sembollu_gorkemli_asa:{tr:'İsrail Sembollü Görkemli Asa',en:'Israeli Emblem Sceptre',ru:'Израильский символический скипетр'},
+  isvicre_temali_gorkemli_scepter:{tr:'İsviçre Görkemli Asası',en:'Swiss Majestic Sceptre',ru:'Швейцарский величественный скипетр'},
+  italya_esintili_barok_sihirli_asa:{tr:'İtalyan Barok Sihirli Asa',en:'Italian Baroque Magic Sceptre',ru:'Итальянский барочный жезл'},
+  italyanin_yaldizli_seremonial_asas:{tr:'İtalya Yaldızlı Seremoni Asası',en:'Italian Gilded Ceremonial Sceptre',ru:'Итальянский золочёный скипетр'},
+  k_k_t_c_temali_gorkemli_sembolik_a:{tr:'K.K.T.C. Sembolik Asası',en:'Northern Cyprus Symbolic Sceptre',ru:'Скипетр Северного Кипра'},
+  kanada_temali_buyulu_toren_asasi:{tr:'Kanada Büyülü Tören Asası',en:'Canadian Enchanted Sceptre',ru:'Канадский зачарованный скипетр'},
+  macaristan_temali_gorkemli_serecce:{tr:'Macaristan Görkemli Tören Asası',en:'Hungarian Majestic Sceptre',ru:'Венгерский величественный скипетр'},
+  makedonyanin_altin_toren_asasi:{tr:'Makedonya Altın Tören Asası',en:'Macedonian Golden Sceptre',ru:'Македонский золотой скипетр'},
+  misirin_altin_sonmezlik_asasi:{tr:'Mısır Ölümsüzlük Asası',en:'Egyptian Eternity Sceptre',ru:'Египетский скипетр вечности'},
+  sveriges_kungliga_heraldikscepter:{tr:'İsveç Kraliyet Hanedan Asası',en:'Swedish Royal Heraldic Sceptre',ru:'Шведский геральдический скипетр'},
+  tayland_temali_suslu_toren_asasi:{tr:'Tayland Süslü Tören Asası',en:'Thai Ornate Ceremonial Sceptre',ru:'Тайский узорный скипетр'},
+  tongkat_seremonial_budaya_indonesi:{tr:'Endonezya Kültür Tören Asası',en:'Indonesian Ceremonial Staff',ru:'Индонезийский церемониальный посох'},
+  turkiye_temali_altin_sorguclu_asa:{tr:'Türkiye Altın Sorguçlu Asa',en:'Turkish Golden Plumed Sceptre',ru:'Турецкий золотой скипетр с плюмажем'},
+  yunanistanin_altin_simgesi:{tr:'Yunanistan Altın Simgesi',en:'Greek Golden Emblem',ru:'Греческий золотой символ'},
+  cek_cumhuriyetinin_suslemeli_haned:{tr:'Çekya Süslemeli Hanedan Asası',en:'Czech Ornate Dynastic Sceptre',ru:'Чешский узорный скипетр'},
+  astral_mezopotamya_sihirli_asasi:{tr:'Astral Mezopotamya Asası',en:'Astral Mesopotamian Sceptre',ru:'Астральный месопотамский жезл'},
+  bermuda_ucgeni_firtina_asasi:{tr:'Bermuda Üçgeni Fırtına Asası',en:'Bermuda Triangle Storm Sceptre',ru:'Штормовой жезл Бермудского треугольника'},
+  dogon_kozmik_tilsim_asasi:{tr:'Dogon Kozmik Tılsım Asası',en:'Dogon Cosmic Talisman Sceptre',ru:'Космический талисман догонов'},
+  isis_esintili_kozmik_asa:{tr:'İsis Kozmik Asası',en:'Isis Cosmic Sceptre',ru:'Космический жезл Исиды'},
+  kozmik_horusun_altin_asasi:{tr:'Kozmik Horus’un Altın Asası',en:'Cosmic Horus Golden Sceptre',ru:'Золотой жезл космического Гора'},
+  kozmik_kara_delik_asasi:{tr:'Kozmik Kara Delik Asası',en:'Cosmic Black Hole Sceptre',ru:'Жезл космической чёрной дыры'},
+  magnetar_space_kozmik_asa_armasi:{tr:'Magnetar Kozmik Asa Arması',en:'Magnetar Cosmic Sceptre Crest',ru:'Космический герб магнетара'},
+  misir_esintili_kozmik_anubis_asasi:{tr:'Kozmik Anubis Asası',en:'Cosmic Anubis Sceptre',ru:'Космический жезл Анубиса'},
+  nebula_space_kozmik_asa_dusu:{tr:'Nebula Kozmik Asa Düşü',en:'Nebula Cosmic Sceptre Dream',ru:'Грёзы туманности'},
+  osirisin_kozmik_mistik_asasi:{tr:'Osiris’in Kozmik Mistik Asası',en:'Osiris Cosmic Mystic Sceptre',ru:'Мистический жезл Осириса'},
+  pulsar_uzay_asasi_amblemi:{tr:'Pulsar Uzay Asası Amblemi',en:'Pulsar Space Sceptre Emblem',ru:'Эмблема жезла пульсара'},
+  sobekin_kozmik_su_asasi:{tr:'Sobek’in Kozmik Su Asası',en:'Sobek Cosmic Water Sceptre',ru:'Космический водный жезл Собека'},
+  uzayli_kacirma_temali_kozmik_asa:{tr:'Uzaylı Kaçırma Kozmik Asası',en:'Alien Abduction Cosmic Sceptre',ru:'Космический жезл похищения'},
+  sasta_daginin_kozmik_buyu_asasi:{tr:'Şasta Dağı Kozmik Büyü Asası',en:'Mount Shasta Cosmic Magic Sceptre',ru:'Магический жезл горы Шаста'},
+  aswang_gece_avcisi_samanik_silahi:{tr:'Aswang Gece Avcısı Şaman Asası',en:'Aswang Night Hunter Shaman Staff',ru:'Шаманский посох ночного охотника'},
+  baton_de_billard_azteque_mexicain_:{tr:'Aztek Süslemeli Bilardo Istakası',en:'Ornate Aztec Billiard Cue',ru:'Узорный ацтекский кий'},
+  buyulu_ejderha_asasi_ve_tilsimlari:{tr:'Büyülü Ejderha Asası',en:'Enchanted Dragon Sceptre',ru:'Зачарованный жезл дракона'},
+  grootslang_serpent_scepteri:{tr:'Grootslang Yılan Asası',en:'Grootslang Serpent Sceptre',ru:'Змеиный жезл Гроотсланга'},
+  japon_temali_sakura_savas_asasi:{tr:'Japon Sakura Savaş Asası',en:'Japanese Sakura War Staff',ru:'Японский боевой посох сакуры'},
+  mucevherli_inkanyamba_firtina_asas:{tr:'Mücevherli Inkanyamba Fırtına Asası',en:'Jewelled Inkanyamba Storm Sceptre',ru:'Самоцветный жезл Инканьямбы'},
+  nefertiti_motifli_misir_asasi:{tr:'Nefertiti Mısır Asası',en:'Nefertiti Egyptian Sceptre',ru:'Египетский жезл Нефертити'},
+  norvec_esintili_suslemeli_viking_a:{tr:'Norveç Süslemeli Viking Asası',en:'Norse Ornate Viking Staff',ru:'Узорный посох викингов'},
+  penanggalanin_kanli_tilsimli_asasi:{tr:'Penanggalan’ın Kanlı Tılsım Asası',en:'Penanggalan Blood Talisman Staff',ru:'Кровавый талисман Пенанггалан'},
+  cin_temali_ejderha_asasi:{tr:'Çin Ejderha Asası',en:'Chinese Dragon Sceptre',ru:'Китайский жезл дракона'},
+  ammit_ruhlarin_misir_yargici:{tr:'Ammit — Ruhların Yargıcı',en:'Ammit, Devourer of Souls',ru:'Аммит — пожиратель душ'},
+  asili_hayaletin_lanetli_savas_asas:{tr:'Asılı Hayaletin Lanetli Asası',en:'Hanged Ghost Cursed Staff',ru:'Проклятый посох призрака'},
+  cadi_asasi_ve_neon_yesil_kristal:{tr:'Cadı Asası ve Neon Kristal',en:'Witch Staff with Neon Crystal',ru:'Ведьмин посох с кристаллом'},
+  dybbukun_lanetli_ruh_muhru:{tr:'Dybbuk’un Lanetli Ruh Mührü',en:'Dybbuk Cursed Soul Seal',ru:'Проклятая печать Диббука'},
+  gotik_kafatasi_ve_kristal_asasi:{tr:'Gotik Kafatası Kristal Asası',en:'Gothic Skull Crystal Staff',ru:'Готический посох с черепом'},
+  kanli_ay_kurt_mizragi:{tr:'Kanlı Ay Kurt Mızrağı',en:'Blood Moon Wolf Spear',ru:'Волчье копьё кровавой луны'},
+  kismetes_tematikaju_gotik_asaegyve:{tr:'Kader Temalı Gotik Asa',en:'Fate-Themed Gothic Staff',ru:'Готический посох судьбы'},
+  olgoy_korkoyun_lanetli_savas_asasi:{tr:'Olgoy Korkoy’un Lanetli Asası',en:'Olgoi-Khorkhoi Cursed Staff',ru:'Проклятый посох олгой-хорхоя'},
+  togo_ve_gana_vampir_adze_asasi:{tr:'Adze Vampir Asası',en:'Adze Vampire Staff',ru:'Вампирский посох Адзе'},
+  vampir_temali_gotik_bilardo_istaka:{tr:'Vampir Gotik Bilardo Istakası',en:'Vampire Gothic Billiard Cue',ru:'Вампирский готический кий'},
+  emiratesin_mucevherli_toren_asasi:{tr:'Emirlikler Mücevherli Tören Asası',en:'Emirates Jewelled Sceptre',ru:'Самоцветный скипетр Эмиратов'},
+  fransiz_kraliyet_asasi_ve_paris_su:{tr:'Fransız Kraliyet Asası',en:'French Royal Sceptre',ru:'Французский королевский скипетр'},
+  izlanda_temali_mucevherli_toren_as:{tr:'İzlanda Mücevherli Tören Asası',en:'Icelandic Jewelled Sceptre',ru:'Исландский самоцветный скипетр'},
+  kolombiyanin_mucevherli_hanedan_as:{tr:'Kolombiya Mücevherli Hanedan Asası',en:'Colombian Jewelled Sceptre',ru:'Колумбийский самоцветный скипетр'},
+  kosta_rika_temali_gorkemli_asa:{tr:'Kosta Rika Görkemli Asası',en:'Costa Rican Majestic Sceptre',ru:'Величественный скипетр Коста-Рики'},
+  londrali_mucevherli_kraliyet_asasi:{tr:'Londra Mücevherli Kraliyet Asası',en:'London Jewelled Royal Sceptre',ru:'Лондонский королевский скипетр'},
+  manananggal_temali_kanli_savas_asa:{tr:'Manananggal Kanlı Savaş Asası',en:'Manananggal Blood War Staff',ru:'Кровавый посох Мананангал'},
+  mucevherli_rus_imparatorluk_asasi:{tr:'Mücevherli Rus İmparatorluk Asası',en:'Jewelled Russian Imperial Sceptre',ru:'Самоцветный императорский скипетр'},
+  zindan_kilici_fantazi_amblemi:{tr:'Zindan Kılıcı Fantezi Amblemi',en:'Dungeon Blade Fantasy Emblem',ru:'Эмблема клинка подземелья'},
+  futuristik_android_enerji_asasi:{tr:'Fütüristik Android Enerji Asası',en:'Futuristic Android Energy Staff',ru:'Энергетический посох андроида'},
+  gelecegin_kodlari_holografik_siber:{tr:'Geleceğin Kodları Siber Asa',en:'Future Code Cyber Staff',ru:'Кибер-посох кодов будущего'},
+  cosmic_eclipse:{tr:'Kozmik Tutulma',en:'Cosmic Eclipse',ru:'Космическое затмение'},
+  royal_diamond:{tr:'Kraliyet Elması',en:'Royal Diamond',ru:'Королевский бриллиант'},
+  emerald_serpent:{tr:'Zümrüt Yılan',en:'Emerald Serpent',ru:'Изумрудный змей'},
+  golden_phoenix:{tr:'Altın Anka',en:'Golden Phoenix',ru:'Золотой феникс'},
+  frost_king:{tr:'Buz Kralı',en:'Frost King',ru:'Ледяной король'},
+  thunder_strike:{tr:'Yıldırım Darbesi',en:'Thunder Strike',ru:'Удар грома'},
+  dragon_bone:{tr:'Ejderha Kemiği',en:'Dragon Bone',ru:'Кость дракона'},
+  neon_core:{tr:'Neon Çekirdek',en:'Neon Core',ru:'Неоновое ядро'},
+  champion:{tr:'Şampiyon',en:'Champion',ru:'Чемпион'},
+  golden_goal:{tr:'Altın Gol',en:'Golden Goal',ru:'Золотой гол'},
+  stadium_flame:{tr:'Stadyum Ateşi',en:'Stadium Flame',ru:'Пламя стадиона'},
+  blood_moon:{tr:'Kanlı Ay',en:'Blood Moon',ru:'Кровавая луна'},
+  ghost_flame:{tr:'Hayalet Alevi',en:'Ghost Flame',ru:'Призрачное пламя'},
+  haunted_bone:{tr:'Lanetli Kemik',en:'Haunted Bone',ru:'Проклятая кость'},
+  pumpkin_inferno:{tr:'Balkabağı Cehennemi',en:'Pumpkin Inferno',ru:'Тыквенное пекло'},
+  candy_cane:{tr:'Şeker Kamışı',en:'Candy Cane',ru:'Леденцовая трость'},
+  frozen_christmas:{tr:'Donmuş Yılbaşı',en:'Frozen Christmas',ru:'Морозное Рождество'},
+  winter_star:{tr:'Kış Yıldızı',en:'Winter Star',ru:'Зимняя звезда'},
+  crescent_moon:{tr:'Hilal',en:'Crescent Moon',ru:'Полумесяц'},
+  eid_glow:{tr:'Bayram Işıltısı',en:'Eid Glow',ru:'Сияние праздника'},
+  golden_night:{tr:'Altın Gece',en:'Golden Night',ru:'Золотая ночь'},
+  heartbreaker:{tr:'Kalp Kıran',en:'Heartbreaker',ru:'Разбивающий сердца'},
+  love_diamond:{tr:'Aşk Elması',en:'Love Diamond',ru:'Алмаз любви'},
+  rose_flame:{tr:'Gül Alevi',en:'Rose Flame',ru:'Пламя розы'},
+  celtic_gold:{tr:'Kelt Altını',en:'Celtic Gold',ru:'Кельтское золото'},
+  emerald_luck:{tr:'Zümrüt Şans',en:'Emerald Luck',ru:'Изумрудная удача'},
+  ocean:{tr:'Okyanus',en:'Ocean',ru:'Океан'},
+  sunset:{tr:'Gün Batımı',en:'Sunset',ru:'Закат'},
+  tropical:{tr:'Tropikal',en:'Tropical',ru:'Тропики'},
+};
+// Secili dildeki adi doner. Tabloda yoksa mevcut teknik ada, o da
+// yoksa ID'ye duser: hicbir istaka adsiz kalmaz.
+function cueAd(id){
+  const c = CUE_AD_I18N[id];
+  if(c) return c[LANG] || c.en || c.tr || id;
+  try{ const m = cueMeta(id); if(m && m.ad && m.ad !== id) return m.ad; }catch(e){}
+  return id;
+}
+
+
 // ── 24 SAATLIK REKLAMLI DENEME ──────────────────────────────────────
 // AYRI DEPO: profil (inferno_p) semasi DEGISMEZ. Deneme sahiplik DEGILDIR;
 // P.owned'a HICBIR SEY yazilmaz. Sure bitince refreshSkinBar'daki MEVCUT
@@ -2919,6 +3042,15 @@ en: {
   'inv.chatOpenFailed':'Chat is not available right now. The invitation is still valid — try again.',
   'inv.noNick':'Open the chat once and choose a nickname first.',
   'inv.failed':'Invitation could not be sent.',
+  'inv.alreadyPending':'You already have a pending invitation to this player.',
+  'inv.rateLimited':'Too many invitations. Please wait a while.',
+  'inv.notInMatch':'Invitations can only be sent during an online match.',
+  'inv.noOpponent':'No opponent found in this match.',
+  'inv.opponentOffline':'Your opponent is offline right now.',
+  'inv.selfInvite':'Your chat identity matches your opponent\u2019s. Creating a new one\u2026',
+  'inv.badToken':'This invitation is no longer valid.',
+  'inv.alreadyUsed':'This invitation has already been answered.',
+  'inv.notRecipient':'You cannot answer this invitation.',
   'profile.chatSoon':'💬 Chat',
   'profile.chatSoonTip':'Chat invite — coming soon',
   'profile.badgeGuest':'GUEST',
@@ -3322,6 +3454,15 @@ tr: {
   'inv.chatOpenFailed':'Sohbet şu anda açılamıyor. Davet hâlâ geçerli — tekrar deneyin.',
   'inv.noNick':'Önce sohbeti bir kez açıp takma ad seçin.',
   'inv.failed':'Davet gönderilemedi.',
+  'inv.alreadyPending':'Bu oyuncuya zaten bekleyen bir davetin var.',
+  'inv.rateLimited':'Çok fazla davet gönderdin. Bir süre bekle.',
+  'inv.notInMatch':'Davet yalnızca online maçta gönderilebilir.',
+  'inv.noOpponent':'Bu maçta rakip bulunamadı.',
+  'inv.opponentOffline':'Rakibin şu anda çevrimdışı.',
+  'inv.selfInvite':'Sohbet kimliğin rakibinle aynı görünüyor. Yenisi oluşturuluyor…',
+  'inv.badToken':'Bu davet artık geçerli değil.',
+  'inv.alreadyUsed':'Bu davet zaten yanıtlanmış.',
+  'inv.notRecipient':'Bu daveti yanıtlayamazsın.',
   'profile.chatSoon':'💬 Sohbet',
   'profile.chatSoonTip':'Sohbet daveti — yakında',
   'profile.badgeGuest':'MİSAFİR',
@@ -3711,6 +3852,15 @@ ru: {
   'inv.chatOpenFailed':'Чат сейчас недоступен. Приглашение ещё действительно — попробуйте снова.',
   'inv.noNick':'Сначала откройте чат и выберите ник.',
   'inv.failed':'Не удалось отправить приглашение.',
+  'inv.alreadyPending':'У вас уже есть ожидающее приглашение этому игроку.',
+  'inv.rateLimited':'Слишком много приглашений. Подождите немного.',
+  'inv.notInMatch':'Приглашения доступны только в онлайн-матче.',
+  'inv.noOpponent':'В этом матче нет соперника.',
+  'inv.opponentOffline':'Ваш соперник сейчас не в сети.',
+  'inv.selfInvite':'Ваш чат-профиль совпадает с соперником. Создаём новый…',
+  'inv.badToken':'Это приглашение больше недействительно.',
+  'inv.alreadyUsed':'На это приглашение уже ответили.',
+  'inv.notRecipient':'Вы не можете ответить на это приглашение.',
   'profile.chatSoon':'💬 Чат',
   'profile.chatSoonTip':'Приглашение в чат — скоро',
   'profile.badgeGuest':'ГОСТЬ',
@@ -4085,6 +4235,13 @@ function setLang(kod){
   try{ if(typeof sosyalPaneliCiz === 'function') sosyalPaneliCiz(); }catch(e){}
   // [PROFIL 5b] Rozet metinleri ceviriden gelir.
   try{ if(typeof ghKimlikTazele === 'function') ghKimlikTazele(); }catch(e){}
+  // [CHAT DIL] Sohbet panelinin CALISMA ZAMANINDA cizilen ogeleri
+  // data-i18n tasimaz; i18nUygula() onlara ULASAMAZ. Dil degisince
+  // yeniden cizilirler. GECMIS mesaj satirlari BILEREK dokunulmaz:
+  // onlar yazildiklari andaki kayittir.
+  try{ if(typeof chatDiliTazele === 'function') chatDiliTazele(); }catch(e){}
+  // [CUE ADI] Istaka adlari da dile baglidir.
+  try{ if(typeof refreshSkinBar === 'function') refreshSkinBar(); }catch(e){}
   // [PROFIL] Misafir adi ceviriden gelir; dil degisince guncellenir.
   try{ if(typeof PROFIL !== 'undefined' && PROFIL._onbellek &&
           PROFIL._onbellek.kaynak === 'guest'){ PROFIL._onbellek = profilVarsayilan(); } }catch(e){}
@@ -4244,7 +4401,7 @@ function renderShop(){
     const _blend = (CUE_SCREEN[def.id] === false) ? 'normal' : 'screen';
     div.innerHTML=`<img src="${ASSET_CUES[def.id]}" style="width:180px;height:44px;object-fit:contain;background:transparent;mix-blend-mode:${_blend}">
 <div class="si-info">
-  <div class="si-name">${def.emoji} ${def.name}</div>
+  <div class="si-name">${def.emoji} ${cueAd(def.id)}</div>
   <div class="bars">
     <div class="bar-row"><span>${t('stat.force')}</span><div class="track"><div class="fill fire" style="width:${def.force*10}%"></div></div></div>
     <div class="bar-row"><span>${t('stat.aim')}</span><div class="track"><div class="fill ice" style="width:${def.aim*10}%"></div></div></div>
@@ -4734,6 +4891,8 @@ const SIFIRLA_ANAHTARLAR = [
   'inferno_lang',         // dil tercihi
   'inferno_chat_nick',    // sohbet takma adi
   'inferno_chat_sid',     // sohbet oturum jetonu
+  'inferno_chat_sid_sekme', // jetonu hangi sekmenin sahiplendigi
+
   'inferno_chat_block',   // engelleme listesi
   'inferno_chat_mute',    // susturma listesi
   'inferno_ads'           // gunluk odullu reklam sayaci
@@ -4995,6 +5154,7 @@ PROFIL.register('unknown', { getir: function(){ return null; } });
 let AKTIF_DAVET = null;      // { token, from, profil }
 let _davetGonderiliyor = false;
 let _davetRakipDeneme = 0;   // opponent_chat_required tekrar sayaci
+let _davetKimlikYenileme = 0; // self_invite sonrasi kimlik yenileme sayaci
 
 function davetPopKapat(){
   AKTIF_DAVET = null;
@@ -5107,6 +5267,33 @@ function davetSidYayinla(){
     if(s) wsSend({ type:'chat_sid', sid: s });
   }catch(e){}
 }
+// [SELF-INVITE KURTARMA] Sohbet kimligini SIFIRDAN kurar.
+// Yalnizca sunucu 'self_invite' dediginde cagrilir: o durumda mevcut
+// sid rakiple PAYLASILIYOR demektir ve bu oturumda kullanilamaz.
+// Saklanan sid ve nick birakilir, yeni bir nick turetilir, sohbete
+// YENIDEN katilinir. Sunucu yeni bir sid uretir.
+function davetKimligiYenile(){
+  try{ sessionStorage.removeItem(CHAT_SID_ANAHTAR); }catch(e){}
+  try{ localStorage.removeItem(CHAT_SID_ANAHTAR);
+       localStorage.removeItem(CHAT_SID_SEKME_ANAHTAR); }catch(e){}
+  try{ CHAT.sid = ''; }catch(e){}
+  // Yeni nick: mevcut adin sonuna kisa bir ayirt edici eklenir.
+  try{
+    let kok = String(CHAT.nick || davetNickTuret()).replace(/_\d{1,4}$/, '');
+    kok = Array.from(kok).slice(0, 11).join('');
+    CHAT.nick = davetNickTemizle(kok + '_' + Math.floor(Math.random() * 9000 + 1000)) ||
+                ('Player_' + Math.floor(Math.random() * 9000 + 1000));
+  }catch(e){}
+  // Acik soket uzerinden YENI kimlikle katil; soket yoksa yeniden baglan.
+  try{
+    if(CHAT_WS && CHAT_WS.readyState === WebSocket.OPEN){
+      CHAT.katildi = false;
+      chatWsGonder({ type:'chat_join', nick: CHAT.nick, room: CHAT.oda });
+    }else{
+      chatBaglan();
+    }
+  }catch(e){}
+}
 // Kimlik + baglanti hazirligi. Hazir olunca true.
 // CHAT.acik (ekran gorunur mu) HICBIR asamada on kosul DEGILDIR.
 let _davetKimlikSozu = null;
@@ -5213,8 +5400,27 @@ function davetMesaj(msg){
       setTimeout(function(){ try{ davetIste(true); }catch(e){} }, 1500);
       return true;
     }
+    // SUNUCUNUN URETTIGI TUM KODLAR ayri mesaja baglidir; 'inv.failed'
+    // artik YALNIZCA gercekten bilinmeyen bir kod icin kullanilir.
     const harita = { cooldown:'inv.cooldown', blocked:'inv.blocked', expired:'inv.expired',
-                     chat_required:'inv.chatRequired', opponent_chat_required:'inv.peerChatRequired' };
+                     chat_required:'inv.chatRequired',
+                     opponent_chat_required:'inv.peerChatRequired',
+                     already_pending:'inv.alreadyPending', rate_limited:'inv.rateLimited',
+                     not_in_match:'inv.notInMatch',       no_opponent:'inv.noOpponent',
+                     opponent_offline:'inv.opponentOffline', self_invite:'inv.selfInvite',
+                     bad_token:'inv.badToken',            already_used:'inv.alreadyUsed',
+                     not_recipient:'inv.notRecipient' };
+    // self_invite: iki oyuncu AYNI sohbet kimligine cozuluyor (ayni
+    // tarayici/origin -> ayni localStorage sid'i). Sunucu kontrolu
+    // KALDIRILMAZ; istemci kendi kimligini BIR KEZ yeniler ve tekrar
+    // dener. Boylece iki oyuncu ayri kimliklerle devam eder.
+    if(msg.reason === 'self_invite' && _davetKimlikYenileme < 1){
+      _davetKimlikYenileme++;
+      toastUI(t('inv.selfInvite'));
+      try{ davetKimligiYenile(); }catch(e){}
+      setTimeout(function(){ try{ davetIste(true); }catch(e){} }, 1200);
+      return true;
+    }
     const k = harita[msg.reason] || 'inv.failed';
     toastUI(t(k, { n: msg.kalan || 0 }));
     return true;
@@ -5534,7 +5740,9 @@ function colListesi(){
   return tumCueler().filter(function(k){
     const m = cueMeta(k);
     if(COL_DURUM.kat !== 'ALL' && m.kat !== COL_DURUM.kat) return false;
-    if(ara && (m.ad||k).toLowerCase().indexOf(ara) < 0 && k.indexOf(ara) < 0) return false;
+    // Arama GORUNEN ad, teknik ad ve ID uzerinde calisir.
+    if(ara && cueAd(k).toLowerCase().indexOf(ara) < 0 &&
+       (m.ad||'').toLowerCase().indexOf(ara) < 0 && k.indexOf(ara) < 0) return false;
     return true;
   });
 }
@@ -5557,7 +5765,7 @@ function colSatir(k){
   d.appendChild(g);
   const orta = document.createElement('div'); orta.className = 'col-orta';
   const ad = document.createElement('div'); ad.className = 'col-ad';
-  ad.appendChild(document.createTextNode(m.ad || k));
+  ad.appendChild(document.createTextNode(cueAd(k)));
   orta.appendChild(ad);
   const et = document.createElement('div'); et.className = 'col-etiket';
   const nd = document.createElement('span'); nd.className = 'col-nadir';
@@ -5612,13 +5820,13 @@ function renderCollection(){
     const sira = function(g){ return g===1 ? 0.5 : g; };   // Aktif, Deneme, Sahip, Kilitli
     const ga = sira(colGrup(a)), gb = sira(colGrup(b));
     if(ga !== gb) return ga - gb;
-    return (cueMeta(a).ad||a).localeCompare(cueMeta(b).ad||b);
+    return cueAd(a).localeCompare(cueAd(b));
   });
   const say = document.getElementById('col-sayac');
   if(say) say.textContent = P.owned.length + ' / ' + tumCueler().length;
   const not = document.getElementById('col-not');
   if(not) not.textContent = denemeAktifMi()
-      ? t('col.trialOn', { cue:(cueMeta(DENEME.cue).ad||DENEME.cue), kalan:denemeKalanMetin() })
+      ? t('col.trialOn', { cue:cueAd(DENEME.cue), kalan:denemeKalanMetin() })
       : t('col.hint');
   const BASLIK = ['col.grpActive','col.grpTrial','col.grpOwned','col.grpLocked'];
   let sonGrup = -1, cizilen = 0;
@@ -5665,14 +5873,14 @@ function renderCollection(){
 // onReward'i cagirir -> reklam tamamlanmadan ERISIM VERILMEZ.
 function freeCueAc(){
   if(denemeAktifMi()){
-    toastUI(t('col.trialOn', { cue:(cueMeta(DENEME.cue).ad||DENEME.cue), kalan:denemeKalanMetin() }));
+    toastUI(t('col.trialOn', { cue:cueAd(DENEME.cue), kalan:denemeKalanMetin() }));
     return;
   }
   if(denemeBugunKullanildiMi()){ toastUI(t('col.freeUsed')); return; }
   const aday = denemeAdayi();
   if(!aday){ toastUI(t('col.freeNone')); return; }
   const m = cueMeta(aday);
-  toastUI(t('col.freeAsk', { cue:(m.ad||aday) }));
+  toastUI(t('col.freeAsk', { cue:cueAd(aday) }));
   if(typeof AD === 'undefined' || !AD || typeof AD.showRewarded !== 'function'){
     toastUI(t('col.adFail')); return;
   }
@@ -5683,7 +5891,7 @@ function freeCueAc(){
   }).then(function(r){
     if(r && r.shown === true && denemeAktifMi(aday)){
       refreshMenu(); refreshSkinBar();
-      toastUI(t('col.freeOk', { cue:(m.ad||aday) }));
+      toastUI(t('col.freeOk', { cue:cueAd(aday) }));
       showScreen('collection');
     } else {
       toastUI(t('col.adFail'));
@@ -8791,16 +8999,43 @@ function chatBlokDugmesiCiz(){
 
 // [V2.1a] Jeton okuma/yazma. Bozuk veya asiri uzun deger sessizce
 // yoksayilir; sunucu zaten gecersiz jetonda YENI kimlik uretir.
+// [SEKME KIMLIGI] Ayni tarayicida ACIK IKI SEKME ayni localStorage'i
+// paylasir. Jeton dogrudan oradan okunursa iki oyuncu SUNUCUDA AYNI
+// sohbet kimligine cozulur ve davet 'self_invite' ile reddedilir.
+// Bu yuzden jeton SEKME BASINA (sessionStorage) tutulur; localStorage
+// kopyasi yalnizca TEK bir sekme tarafindan sahiplenilebilir. Ikinci
+// sekme devralmaz, sunucudan YENI jeton alir.
+// Sunucudaki imza dogrulamasi (chatSidDogrula) DEGISMEZ.
+const CHAT_SID_SEKME_ANAHTAR = CHAT_SID_ANAHTAR + '_sekme';
+const _CHAT_SEKME_KIMLIGI = (function(){
+  try{ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); }
+  catch(e){ return 'sekme'; }
+})();
 function chatSidOku(){
+  // 1) BU sekmeye ait jeton
   try{
+    const s = sessionStorage.getItem(CHAT_SID_ANAHTAR);
+    if(typeof s === 'string' && s.length > 0 && s.length <= 128) return s;
+  }catch(e){}
+  // 2) Tarayici kopyasi BASKA bir sekmece sahiplenilmisse KULLANILMAZ.
+  try{
+    const sahip = localStorage.getItem(CHAT_SID_SEKME_ANAHTAR);
+    if(sahip && sahip !== _CHAT_SEKME_KIMLIGI) return '';
     const j = localStorage.getItem(CHAT_SID_ANAHTAR);
-    return (typeof j === 'string' && j.length > 0 && j.length <= 128) ? j : '';
-  }catch(e){ return ''; }
+    if(typeof j === 'string' && j.length > 0 && j.length <= 128){
+      try{ sessionStorage.setItem(CHAT_SID_ANAHTAR, j); }catch(e){}
+      try{ localStorage.setItem(CHAT_SID_SEKME_ANAHTAR, _CHAT_SEKME_KIMLIGI); }catch(e){}
+      return j;
+    }
+  }catch(e){}
+  return '';
 }
 function chatSidYaz(j){
   if(typeof j !== 'string' || !j || j.length > 128) return;
   CHAT.sid = j;
-  try{ localStorage.setItem(CHAT_SID_ANAHTAR, j); }catch(e){}
+  try{ sessionStorage.setItem(CHAT_SID_ANAHTAR, j); }catch(e){}
+  try{ localStorage.setItem(CHAT_SID_ANAHTAR, j);
+       localStorage.setItem(CHAT_SID_SEKME_ANAHTAR, _CHAT_SEKME_KIMLIGI); }catch(e){}
 }
 
 // ── Engelleme / susturma: YALNIZCA istemci tarafinda ─────────────────
@@ -9263,6 +9498,37 @@ function chatMsgIsle(m){
     case 'chat_block_notice':
       break;
   }
+}
+
+// ── [CHAT DIL] Acik sohbet panelini secili dile getir ──────────
+// setLang() cagirir. Yalnizca CALISMA ZAMANINDA cizilen ogeler yeniden
+// uretilir; mesaj akisindaki GECMIS satirlar korunur (onlar olay
+// kaydidir, geriye donuk cevrilmez). Sohbet kapaliysa hicbir sey yapmaz.
+function chatDiliTazele(){
+  const o = document.getElementById('screen-chat');
+  if(!o || o.style.display === 'none' || !CHAT.acik) return;
+  try{ i18nUygula(o); }catch(e){}                    // data-i18n tasiyanlar
+  try{ chatBlokDugmesiCiz(); }catch(e){}             // ENGELLE / KALDIR
+  try{ chatRaporDugmesiCiz(); }catch(e){}            // Bildir
+  try{ chatModDugmesiCiz(); }catch(e){}              // MOD
+  try{ chatOdalariCiz(); }catch(e){}                 // oda listesi + baglam
+  try{ chatKullanicilariCiz(CHAT.sonKullanicilar || []); }catch(e){}
+  // Acik alt paneller: moderator ve rapor.
+  try{
+    const mp = document.getElementById('chat-mod');
+    if(mp && getComputedStyle(mp).display !== 'none'){
+      const tk = document.getElementById('chat-mod-token');
+      const eskiJeton = tk ? tk.value : '';        // yazilan jeton korunur
+      chatModPaneliAc();
+      if(tk) tk.value = eskiJeton;
+    }
+  }catch(e){}
+  try{
+    const rp = document.getElementById('chat-rapor');
+    if(rp && getComputedStyle(rp).display !== 'none' && CHAT_RAPOR_BAGLAM){
+      chatRaporPaneliAc(CHAT_RAPOR_BAGLAM.nick, CHAT_RAPOR_BAGLAM.text, CHAT_RAPOR_BAGLAM.scope);
+    }
+  }catch(e){}
 }
 
 // ── Panel gecisleri ───────────────────────────────────────────────────
