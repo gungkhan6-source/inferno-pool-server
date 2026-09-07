@@ -1042,7 +1042,12 @@ font-family:sans-serif;
   background:linear-gradient(135deg,#c86a00,#8a3d00);
   border:1px solid rgba(255,180,0,0.45);color:#fff2d8;}
 #col-adcoin .ac-btn:hover{border-color:rgba(255,210,80,0.8);}
-#col-adcoin .ac-btn[disabled]{opacity:0.5;cursor:default;}
+#col-adcoin .ac-btn[disabled]{opacity:0.45;cursor:default;}
+/* Reklam yok / hak bitti: kart GORUNUR kalir, yalnizca soner. */
+#col-adcoin.pasif{background:linear-gradient(135deg,rgba(255,170,0,0.06),rgba(255,90,0,0.04));
+  border-color:rgba(255,180,0,0.16);}
+#col-adcoin.pasif .ac-baslik{color:rgba(255,214,138,0.55);}
+#col-adcoin.pasif .ac-odul{color:rgba(255,204,51,0.55);}
 @media (max-width:430px){
   #col-adcoin{gap:8px;padding:8px 10px;}
   #col-adcoin .ac-baslik{font-size:0.66rem;}
@@ -1415,6 +1420,9 @@ async function initCrazyGames() {
     if (!CG_SDK) return;
     await CG_SDK.init();
     cgReady = true;
+    // [ALTIN KARTI] SDK hazir: kart varsa aninda aktiflesir.
+    try{ if(typeof colAdCoinTazele === 'function') colAdCoinTazele(); }catch(e){}
+    try{ if(typeof reklamCoinTazele === 'function') reklamCoinTazele(); }catch(e){}
   } catch (e) {}
 }
 async function showMidrollAd() {
@@ -3067,6 +3075,7 @@ en: {
   'coin.cardNote':'Optional. Watch a short video to the end and get {n} gold. Gold is only for cosmetic cues — every cue can also be earned from matches.',
   'coin.cardBtn':'WATCH VIDEO',
   'coin.cardBusy':'LOADING…',
+  'coin.cardUnavailable':'Rewarded video is currently unavailable',
   'coin.ok':'💰 +{n} coins added!',
   'coin.fail':'Ad could not be shown. No coins were given.',
   'coin.limit':'Daily ad limit reached. Coins are also earned from matches.',
@@ -3487,6 +3496,7 @@ tr: {
   'coin.cardNote':'İsteğe bağlıdır. Kısa videoyu sonuna kadar izle, {n} altın kazan. Altın yalnızca kozmetik istakalar içindir — her istaka maçlardan da kazanılabilir.',
   'coin.cardBtn':'VİDEOYU İZLE',
   'coin.cardBusy':'YÜKLENİYOR…',
+  'coin.cardUnavailable':'Bu platformda reklam şu anda kullanılamıyor',
   'coin.ok':'💰 +{n} jeton eklendi!',
   'coin.fail':'Reklam gösterilemedi. Jeton verilmedi.',
   'coin.limit':'Günlük reklam hakkı doldu. Jetonlar maçlardan da kazanılır.',
@@ -3893,6 +3903,7 @@ ru: {
   'coin.cardNote':'Необязательно. Посмотрите короткое видео до конца и получите {n} золота. Золото нужно только для косметических киев — любой кий можно выиграть в матчах.',
   'coin.cardBtn':'СМОТРЕТЬ',
   'coin.cardBusy':'ЗАГРУЗКА…',
+  'coin.cardUnavailable':'Вознаграждаемое видео сейчас недоступно',
   'coin.ok':'💰 +{n} монет начислено!',
   'coin.fail':'Рекламу не удалось показать. Монеты не начислены.',
   'coin.limit':'Дневной лимит рекламы исчерпан. Монеты также дают за матчи.',
@@ -4674,24 +4685,63 @@ function reklamCoinIste(){
 // true oldugu icin isAvailable false doner -> kart GIZLI kalir ve
 // hicbir gercek reklam cagrilmaz.
 // AKTIF MACTA GOSTERILMEZ: bu kart yalnizca Istakalarim ekranindadir.
+// Reklam GERCEKTEN oynatilabilir mi? (adapter senkron sozlesmesi)
+function reklamKullanilabilirMi(){
+  try{
+    if(typeof AD === 'undefined' || !AD || typeof AD.isAvailable !== 'function') return false;
+    return !!AD.isAvailable();
+  }catch(e){ return false; }
+}
 function colAdCoinTazele(){
   const k = document.getElementById('col-adcoin');
   if(!k) return;
-  if(!reklamCoinGosterilsinMi()){ k.style.display = 'none'; return; }
+  // KART HER ZAMAN GORUNUR. Reklam yoksa gizlenmez; buton PASIF olur ve
+  // nedeni secili dilde yazilir. Sahte reklam/sahte odul YOKTUR.
   k.style.display = 'flex';
   const bas = document.getElementById('col-adcoin-baslik');
   const od  = document.getElementById('col-adcoin-odul');
   const not = document.getElementById('col-adcoin-not');
   const btn = document.getElementById('col-adcoin-btn');
+  const varMi  = reklamKullanilabilirMi();
+  const kalan  = reklamKalanHak();
+  const aktif  = varMi && kalan > 0 && !_reklamCoinCalisiyor;
+  k.classList.toggle('pasif', !varMi || kalan <= 0);
   if(bas) bas.textContent = t('coin.cardTitle');
+  // Odul bilgisi HER DURUMDA gorunur.
   if(od)  od.textContent  = t('coin.cardReward', { n: REKLAM_COIN_ODULU });
-  if(not) not.textContent = t('coin.cardNote', { n: REKLAM_COIN_ODULU }) +
-                            '  ' + t('coin.left', { n: reklamKalanHak() });
+  if(not){
+    if(!varMi)          not.textContent = t('coin.cardUnavailable');
+    else if(kalan <= 0) not.textContent = t('coin.limit');
+    else                not.textContent = t('coin.cardNote', { n: REKLAM_COIN_ODULU }) +
+                                          '  ' + t('coin.left', { n: kalan });
+  }
   if(btn){
     btn.textContent = _reklamCoinCalisiyor ? t('coin.cardBusy') : t('coin.cardBtn');
-    btn.disabled = _reklamCoinCalisiyor;
-    btn.onclick = reklamCoinIste;
+    btn.disabled = !aktif;
+    btn.onclick = reklamCoinIste;      // pasifken tarayici zaten tetiklemez
   }
+}
+// [SDK GECIKMESI] Portal SDK'si sayfaya bizden SONRA hazir olabilir.
+// Istakalarim ekrani ACIKKEN kisa sureli hafif yoklama yapilir; SDK hazir
+// olunca kart kendiliginden AKTIF hale gelir. Reklam CAGRILMAZ, yalnizca
+// senkron isAvailable() okunur. Ekran kapaninca yoklama durur.
+let _adKartYoklama = null;
+function colAdCoinYoklamaBaslat(){
+  if(_adKartYoklama) return;
+  let kalanTur = 20;                     // ~30 sn (20 x 1.5 sn)
+  _adKartYoklama = setInterval(function(){
+    const e = document.getElementById('screen-collection');
+    const acik = !!(e && e.classList.contains('active'));
+    if(!acik || kalanTur-- <= 0 || reklamKullanilabilirMi()){
+      colAdCoinDurdur();
+      if(acik) colAdCoinTazele();
+      return;
+    }
+    colAdCoinTazele();
+  }, 1500);
+}
+function colAdCoinDurdur(){
+  if(_adKartYoklama){ clearInterval(_adKartYoklama); _adKartYoklama = null; }
 }
 
 // ════════════════════════════════════════════════════
@@ -6012,8 +6062,9 @@ function colKatlariCiz(){
 }
 function renderCollection(){
   const kok = document.getElementById('col-liste'); if(!kok) return;
-  // [ALTIN KARTI] Ekran her acildiginda hak/dil durumu tazelenir.
-  try{ colAdCoinTazele(); }catch(e){}
+  // [ALTIN KARTI] Ekran her acildiginda hak/dil durumu tazelenir ve
+  // SDK gec hazir olursa kartin aktiflesmesi icin yoklama baslatilir.
+  try{ colAdCoinTazele(); colAdCoinYoklamaBaslat(); }catch(e){}
   if(COL_DURUM.gozcu){ COL_DURUM.gozcu.disconnect(); COL_DURUM.gozcu = null; }
   while(kok.firstChild) kok.removeChild(kok.firstChild);
   colKatlariCiz();
@@ -8370,7 +8421,11 @@ const AD = {
   // Chat kodu ve oyun kodu platform adi BILMEZ; yalnizca AD.* cagirir.
   // Tespit SDK CAGIRMAZ, sadece ortam isaretlerine bakar.
   platform: function(){
-    if(this._pl) return this._pl;
+    // ONBELLEK YALNIZCA GERCEK PORTAL ICIN. 'web' sonucu DONDURULMAZ:
+    // portal SDK'si (ornegin YaGames) sayfaya bizden SONRA yuklenirse
+    // erken bir cagri platformu kalici olarak 'web'e sabitlerdi ve
+    // Yandex/CrazyGames bir daha ASLA tespit edilemezdi.
+    if(this._pl && this._pl !== 'web') return this._pl;
     let p = 'web';
     try{
       const zorla = (typeof window.INFERNO_PLATFORM === 'string') ? window.INFERNO_PLATFORM : '';
@@ -8629,7 +8684,13 @@ function _yandexBaslat(){
       return _ysdkInit;
     }
     _ysdkInit = Promise.resolve(window.YaGames.init())
-      .then(function(s){ _ysdk = s || null; return _ysdk; })
+      .then(function(s){
+        _ysdk = s || null;
+        // [ALTIN KARTI] SDK hazir: kart varsa aninda aktiflesir.
+        try{ if(typeof colAdCoinTazele === 'function') colAdCoinTazele(); }catch(e){}
+        try{ if(typeof reklamCoinTazele === 'function') reklamCoinTazele(); }catch(e){}
+        return _ysdk;
+      })
       .catch(function(){ _ysdk = null; return null; });
   }catch(e){ _ysdkInit = Promise.resolve(null); }
   return _ysdkInit;
