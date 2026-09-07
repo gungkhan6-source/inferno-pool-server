@@ -768,6 +768,17 @@ font-family:sans-serif;
       <input id="col-ara" type="text" data-i18n-ph="col.search" placeholder="Search">
       <div id="col-katlar"></div>
     </div>
+    <!-- [ALTIN KARTI] Istege bagli reklam. Reklam kullanilamiyorsa veya
+         gunluk hak bittiyse kart GIZLENIR; oyunun hicbir bolumu
+         kilitlenmez, her istaka maclardan kazanilan jetonla alinabilir. -->
+    <div id="col-adcoin">
+      <div class="ac-sol">
+        <div class="ac-baslik" id="col-adcoin-baslik"></div>
+        <div class="ac-odul" id="col-adcoin-odul"></div>
+        <div class="ac-not" id="col-adcoin-not"></div>
+      </div>
+      <button class="ac-btn" type="button" id="col-adcoin-btn"></button>
+    </div>
     <div id="col-liste"></div>
     <div class="col-not" id="col-not"></div>
   </div>
@@ -1012,6 +1023,33 @@ font-family:sans-serif;
    Renkler mevcut temadan (--dk/--em/--gd/--pn) alinir. */
 #screen-chat{position:fixed;inset:0;z-index:80;display:none;
   align-items:center;justify-content:center;background:rgba(4,0,10,0.9);}
+/* [ALTIN KARTI] Istakalarim ekranindaki istege bagli reklam karti.
+   Arama alani ve kategori seridi DEGISMEZ; kart onlarin ALTINA girer. */
+#col-adcoin{display:none;align-items:center;gap:10px;margin:8px 0 2px;
+  padding:10px 12px;border-radius:8px;
+  background:linear-gradient(135deg,rgba(255,170,0,0.13),rgba(255,90,0,0.08));
+  border:1px solid rgba(255,180,0,0.3);}
+#col-adcoin .ac-sol{flex:1;min-width:0;}
+#col-adcoin .ac-baslik{font-family:'Rajdhani',sans-serif;font-weight:700;
+  font-size:0.74rem;letter-spacing:1px;color:#ffd68a;}
+#col-adcoin .ac-odul{font-family:'Rajdhani',sans-serif;font-weight:700;
+  font-size:0.95rem;color:#ffcc33;margin-top:1px;}
+#col-adcoin .ac-not{font-size:0.58rem;line-height:1.35;
+  color:rgba(255,255,255,0.55);margin-top:3px;}
+#col-adcoin .ac-btn{flex:none;padding:9px 14px;border-radius:6px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-weight:700;font-size:0.68rem;
+  letter-spacing:1px;white-space:nowrap;
+  background:linear-gradient(135deg,#c86a00,#8a3d00);
+  border:1px solid rgba(255,180,0,0.45);color:#fff2d8;}
+#col-adcoin .ac-btn:hover{border-color:rgba(255,210,80,0.8);}
+#col-adcoin .ac-btn[disabled]{opacity:0.5;cursor:default;}
+@media (max-width:430px){
+  #col-adcoin{gap:8px;padding:8px 10px;}
+  #col-adcoin .ac-baslik{font-size:0.66rem;}
+  #col-adcoin .ac-odul{font-size:0.85rem;}
+  #col-adcoin .ac-not{font-size:0.53rem;}
+  #col-adcoin .ac-btn{padding:8px 10px;font-size:0.6rem;}
+}
 /* [CHAT MINI] Mac modunda kucultme dugmesi ve alt chat bari.
    Kucultme SADECE gorseldir: oturum, baglanti ve DM baglami surer. */
 .chat-kucult{flex:none;padding:5px 10px;border-radius:5px;cursor:pointer;
@@ -3024,6 +3062,11 @@ en: {
   'radio.soonToast':'📻 Inferno Radio is coming soon!',
   'radio.err':'📻 Radio could not start.',
   'coin.button':'🎬 WATCH AD → +{n} COINS',
+  'coin.cardTitle':'🎥 WATCH VIDEO',
+  'coin.cardReward':'+{n} 🪙 GOLD',
+  'coin.cardNote':'Optional. Watch a short video to the end and get {n} gold. Gold is only for cosmetic cues — every cue can also be earned from matches.',
+  'coin.cardBtn':'WATCH VIDEO',
+  'coin.cardBusy':'LOADING…',
   'coin.ok':'💰 +{n} coins added!',
   'coin.fail':'Ad could not be shown. No coins were given.',
   'coin.limit':'Daily ad limit reached. Coins are also earned from matches.',
@@ -3439,6 +3482,11 @@ tr: {
   'radio.soonToast':'📻 Inferno Radio yakında yayında!',
   'radio.err':'📻 Radyo başlatılamadı.',
   'coin.button':'🎬 REKLAM İZLE → +{n} JETON',
+  'coin.cardTitle':'🎥 VİDEO İZLE',
+  'coin.cardReward':'+{n} 🪙 ALTIN',
+  'coin.cardNote':'İsteğe bağlıdır. Kısa videoyu sonuna kadar izle, {n} altın kazan. Altın yalnızca kozmetik istakalar içindir — her istaka maçlardan da kazanılabilir.',
+  'coin.cardBtn':'VİDEOYU İZLE',
+  'coin.cardBusy':'YÜKLENİYOR…',
   'coin.ok':'💰 +{n} jeton eklendi!',
   'coin.fail':'Reklam gösterilemedi. Jeton verilmedi.',
   'coin.limit':'Günlük reklam hakkı doldu. Jetonlar maçlardan da kazanılır.',
@@ -3840,6 +3888,11 @@ ru: {
   'radio.soonToast':'📻 Inferno Radio скоро в эфире!',
   'radio.err':'📻 Не удалось запустить радио.',
   'coin.button':'🎬 СМОТРЕТЬ РЕКЛАМУ → +{n} МОНЕТ',
+  'coin.cardTitle':'🎥 СМОТРЕТЬ ВИДЕО',
+  'coin.cardReward':'+{n} 🪙 ЗОЛОТА',
+  'coin.cardNote':'Необязательно. Посмотрите короткое видео до конца и получите {n} золота. Золото нужно только для косметических киев — любой кий можно выиграть в матчах.',
+  'coin.cardBtn':'СМОТРЕТЬ',
+  'coin.cardBusy':'ЗАГРУЗКА…',
   'coin.ok':'💰 +{n} монет начислено!',
   'coin.fail':'Рекламу не удалось показать. Монеты не начислены.',
   'coin.limit':'Дневной лимит рекламы исчерпан. Монеты также дают за матчи.',
@@ -4273,6 +4326,8 @@ function setLang(kod){
   try{ if(typeof sosyalPaneliCiz === 'function') sosyalPaneliCiz(); }catch(e){}
   // [PROFIL 5b] Rozet metinleri ceviriden gelir.
   try{ if(typeof ghKimlikTazele === 'function') ghKimlikTazele(); }catch(e){}
+  // [ALTIN KARTI] Kart metinleri ceviriden gelir.
+  try{ if(typeof colAdCoinTazele === 'function') colAdCoinTazele(); }catch(e){}
   // [CHAT DIL] Sohbet panelinin CALISMA ZAMANINDA cizilen ogeleri
   // data-i18n tasimaz; i18nUygula() onlara ULASAMAZ. Dil degisince
   // yeniden cizilirler. GECMIS mesaj satirlari BILEREK dokunulmaz:
@@ -4578,13 +4633,20 @@ function reklamCoinTazele(){
   b.textContent = t('coin.button', { n: REKLAM_COIN_ODULU }) +
                   '  \u00b7  ' + t('coin.left', { n: reklamKalanHak() });
 }
+// [ALTIN KARTI] Menu dugmesi ve Istakalarim karti AYNI akisi kullanir.
+// Bu kilit, iki giris noktasindan (veya cift tiklamadan) AYNI ANDA iki
+// reklam istegi cikmasini ve dolayisiyla CIFT ODUL olasiligini engeller.
+let _reklamCoinCalisiyor = false;
 function reklamCoinIste(){
+  if(_reklamCoinCalisiyor) return;
   if(reklamKalanHak() <= 0){ toastUI(t('coin.limit')); reklamCoinTazele(); return; }
   if(typeof AD === 'undefined' || !AD || typeof AD.showRewarded !== 'function'){
     toastUI(t('coin.fail')); return;
   }
+  _reklamCoinCalisiyor = true;
   const b = document.getElementById('menu-adcoin');
   if(b) b.disabled = true;
+  colAdCoinTazele();
   AD.showRewarded({
     kullaniciIstedi: true,          // SOZLESME: kullanici acikca istedi
     kaynak: 'coin_reward',
@@ -4597,11 +4659,39 @@ function reklamCoinIste(){
       addCoins(REKLAM_COIN_ODULU);
     }
   }).then(function(r){
+    _reklamCoinCalisiyor = false;
     if(b) b.disabled = false;
     if(r && r.shown === true){ toastUI(t('coin.ok', { n: REKLAM_COIN_ODULU })); }
-    else { toastUI(t('coin.fail')); }
+    else { toastUI(t('coin.fail')); }   // adStarted/adClosed/adError -> ODUL YOK
     reklamCoinTazele();
+    colAdCoinTazele();
   });
+}
+
+// [ALTIN KARTI] Istakalarim ekranindaki kart. Gorunurluk kurali menu
+// dugmesiyle AYNIDIR: reklam gercekten kullanilabilir olmali (adapter
+// isAvailable) VE gunluk hak kalmali. Yerel/test ortaminda AD.isTest()
+// true oldugu icin isAvailable false doner -> kart GIZLI kalir ve
+// hicbir gercek reklam cagrilmaz.
+// AKTIF MACTA GOSTERILMEZ: bu kart yalnizca Istakalarim ekranindadir.
+function colAdCoinTazele(){
+  const k = document.getElementById('col-adcoin');
+  if(!k) return;
+  if(!reklamCoinGosterilsinMi()){ k.style.display = 'none'; return; }
+  k.style.display = 'flex';
+  const bas = document.getElementById('col-adcoin-baslik');
+  const od  = document.getElementById('col-adcoin-odul');
+  const not = document.getElementById('col-adcoin-not');
+  const btn = document.getElementById('col-adcoin-btn');
+  if(bas) bas.textContent = t('coin.cardTitle');
+  if(od)  od.textContent  = t('coin.cardReward', { n: REKLAM_COIN_ODULU });
+  if(not) not.textContent = t('coin.cardNote', { n: REKLAM_COIN_ODULU }) +
+                            '  ' + t('coin.left', { n: reklamKalanHak() });
+  if(btn){
+    btn.textContent = _reklamCoinCalisiyor ? t('coin.cardBusy') : t('coin.cardBtn');
+    btn.disabled = _reklamCoinCalisiyor;
+    btn.onclick = reklamCoinIste;
+  }
 }
 
 // ════════════════════════════════════════════════════
@@ -5863,6 +5953,7 @@ function colGrup(k){
   if(P.owned.indexOf(k) >= 0) return 2;                  // Sahip olduklarim
   return 3;                                              // Kilidi acilmamis
 }
+// Koleksiyon her cizildiginde kart da tazelenir (hak/dil degismis olabilir).
 function colSatir(k){
   const m = cueMeta(k), grup = colGrup(k);
   const d = document.createElement('div');
@@ -5921,6 +6012,8 @@ function colKatlariCiz(){
 }
 function renderCollection(){
   const kok = document.getElementById('col-liste'); if(!kok) return;
+  // [ALTIN KARTI] Ekran her acildiginda hak/dil durumu tazelenir.
+  try{ colAdCoinTazele(); }catch(e){}
   if(COL_DURUM.gozcu){ COL_DURUM.gozcu.disconnect(); COL_DURUM.gozcu = null; }
   while(kok.firstChild) kok.removeChild(kok.firstChild);
   colKatlariCiz();
