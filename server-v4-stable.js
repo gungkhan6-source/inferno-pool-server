@@ -171,6 +171,10 @@ wss.on('connection', (ws) => {
         case 'rematch_decline':
           relay(ws, msg); break;
         case 'turn_end': turnEnd(ws, msg); break;
+        // [DAVET] Sohbet daveti. Hedef SUNUCU tarafindan belirlenir.
+        case 'chat_invite':         davetGonder(ws, msg); break;
+        case 'chat_invite_accept':  davetKabul(ws, msg);  break;
+        case 'chat_invite_decline': davetRed(ws, msg);    break;
         case 'forfeit_turn': forfeitTurn(ws); break;
         // UYGULAMA HEARTBEAT: istemcinin 10 sn'lik ping'i canlilik kaynagi.
         case 'ping': ws.lastAppMsg = Date.now(); send(ws, {type:'pong'}); break;
@@ -181,6 +185,9 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     console.log('-', ws.id);
+    // [DAVET] Ayrilan oyuncunun gonderdigi VE ona gelen bekleyen davetler
+    // gecersizlesir; kopmus bir maca ait davet kabul edilemez.
+    try { davetleriIptal(ws.id); } catch(e) {}
 
     if (waitingRoom && waitingRoom.host === ws) {
       waitingRoom = null;
@@ -196,6 +203,203 @@ wss.on('connection', (ws) => {
   });
 });
 
+
+// ══════════════════════════════════════════════════════
+//  ONLINE KIMLIK + SOHBET DAVETI                                [DAVET]
+// ═══════════════════════════════════════════════════════
+// TUMU RAM'DE. Veritabani, disk, dis servis YOKTUR; restart hepsini siler.
+
+const DAVET_TTL_MS      = 60 * 1000;   // davet omru
+const DAVET_COOLDOWN_MS = 45 * 1000;   // ayni gonderen -> ayni alici
+const DAVET_SAATLIK_MAX = 12;          // gonderen basina saatlik tavan
+const DAVET_MAX         = 500;         // bellek tavani (LRU)
+const PROFIL_AD_MAX     = 24;
+const PROFIL_AVATAR_MAX = 4096;
+const PROFIL_KAYNAKLAR  = ['crazygames', 'yandex', 'pixidus', 'guest'];
+
+const davetler     = new Map();   // token -> { gonderenId, aliciId, odaId, bitis, kullanildi }
+const davetSayac   = new Map();   // gonderenId -> { son: Map(aliciId->ms), saat: [ms] }
+
+// Istemciden gelen profil ASLA oldugu gibi kullanilmaz.
+// E-posta, IP, gercek ad gibi alanlar TASINMAZ: yalnizca ad/avatar/kaynak.
+function davetProfilTemizle(p){
+  const bos = { ad: '', avatar: '', kaynak: 'guest' };
+  if(!p || typeof p !== 'object') return bos;
+  let ad = (typeof p.ad === 'string') ? p.ad : '';
+  // Kontrol karakterleri ve yon isaretleri temizlenir (sahte gorunum onlenir).
+  ad = ad.replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028\u2029\uFEFF]/g, '').trim();
+  if(ad.length > PROFIL_AD_MAX) ad = ad.slice(0, PROFIL_AD_MAX);
+  let av = (typeof p.avatar === 'string') ? p.avatar.trim() : '';
+  // YALNIZCA https: veya data:image/ kabul edilir. http:, javascript:, veri
+  // uretmeyen her sey ELENIR.
+  if(!/^(https:\/\/|data:image\/)/i.test(av) || av.length > PROFIL_AVATAR_MAX) av = '';
+  let kk = (typeof p.kaynak === 'string') ? p.kaynak : 'guest';
+  if(PROFIL_KAYNAKLAR.indexOf(kk) < 0) kk = 'guest';
+  // Ad yoksa kaynak da guest'e duser: platform rozeti isimsiz gosterilmez.
+  if(!ad) kk = 'guest';
+  return { ad: ad, avatar: av, kaynak: kk };
+}
+
+function davetToken(){
+  // Tahmin edilemez: 128 bit kriptografik rastgelelik.
+  return chatCrypto.randomBytes(16).toString('hex');
+}
+function davetSupur(simdi){
+  davetler.forEach(function(d, tok){
+    if(d.bitis <= simdi || d.kullanildi) davetler.delete(tok);
+  });
+  if(davetler.size > DAVET_MAX){
+    const fazla = davetler.size - DAVET_MAX;
+    let i = 0;
+    for(const tok of davetler.keys()){ if(i++ >= fazla) break; davetler.delete(tok); }
+  }
+  davetSayac.forEach(function(k, id){
+    k.saat = k.saat.filter(function(t){ return (simdi - t) < 3600000; });
+    if(!k.saat.length) davetSayac.delete(id);
+  });
+}
+// Oyuncu ayrilinca ONA AIT ve ONA GELEN bekleyen davetler gecersizlesir.
+function davetleriIptal(oyuncuId){
+  davetler.forEach(function(d, tok){
+    if(d.gonderenId === oyuncuId || d.aliciId === oyuncuId) davetler.delete(tok);
+  });
+}
+
+// Oyun soketinden chat kimligine KOPRU: sid SUNUCU tarafindan uretilmistir,
+// bu yuzden dogrulanabilir. Istemcinin iddia ettigi nick KULLANILMAZ.
+function davetChatKimligi(jeton){
+  if(typeof jeton !== 'string' || !jeton || jeton.length > 128) return null;
+  // Istemcideki sid IMZALI bir jetondur (id.hmac). Once imza dogrulanir;
+  // boylece uydurulmus bir sid ile baskasinin kimligine burunulemez.
+  const sid = chatSidDogrula(jeton);
+  if(!sid) return null;
+  const kayit = chatSid.get(sid);
+  if(!kayit || !kayit.nickAlt) return null;
+  // Blok kontrolu HAM sid ister, bu yuzden ikisi de dondurulur.
+  return { sid: sid, nickAlt: kayit.nickAlt };
+}
+// Iki yonlu blok kontrolu. MEVCUT chatBlokVarMi() kullanilir: ic anahtar
+// bicimi ve TTL mantigi orada; ikinci bir uygulama yazmak hataya acik olur.
+function davetBlokVar(a, b){
+  if(!a || !b) return false;
+  return chatBlokVarMi(a.sid, { sid: b.sid, nickAlt: b.nickAlt }) ||
+         chatBlokVarMi(b.sid, { sid: a.sid, nickAlt: a.nickAlt });
+}
+
+function davetHata(ws, kod){ send(ws, { type:'chat_invite_error', reason: kod }); }
+
+// ── chat_invite: daveti OLUSTUR ───────────────────────────
+function davetGonder(ws, msg){
+  const simdi = Date.now();
+  davetSupur(simdi);
+  const oda = rooms.get(ws.roomId);
+  // Aktif macta olmayan davet gonderemez.
+  if(!oda || !oda.host || !oda.guest) return davetHata(ws, 'not_in_match');
+  // HEDEF ISTEMCIDEN ALINMAZ: sunucu odadaki digerini kendisi bulur.
+  // Kendine davet ve yanlis hedef bu yuzden YAPISAL OLARAK imkansizdir.
+  const hedef = (ws === oda.host) ? oda.guest : oda.host;
+  if(!hedef || hedef === ws) return davetHata(ws, 'no_opponent');
+  if(hedef.readyState !== WebSocket.OPEN) return davetHata(ws, 'opponent_offline');
+
+  // Chat kimligi: her iki taraf da chat'e katilmis olmali (DM icin sart).
+  const ben = davetChatKimligi(msg && msg.sid);
+  if(!ben) return davetHata(ws, 'chat_required');
+  const o = davetChatKimligi(hedef.chatSid);
+  if(!o) return davetHata(ws, 'opponent_chat_required');
+  if(ben.nickAlt === o.nickAlt) return davetHata(ws, 'self_invite');
+  if(davetBlokVar(ben, o)) return davetHata(ws, 'blocked');
+
+  // Cooldown + saatlik tavan.
+  let k = davetSayac.get(ws.id);
+  if(!k){ k = { son: new Map(), saat: [] }; davetSayac.set(ws.id, k); }
+  const sonMs = k.son.get(hedef.id) || 0;
+  if((simdi - sonMs) < DAVET_COOLDOWN_MS){
+    return send(ws, { type:'chat_invite_error', reason:'cooldown',
+                      kalan: Math.ceil((DAVET_COOLDOWN_MS - (simdi - sonMs)) / 1000) });
+  }
+  k.saat = k.saat.filter(function(t){ return (simdi - t) < 3600000; });
+  if(k.saat.length >= DAVET_SAATLIK_MAX) return davetHata(ws, 'rate_limited');
+
+  // Ayni cift icin bekleyen davet varsa yenisi acilmaz.
+  let zatenVar = false;
+  davetler.forEach(function(d){
+    if(!d.kullanildi && d.bitis > simdi &&
+       d.gonderenId === ws.id && d.aliciId === hedef.id) zatenVar = true;
+  });
+  if(zatenVar) return davetHata(ws, 'already_pending');
+
+  const tok = davetToken();
+  davetler.set(tok, { gonderenId: ws.id, aliciId: hedef.id, odaId: oda.id,
+                      gonderen: ben, alici: o,
+                      gonderenAlt: ben.nickAlt, aliciAlt: o.nickAlt,
+                      bitis: simdi + DAVET_TTL_MS, kullanildi: false });
+  k.son.set(hedef.id, simdi);
+  k.saat.push(simdi);
+
+  // Aliciya: gonderenin PUBLIC profili + token. Ozel veri YOK.
+  send(hedef, { type:'chat_invite', token: tok,
+                from: ws.nick || '', fromProfile: ws.profil || null,
+                ttl: Math.floor(DAVET_TTL_MS / 1000) });
+  // Gonderene: gonderildi bilgisi (token PAYLASILMAZ).
+  send(ws, { type:'chat_invite', sent: true, ttl: Math.floor(DAVET_TTL_MS / 1000) });
+  console.log('INVITE', ws.id, '->', hedef.id);
+}
+
+// ── Ortak dogrulama ──────────────────────────────────
+function davetCoz(ws, msg){
+  const simdi = Date.now();
+  davetSupur(simdi);
+  const tok = (msg && typeof msg.token === 'string') ? msg.token : '';
+  if(!tok || tok.length !== 32 || !/^[0-9a-f]+$/.test(tok)) return { hata:'bad_token' };
+  const d = davetler.get(tok);
+  if(!d) return { hata:'bad_token' };            // yok / silinmis / reddedilmis
+  if(d.kullanildi) return { hata:'already_used' };
+  if(d.bitis <= simdi){ davetler.delete(tok); return { hata:'expired' }; }
+  // YALNIZCA daveti alan kisi cevaplayabilir.
+  if(d.aliciId !== ws.id) return { hata:'not_recipient' };
+  return { tok: tok, d: d };
+}
+
+// ── chat_invite_accept ──────────────────────────────
+function davetKabul(ws, msg){
+  const r = davetCoz(ws, msg);
+  if(r.hata) return davetHata(ws, r.hata);
+  const d = r.d;
+  // Blok kabul aninda TEKRAR kontrol edilir (arada eklenmis olabilir).
+  if(davetBlokVar(d.gonderen, d.alici)) { davetler.delete(r.tok); return davetHata(ws, 'blocked'); }
+  // TEK KULLANIMLIK: ikinci kabul no-op olur (yukarida 'already_used').
+  d.kullanildi = true;
+  davetler.delete(r.tok);
+  const oda = rooms.get(d.odaId);
+  const gonderen = oda ? (oda.host && oda.host.id === d.gonderenId ? oda.host :
+                          (oda.guest && oda.guest.id === d.gonderenId ? oda.guest : null)) : null;
+  // Her iki tarafa da KARSI TARAFIN chat nick'i gider; herkes KENDI
+  // kimligiyle DM acar, kimse baskasinin kimligini kullanmaz.
+  send(ws, { type:'chat_invite_accept', ok: true, peer: d.gonderenAlt });
+  if(gonderen && gonderen.readyState === WebSocket.OPEN){
+    send(gonderen, { type:'chat_invite_accept', ok: true, accepted: true, peer: d.aliciAlt });
+  }
+  console.log('INVITE ACCEPT', d.gonderenId, '<->', d.aliciId);
+}
+
+// ── chat_invite_decline ───────────────────────────
+function davetRed(ws, msg){
+  const r = davetCoz(ws, msg);
+  if(r.hata) return davetHata(ws, r.hata);
+  const d = r.d;
+  // Reddedilen davet TEKRAR KULLANILAMAZ.
+  davetler.delete(r.tok);
+  const oda = rooms.get(d.odaId);
+  const gonderen = oda ? (oda.host && oda.host.id === d.gonderenId ? oda.host :
+                          (oda.guest && oda.guest.id === d.gonderenId ? oda.guest : null)) : null;
+  send(ws, { type:'chat_invite_decline', ok: true });
+  // Gonderene TEK bildirim; spam UI uretilmez. Mac AKISI DEGISMEZ.
+  if(gonderen && gonderen.readyState === WebSocket.OPEN){
+    send(gonderen, { type:'chat_invite_decline', ok: true, declined: true });
+  }
+  console.log('INVITE DECLINE', d.gonderenId, '<-', d.aliciId);
+}
+
 // MATCH
 function findMatch(ws, msg) {
   // D1 — Zaten AKTIF bir maçta olan socket yeniden kuyruga giremez.
@@ -209,6 +413,12 @@ function findMatch(ws, msg) {
   // D6 — takma adi socket uzerinde sakla (game_start ile iletilecek).
   if (msg && typeof msg.nickname === 'string') {
     ws.nick = msg.nickname.slice(0, 24);
+  }
+  // [DAVET] Public profil SANITIZE edilerek saklanir; istemciye oldugu gibi
+  // guvenilmez. Chat sid'i davet kimlik koprusu icin tutulur (sunucu uretimi).
+  ws.profil = davetProfilTemizle(msg && msg.profil);
+  if (msg && typeof msg.chatSid === 'string' && msg.chatSid.length <= 128) {
+    ws.chatSid = msg.chatSid;
   }
 
   if (waitingRoom && waitingRoom.host !== ws) {
@@ -227,8 +437,14 @@ function findMatch(ws, msg) {
     const hostNick  = room.host.nick  || 'Player 1';
     const guestNick = room.guest.nick || 'Player 2';
 
-    send(room.host,  {type:'game_start', slot:0, ballSeed:seed, hostNick:hostNick, guestNick:guestNick});
-    send(room.guest, {type:'game_start', slot:1, ballSeed:seed, hostNick:hostNick, guestNick:guestNick});
+    // [DAVET] Public profiller de tasinir: ad / avatar / kaynak. Baska
+    // hicbir kisisel alan (e-posta, IP, gercek ad) GONDERILMEZ.
+    const hostProfil  = room.host.profil  || { ad:'', avatar:'', kaynak:'guest' };
+    const guestProfil = room.guest.profil || { ad:'', avatar:'', kaynak:'guest' };
+    send(room.host,  {type:'game_start', slot:0, ballSeed:seed, hostNick:hostNick, guestNick:guestNick,
+                      hostProfile:hostProfil, guestProfile:guestProfil});
+    send(room.guest, {type:'game_start', slot:1, ballSeed:seed, hostNick:hostNick, guestNick:guestNick,
+                      hostProfile:hostProfil, guestProfile:guestProfil});
 
     console.log('MATCH', room.id, hostNick, 'vs', guestNick);
 
@@ -1820,6 +2036,11 @@ function chatYonlendir(ws, ham){
     // Uygulama seviyesi chat heartbeat. Mevcut heartbeat blogu
     // DEGISTIRILMEDI; zaten her mesaj ws.lastAppMsg'i tazeliyor.
     case 'chat_ping':          chatGonder(ws, { type:'chat_pong', ts: Date.now() }); break;
+    // [DAVET] Bu uc tip OYUN tarafinda ele alinir; chat dispatcher'i
+    // yalnizca gecer (yoksa 'unknown_type' gurultusu uretirdi).
+    case 'chat_invite':
+    case 'chat_invite_accept':
+    case 'chat_invite_decline': break;
     // Bilinmeyen chat_* tipleri kontrollu reddedilir (sessiz degil).
     default:                   chatHata(ws, 'unknown_type', msg.type);
   }
