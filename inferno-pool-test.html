@@ -1012,6 +1012,35 @@ font-family:sans-serif;
    Renkler mevcut temadan (--dk/--em/--gd/--pn) alinir. */
 #screen-chat{position:fixed;inset:0;z-index:80;display:none;
   align-items:center;justify-content:center;background:rgba(4,0,10,0.9);}
+/* [CHAT MINI] Mac modunda kucultme dugmesi ve alt chat bari.
+   Kucultme SADECE gorseldir: oturum, baglanti ve DM baglami surer. */
+.chat-kucult{flex:none;padding:5px 10px;border-radius:5px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.85rem;line-height:1;
+  font-weight:700;letter-spacing:0;display:none;
+  background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.18);
+  color:rgba(255,255,255,0.7);}
+.chat-kucult:hover{background:rgba(255,255,255,0.14);color:#fff;}
+/* Dugme YALNIZCA mac modunda gorunur; menuden acilan tam ekran sohbet
+   duzeni DEGISMEZ. */
+#screen-chat.mac-modu .chat-kucult{display:inline-block;}
+/* Kucultulmus durum: kutu gizlenir, yerine alt bar gelir. */
+#screen-chat.mac-modu.kucuk .chat-kutu{display:none;}
+#chat-mini{position:absolute;display:none;pointer-events:auto;cursor:pointer;
+  align-items:center;gap:6px;padding:7px 14px;border-radius:18px;
+  font-family:'Rajdhani',sans-serif;font-size:0.72rem;font-weight:700;
+  letter-spacing:1px;white-space:nowrap;
+  background:linear-gradient(135deg,#0a5c3a,#063d26);
+  border:1px solid rgba(0,255,136,0.32);color:#dff5e8;
+  box-shadow:0 0 14px rgba(0,200,120,0.25);}
+#chat-mini:hover{border-color:rgba(0,255,136,0.6);}
+/* Okunmamis DM varsa kucuk nokta. */
+#chat-mini .mini-nokta{width:7px;height:7px;border-radius:50%;flex:none;
+  background:#ff4444;box-shadow:0 0 6px rgba(255,68,68,0.8);display:none;}
+#screen-chat.mac-modu.kucuk #chat-mini{display:inline-flex;}
+@media (max-width:430px){
+  #chat-mini{font-size:0.64rem;padding:6px 11px;letter-spacing:0.6px;}
+  .chat-kucult{padding:4px 8px;font-size:0.78rem;}
+}
 /* [DAVET MAC MODU] Online mac SIRASINDA sohbet, oyunun yerine GECMEZ.
    showScreen kullanilmaz, G.phase'e dokunulmaz, oyun dongusu durmaz.
    Kapsayici pointer-events:none -> masa tiklamalari altta ISLENIR;
@@ -3240,6 +3269,9 @@ en: {
   'common.no':'NO',
   // ── CHAT (Asama 3-5'te kullanilacak, sozlukte simdiden hazir) ──
   'chat.title':'🔥 INFERNO POOL COMMUNITY',
+  'chat.barLabel':'💬 CHAT',
+  'chat.minimize':'Minimize the chat',
+  'chat.restore':'Open the chat',
   'chat.open':'💬 CHAT',
   'chat.welcome':'WELCOME TO INFERNO POOL',
   'chat.chooseNick':'Choose your nickname',
@@ -3638,6 +3670,9 @@ tr: {
   'common.yes':'EVET',
   'common.no':'HAYIR',
   'chat.title':'🔥 INFERNO POOL TOPLULUĞU',
+  'chat.barLabel':'💬 SOHBET',
+  'chat.minimize':'Sohbeti küçült',
+  'chat.restore':'Sohbeti aç',
   'chat.open':'💬 SOHBET',
   'chat.welcome':'INFERNO POOL’A HOŞ GELDİN',
   'chat.chooseNick':'Takma adını seç',
@@ -4036,6 +4071,9 @@ ru: {
   'common.yes':'ДА',
   'common.no':'НЕТ',
   'chat.title':'🔥 СООБЩЕСТВО INFERNO POOL',
+  'chat.barLabel':'💬 ЧАТ',
+  'chat.minimize':'Свернуть чат',
+  'chat.restore':'Открыть чат',
   'chat.open':'💬 ЧАТ',
   'chat.welcome':'ДОБРО ПОЖАЛОВАТЬ В INFERNO POOL',
   'chat.chooseNick':'Выберите никнейм',
@@ -5446,6 +5484,74 @@ function davetMactaMi(){
 //   * reklam kancasi (AD.beforeEnterChat) mac ortasinda CALISTIRILMAZ
 // Bu fonksiyon YALNIZCA kabul edilmis bir davetten cagrilir; oyun sirasinda
 // sohbet kendiliginden ACILMAZ.
+// ── [CHAT MINI] Kucultme / geri acma ───────────────────────
+// KUCULTME YALNIZCA GORSELDIR. Sunlar KORUNUR:
+//   CHAT.acik (yeniden baglanma mantigi bunu okur), CHAT_WS baglantisi,
+//   CHAT.dmHedef (DM baglami) ve mesaj akisindaki gecmis.
+// chatKapat() ile KARISTIRILMAMALIDIR: o oturumu gercekten kapatir.
+function chatKucultuluyorMu(){
+  const o = document.getElementById('screen-chat');
+  return !!(o && o.classList.contains('kucuk'));
+}
+function chatKucult(){
+  const o = document.getElementById('screen-chat');
+  if(!o || !o.classList.contains('mac-modu')) return;
+  o.classList.add('kucuk');
+  chatMiniYerlestir();
+}
+function chatBuyut(){
+  const o = document.getElementById('screen-chat');
+  if(!o) return;
+  o.classList.remove('kucuk');
+  try{ chatMiniNoktaTazele(); }catch(e){}
+  // Kutu yeniden gorunur oldugu icin olculeri tazelenir.
+  try{ davetOverlayYerlestir(); }catch(e){}
+  // Akis en alta: kucukken gelen mesajlar gorunsun.
+  try{ const a = chatAkisEleman(); if(a) a.scrollTop = a.scrollHeight; }catch(e){}
+}
+// Okunmamis DM gostergesi (yalnizca gorsel).
+function chatMiniNoktaTazele(){
+  const n = document.getElementById('chat-mini-nokta');
+  if(!n) return;
+  let v = 0;
+  try{ Object.keys(CHAT.dmOkunmamis || {}).forEach(function(k){ v += CHAT.dmOkunmamis[k] || 0; }); }catch(e){}
+  n.style.display = (v > 0 && chatKucultuluyorMu()) ? 'block' : 'none';
+}
+// Mini bar yerlesimi: masa ve ISTAKA SERIDI ile cakismaz.
+// Aday sira: (A) seridin ALTI  (B) seridin SAGI  (C) sag alt kose.
+function chatMiniYerlestir(){
+  const o = document.getElementById('screen-chat');
+  const m = document.getElementById('chat-mini');
+  if(!o || !m || !o.classList.contains('kucuk')) return;
+  const B = 8;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const r = m.getBoundingClientRect();
+  const w = Math.max(90, Math.round(r.width || 120));
+  const h = Math.max(24, Math.round(r.height || 32));
+  const serit = _davetOlc('.skin-bar, #skin-bar, .skin-strip');
+  const masa  = _davetOlc('#pool-canvas');
+  let x = vw - B - w, y = vh - B - h;
+  if(serit){
+    const altBant = vh - serit.bottom - B * 2;
+    if(altBant >= h){
+      y = vh - B - h;                            // A) seridin altindaki bant
+      if(y < serit.bottom + B) y = serit.bottom + B;
+    }else if((vw - serit.right - B * 2) >= w){
+      x = vw - B - w;                            // B) seridin sagi
+      y = Math.max(serit.top, vh - B - h);
+      if(y + h > vh - B) y = vh - B - h;
+    }else{
+      y = Math.max(B, serit.top - B - h);        // C) seridin ustu
+    }
+  }else if(masa){
+    y = Math.min(vh - B - h, Math.max(B, masa.bottom + B));
+  }
+  // Ekran disina TASMA yok.
+  x = Math.max(B, Math.min(x, vw - B - w));
+  y = Math.max(B, Math.min(y, vh - B - h));
+  m.style.left = Math.round(x) + 'px';
+  m.style.top  = Math.round(y) + 'px';
+}
 // Masaustu overlay yerlesimi. ISTAKA SERIDI ASLA ORTULMEZ.
 // Serit yatay kaydirmali ve konumu pencere boyutuna gore degistigi icin
 // olcum CALISMA ZAMANINDA yapilir. Mobilde (<=560px) CSS'teki alt sayfa
@@ -5467,6 +5573,7 @@ function _davetOlc(sec){
 function davetOverlayYerlestir(){
   const o = document.getElementById('screen-chat');
   if(!o || !o.classList.contains('mac-modu')) return;
+  try{ chatMiniYerlestir(); }catch(e){}   // kucultulmusse bar da tasinir
   const kutu = o.querySelector('.chat-kutu');
   if(!kutu) return;
   // MOBIL: CSS'teki alt sayfa duzeni gecerlidir; satir ici olculer silinir.
@@ -5537,6 +5644,7 @@ function davetSohbetEkraniAc(){
   const o = document.getElementById('screen-chat');
   if(!o) return false;
   o.classList.toggle('mac-modu', davetMactaMi());
+  o.classList.remove('kucuk');   // [CHAT MINI] davet gelince tam boyut
   o.style.display = 'flex';
   // Mevcut yeniden baglanma mantigi (chatYenidenPlanla / chatYenidenKatil)
   // ekranin acik olmasini bu bayraktan okur; kapatinca chatKapat sifirlar.
@@ -9403,6 +9511,7 @@ function chatMsgIsle(m){
       } else if(m.mine !== true){
         CHAT.dmOkunmamis[m.with] = (CHAT.dmOkunmamis[m.with] || 0) + 1;
         chatKullanicilariCiz(CHAT.sonKullanicilar || []);
+        try{ chatMiniNoktaTazele(); }catch(e){}
       }
       break;
     case 'chat_users':
@@ -9508,6 +9617,7 @@ function chatDiliTazele(){
   const o = document.getElementById('screen-chat');
   if(!o || o.style.display === 'none' || !CHAT.acik) return;
   try{ i18nUygula(o); }catch(e){}                    // data-i18n tasiyanlar
+  try{ chatMiniYerlestir(); }catch(e){}              // metin boyu degisebilir
   try{ chatBlokDugmesiCiz(); }catch(e){}             // ENGELLE / KALDIR
   try{ chatRaporDugmesiCiz(); }catch(e){}            // Bildir
   try{ chatModDugmesiCiz(); }catch(e){}              // MOD
@@ -9562,6 +9672,7 @@ function chatAc(){
     if(!o) return;
     o.style.display = 'flex';
     o.classList.remove('mac-modu');   // menuden acilis DAIMA tam ekran
+    o.classList.remove('kucuk');      // [CHAT MINI] durum sifirlanir
     o.style.paddingBottom = '';
     const kk0 = o.querySelector('.chat-kutu');
     if(kk0){ kk0.style.position=''; kk0.style.left=''; kk0.style.top='';
@@ -9580,6 +9691,7 @@ function chatKapat(){
   if(o){
     o.style.display = 'none';
     o.classList.remove('mac-modu');
+    o.classList.remove('kucuk');      // [CHAT MINI] durum sifirlanir
     // Mac modunda verilen satir ici olculer temizlenir; menuden
     // acilan TAM EKRAN sohbet bunlardan ETKILENMEZ.
     o.style.paddingBottom = '';
@@ -9693,6 +9805,16 @@ function chatKur(){
   if(btn) btn.onclick = chatAc;
   const kapat = document.getElementById('chat-kapat');
   if(kapat) kapat.onclick = chatKapat;
+  // [CHAT MINI] Kucultme dugmesi ve alt bar. Oturum KAPATILMAZ.
+  const kk = document.getElementById('chat-kucult');
+  if(kk) kk.onclick = chatKucult;
+  const mb = document.getElementById('chat-mini');
+  if(mb){
+    mb.onclick = chatBuyut;
+    mb.onkeydown = function(e){
+      if(e && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); chatBuyut(); }
+    };
+  }
   const nb = document.getElementById('chat-nick-btn');
   if(nb) nb.onclick = chatNickGonder;
   const ng = document.getElementById('chat-nick-giris');
@@ -9783,6 +9905,12 @@ if(document.readyState === 'loading'){
      Mesaj ve nickname'ler JS tarafinda YALNIZCA createTextNode ile
      yazilir; bu blokta hicbir kullanici verisi yoktur. -->
 <div id="screen-chat">
+  <!-- [CHAT MINI] Kucultulmus sohbet bari. Yalnizca mac modunda ve
+       yalnizca kucultulmusken gorunur; metni i18n'den gelir. -->
+  <div id="chat-mini" role="button" tabindex="0">
+    <span class="mini-nokta" id="chat-mini-nokta"></span>
+    <span id="chat-mini-metin" data-i18n="chat.barLabel">💬 CHAT</span>
+  </div>
   <div class="chat-kutu">
     <div class="chat-ust">
       <div class="chat-baslik" data-i18n="chat.title">INFERNO POOL COMMUNITY</div>
@@ -9791,6 +9919,8 @@ if(document.readyState === 'loading'){
       <button class="chat-rapor-btn" type="button" id="chat-rapor-btn"></button>
       <button class="chat-mod-btn" type="button" id="chat-mod-btn"></button>
       <div class="chat-sayac"><span data-i18n="chat.onlinePlayers">ONLINE PLAYERS</span>: <span id="chat-sayi">0</span></div>
+      <button class="chat-kucult" type="button" id="chat-kucult"
+              data-i18n-title="chat.minimize" aria-label="minimize">−</button>
       <button class="chat-kapat" type="button" id="chat-kapat" data-i18n="common.close">CLOSE</button>
     </div>
 
