@@ -1020,10 +1020,12 @@ font-family:sans-serif;
 #screen-chat.mac-modu{background:transparent;pointer-events:none;
   align-items:flex-end;justify-content:flex-end;padding:8px;}
 #screen-chat.mac-modu .chat-kutu{pointer-events:auto;
-  width:340px;max-width:calc(100vw - 16px);
-  /* Yukseklik BILEREK kisitli: masanin ALTINDAKI serbest bantta kalir,
-     boylece masa, cep panelleri ve istaka SERIDI ortulmez. */
-  height:min(24vh,215px);min-height:150px;max-height:calc(100vh - 16px);
+  /* MASAUSTU: kutu, istaka SERIDININ ALTINDAKI serbest banda oturur;
+     hicbir cue/istaka secim alani ORTULMEZ. Mesaj alani kullanilabilir
+     kalsin diye kutu YUKSEK degil GENIS tutulur. Kutu DISINDA kalan
+     her yerde tiklama masaya gecer (kapsayici pointer-events:none). */
+  width:520px;max-width:calc(100vw - 16px);
+  height:min(22vh,198px);min-height:150px;max-height:calc(100vh - 16px);
   border-radius:10px;box-shadow:0 0 24px rgba(0,0,0,0.6);}
 /* Dar kutuda dikey yeri ALAN ogeler kisilir; islev kaybi yok. */
 #screen-chat.mac-modu .chat-govde{flex-direction:column;}
@@ -1040,7 +1042,26 @@ font-family:sans-serif;
 #screen-chat.mac-modu .chat-kullanici{flex:none;padding:5px 8px;font-size:0.62rem;
   border:1px solid rgba(255,100,0,0.14);border-radius:5px;}
 #screen-chat.mac-modu #chat-hos{display:none;}   /* karsilama blogu: yer acilir */
-#screen-chat.mac-modu .chat-ust{padding:7px 10px;gap:6px;}
+#screen-chat.mac-modu .chat-ust{padding:4px 10px;gap:6px;}
+#screen-chat.mac-modu .chat-alt{padding:5px 8px;}
+/* MASAUSTU dar bant: oda/kullanici seridi gizlenir, kazanilan yer MESAJ
+   alanina gider. Mobilde serit KALIR (orada alt sayfa yeterince yuksek).
+   Sohbetin kendisi degismez: bu YALNIZCA mac modundaki gorunumdur. */
+@media (min-width:561px){
+  #screen-chat.mac-modu .chat-yan{display:none;}
+}
+/* DAR BANT: masa ve istaka seridi ORTULMEDEN sigmasi icin baslik ve
+   giris satiri kisilir; MESAJ alani korunur. */
+#screen-chat.mac-modu .chat-kutu.dar .chat-ust{padding:2px 8px;gap:5px;}
+#screen-chat.mac-modu .chat-kutu.dar .chat-baglam{font-size:0.68rem;}
+#screen-chat.mac-modu .chat-kutu.dar .chat-blok,
+#screen-chat.mac-modu .chat-kutu.dar .chat-rapor-btn,
+#screen-chat.mac-modu .chat-kutu.dar .chat-mod-btn,
+#screen-chat.mac-modu .chat-kutu.dar .chat-kapat{padding:3px 6px;font-size:0.55rem;}
+#screen-chat.mac-modu .chat-kutu.dar .chat-akis{padding:5px 9px;}
+#screen-chat.mac-modu .chat-kutu.dar .chat-alt{padding:4px 7px;gap:5px;}
+#screen-chat.mac-modu .chat-kutu.dar .chat-giris{padding:5px 8px;font-size:0.72rem;}
+#screen-chat.mac-modu .chat-kutu.dar .chat-yolla{padding:5px 9px;font-size:0.6rem;}
 #screen-chat.mac-modu .chat-baslik{display:none;}
 #screen-chat.mac-modu .chat-sayac{display:none;}
 #screen-chat.mac-modu .chat-akis{padding:8px 10px;}
@@ -1589,6 +1610,13 @@ function startOnlineGame(seed, nick1, nick2) {
   // varsayilanla cizilir, geldiginde tekrar tazelenir.
   try{ ghKimlikTazele(); }catch(e){}
   try{ profilYukle().then(function(){ try{ ghKimlikTazele(); }catch(e){} }); }catch(e){}
+  // [DAVET] Sohbet kimligi BURADA HAZIRLANMAZ. Oyuncu yalnizca online
+  // mac oynadigi icin global sohbete KATILMAZ: kullanici listesinde
+  // gorunmez ve yabancilardan DM alamaz. Kimlik + baglanti YALNIZCA
+  // davet akisi baslatildiginda (gonderirken veya KABUL ederken)
+  // kurulur; ilk davette 1-2 sn baglanti gecikmesi olabilir ve bu
+  // sure 'inv.connecting' gostergesiyle kullaniciya bildirilir.
+  _davetRakipDeneme = 0;
   el('gs1').textContent='0'; el('gs2').textContent='0';
   el('ge1').textContent='---'; el('ge2').textContent='---';
   el('gc1').textContent='0'; el('gc2').textContent='0';
@@ -4966,6 +4994,7 @@ PROFIL.register('unknown', { getir: function(){ return null; } });
 // hedef istemciden ALINMAZ. Masa oyunu davet sirasinda DURMAZ.
 let AKTIF_DAVET = null;      // { token, from, profil }
 let _davetGonderiliyor = false;
+let _davetRakipDeneme = 0;   // opponent_chat_required tekrar sayaci
 
 function davetPopKapat(){
   AKTIF_DAVET = null;
@@ -4992,17 +5021,29 @@ function davetPopAc(veri){
   e.classList.add('show');
 }
 // Rakip kartindaki butondan davet gonder.
-function davetIste(){
+function davetIste(otomatik){
   if(_davetGonderiliyor) return;
   if(!(typeof G !== 'undefined' && G && G.onlineMode)) return;
+  if(otomatik !== true) _davetRakipDeneme = 0;   // kullanici tiklamasi: sayaci sifirla
   const b = document.getElementById(_davetRakipPid() + '-chat');
+  const eskiMetin = b ? b.textContent : '';
   _davetGonderiliyor = true;
-  if(b) b.disabled = true;
-  // chatSid sunucu uretimi; sunucu bunu chat kimligine cevirir.
-  let sid = '';
-  try{ sid = (typeof chatSidOku === 'function') ? chatSidOku() : ''; }catch(e){}
-  try{ wsSend({ type:'chat_invite', sid: sid }); }catch(e){}
-  setTimeout(function(){ _davetGonderiliyor = false; if(b) b.disabled = false; }, 1200);
+  // .gh-chat bir <span>: etkilesim _davetGonderiliyor ile kilitlenir,
+  // gorsel durum ise CSS'teki [disabled] ozniteligi ile verilir.
+  if(b){ b.setAttribute('disabled', ''); b.textContent = t('inv.connecting'); }
+  function bitir(){
+    _davetGonderiliyor = false;
+    if(b){ b.removeAttribute('disabled'); b.textContent = eskiMetin || t('inv.button'); }
+  }
+  // Sohbet ekranini ACMADAN kimlik + baglanti hazirlanir.
+  davetChatHazirla(6000).then(function(hazir){
+    if(!hazir){ bitir(); toastUI(t('inv.chatOpenFailed')); return; }
+    // davetChatHazirla() basarili donuste sid'i ZATEN yayinladi.
+    let sid = '';
+    try{ sid = (typeof chatSidOku === 'function') ? chatSidOku() : ''; }catch(e){}
+    try{ wsSend({ type:'chat_invite', sid: sid }); }catch(e){}
+    setTimeout(bitir, 1200);
+  });
 }
 function _davetRakipPid(){
   let s = 0;
@@ -5018,20 +5059,94 @@ function davetChatHazir(){
   try{ return !!(typeof CHAT !== 'undefined' && CHAT && CHAT.bagli && CHAT.katildi && CHAT.nick); }
   catch(e){ return false; }
 }
-// Hazir degilse YENIDEN BAGLANMAYI dener. Yalnizca hazir olunca true doner.
+// ── [DAVET] ARKA PLAN SOHBET KIMLIGI ────────────────────────────
+// Oyuncunun sohbet EKRANINI onceden acmasi ARTIK GEREKMEZ. Davet akisi
+// gerektiginde kimligi ve baglantiyi kendisi hazirlar.
+//
+// Nick oncelik sirasi:
+//   1) Platform hesabi adi  (YALNIZCA platform gercekten verdiyse)
+//   2) Mevcut online oyun nickname'i
+//   3) Guvenli guest karsiligi: TR Oyuncu / EN Player / RU \u0418\u0433\u0440\u043e\u043a
+// Platformdan GELMEYEN ad veya avatar UYDURULMAZ; 3. secenek yalnizca
+// ceviriden gelen genel bir etikettir, sahte hesap degildir.
+//
+// Mevcut nick kurallari AYNEN korunur (NFKC, kontrol karakteri, desen,
+// CHAT_NICK_MIN/MAX). Sunucu her durumda yeniden dogrular.
+function davetNickTemizle(ham){
+  let n = String(ham || '').trim();
+  try{ n = n.normalize('NFKC'); }catch(e){}
+  if(CHAT_NICK_KONTROL.test(n)) return '';
+  n = n.replace(/\s+/g, '_');                 // desen bosluk KABUL ETMEZ
+  n = Array.from(n).filter(function(k){ return CHAT_NICK_DESEN.test(k); }).join('');
+  if(chatNickUzunluk(n) > CHAT_NICK_MAX) n = Array.from(n).slice(0, CHAT_NICK_MAX).join('');
+  if(!n || chatNickUzunluk(n) < chatNickAltSinir(n)) return '';
+  return n;
+}
+function davetNickTuret(){
+  try{
+    const p = profilAl();
+    if(p && p.kaynak && p.kaynak !== 'guest'){
+      const a = davetNickTemizle(p.ad);
+      if(a) return a;
+    }
+  }catch(e){}
+  try{
+    const a = davetNickTemizle((typeof P !== 'undefined' && P && P.nickname) ||
+                               (typeof _NICK !== 'undefined' ? _NICK : ''));
+    if(a) return a;
+  }catch(e){}
+  const g = davetNickTemizle(t('profile.guest'));
+  return g || ('Player_' + Math.floor(Math.random() * 9000 + 1000));
+}
+// Elde edilen SID OYUN soketine bildirilir: sunucu ws.chatSid'i yalnizca
+// find_match aninda yakaladigi icin, mac BASLADIKTAN sonra kurulan sohbet
+// kimligi aksi halde sunucuya ulasmazdi.
+function davetSidYayinla(){
+  try{
+    const s = (typeof chatSidOku === 'function') ? chatSidOku() : '';
+    if(s) wsSend({ type:'chat_sid', sid: s });
+  }catch(e){}
+}
+// Kimlik + baglanti hazirligi. Hazir olunca true.
+// CHAT.acik (ekran gorunur mu) HICBIR asamada on kosul DEGILDIR.
+let _davetKimlikSozu = null;
+let _davetNickDeneme = 0;
+// Hazir olmayi BEKLEYENLER. chat_join basarili olur olmaz cozulurler;
+// boylece yoklama araligi kadar BOSA BEKLEME olmaz. (Olcum: katilim
+// 14 ms'de bitiyordu, davet 785 ms'de gidiyordu; fark yoklamaydi.)
+let _davetHazirBekleyen = [];
+function davetHazirBildir(){
+  if(!_davetHazirBekleyen.length) return;
+  if(!davetChatHazir()) return;
+  const liste = _davetHazirBekleyen; _davetHazirBekleyen = [];
+  liste.forEach(function(f){ try{ f(true); }catch(e){} });
+}
 function davetChatHazirla(zamanAsimi){
-  return new Promise(function(coz){
-    if(davetChatHazir()) return coz(true);
-    // Nick yoksa katilim imkansiz: sessizce beklemek yerine ACIK hata.
-    try{ if(!CHAT || !CHAT.nick) return coz(false); }catch(e){ return coz(false); }
+  if(davetChatHazir()){ davetSidYayinla(); return Promise.resolve(true); }
+  if(_davetKimlikSozu) return _davetKimlikSozu;
+  const bitis = Date.now() + (zamanAsimi || 6000);
+  _davetKimlikSozu = new Promise(function(coz){
+    let bitti = false;
+    function bitir(v){
+      if(bitti) return; bitti = true;
+      _davetKimlikSozu = null;
+      if(v) davetSidYayinla();
+      coz(v);
+    }
+    _davetHazirBekleyen.push(bitir);          // OLAY: chat_join ok -> aninda
+    // Nick yoksa TURETILIR: kullaniciya panel gosterilmez.
+    try{ if(!CHAT.nick) CHAT.nick = davetNickTuret(); }catch(e){}
     try{ if(typeof chatBaglan === 'function') chatBaglan(); }catch(e){}
-    const bitis = Date.now() + (zamanAsimi || 4000);
+    // GUVENLIK AGI: olay hic gelmezse (yeniden baglanma, nick catismasi)
+    // kisa araliklarla yine de kontrol edilir.
     (function bekle(){
-      if(davetChatHazir()) return coz(true);
-      if(Date.now() >= bitis) return coz(false);
-      setTimeout(bekle, 150);
+      if(bitti) return;
+      if(davetChatHazir()) return bitir(true);
+      if(Date.now() >= bitis) return bitir(false);
+      setTimeout(bekle, 80);
     })();
   });
+  return _davetKimlikSozu;
 }
 function davetCevap(kabul){
   if(!AKTIF_DAVET) return davetPopKapat();
@@ -5048,9 +5163,9 @@ function davetCevap(kabul){
   // acilmadi" yarim durumu bu sayede olusamaz.
   const kb = document.getElementById('inv-kabul');
   const rb = document.getElementById('inv-red');
-  let nickVar = true;
-  try{ nickVar = !!(CHAT && CHAT.nick); }catch(e){ nickVar = false; }
-  if(!nickVar){ toastUI(t('inv.noNick')); return; }
+  // NICK SARTI YOK: davetChatHazirla() gerekirse kimligi kendisi
+  // turetir ve arka planda baglanir. "Once sohbete katilin"
+  // durumu BILEREK KALDIRILDI.
   if(kb){ kb.disabled = true; kb.textContent = t('inv.connecting'); }
   if(rb) rb.disabled = true;
   davetChatHazirla(4000).then(function(hazir){
@@ -5062,7 +5177,12 @@ function davetCevap(kabul){
       return;
     }
     davetPopKapat();
-    try{ wsSend({ type:'chat_invite_accept', token: tok }); }catch(e){}
+    // Kabul mesaji ALICININ KENDI sid'ini tasir: davet gonderildiginde
+    // alicinin sohbet kimligi HENUZ olmayabilir (kimse zorla sohbete
+    // katilmaz), sunucu kimligi bu jetonla KABUL aninda cozer.
+    let benimSid = '';
+    try{ benimSid = (typeof chatSidOku === 'function') ? chatSidOku() : ''; }catch(e){}
+    try{ wsSend({ type:'chat_invite_accept', token: tok, sid: benimSid }); }catch(e){}
   });
 }
 // Sunucudan gelen davet mesajlari. Oyun akisina DOKUNMAZ.
@@ -5084,6 +5204,15 @@ function davetMesaj(msg){
     return true;
   }
   if(msg.type === 'chat_invite_error'){
+    // Rakip sohbet kimligini HENUZ hazirlamamis olabilir (mac yeni
+    // basladiysa arka plan katilimi surüyordur). Bu hata cooldown
+    // TUKETMEZ (sunucu cooldown blogundan ONCE doner), bu yuzden
+    // SINIRLI sayida sessiz tekrar guvenlidir.
+    if(msg.reason === 'opponent_chat_required' && _davetRakipDeneme < 3){
+      _davetRakipDeneme++;
+      setTimeout(function(){ try{ davetIste(true); }catch(e){} }, 1500);
+      return true;
+    }
     const harita = { cooldown:'inv.cooldown', blocked:'inv.blocked', expired:'inv.expired',
                      chat_required:'inv.chatRequired', opponent_chat_required:'inv.peerChatRequired' };
     const k = harita[msg.reason] || 'inv.failed';
@@ -5111,6 +5240,93 @@ function davetMactaMi(){
 //   * reklam kancasi (AD.beforeEnterChat) mac ortasinda CALISTIRILMAZ
 // Bu fonksiyon YALNIZCA kabul edilmis bir davetten cagrilir; oyun sirasinda
 // sohbet kendiliginden ACILMAZ.
+// Masaustu overlay yerlesimi. ISTAKA SERIDI ASLA ORTULMEZ.
+// Serit yatay kaydirmali ve konumu pencere boyutuna gore degistigi icin
+// olcum CALISMA ZAMANINDA yapilir. Mobilde (<=560px) CSS'teki alt sayfa
+// duzeni gecerlidir; burada hicbir sey degistirilmez.
+const DAVET_OVERLAY_BOSLUK  = 8;     // kenar / oge bosluğu
+const DAVET_OVERLAY_GEN_MAX = 520;
+const DAVET_OVERLAY_GEN_MIN = 340;
+const DAVET_OVERLAY_YUK_MAX = 260;
+const DAVET_OVERLAY_YUK_MIN = 110;   // dar masaustu bantlari
+const DAVET_OVERLAY_DAR     = 170;   // altinda 'kompakt' gorunum
+function _davetOlc(sec){
+  try{
+    const e = document.querySelector(sec);
+    if(!e) return null;
+    const r = e.getBoundingClientRect();
+    return (r.width > 0 && r.height > 0) ? r : null;
+  }catch(e){ return null; }
+}
+function davetOverlayYerlestir(){
+  const o = document.getElementById('screen-chat');
+  if(!o || !o.classList.contains('mac-modu')) return;
+  const kutu = o.querySelector('.chat-kutu');
+  if(!kutu) return;
+  // MOBIL: CSS'teki alt sayfa duzeni gecerlidir; satir ici olculer silinir.
+  if(window.innerWidth <= 560){
+    kutu.style.position = ''; kutu.style.left = ''; kutu.style.top = '';
+    kutu.style.width = ''; kutu.style.height = ''; kutu.style.minHeight = '';
+    kutu.classList.remove('dar');
+    o.style.paddingBottom = '';
+    return;
+  }
+  const B = DAVET_OVERLAY_BOSLUK;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const masa  = _davetOlc('#pool-canvas');
+  const serit = _davetOlc('.skin-bar, #skin-bar, .skin-strip');
+
+  // Aday BOS bolgeler (oncelik sirasiyla). Istaka seridi ve masa
+  // KAPSAM DISI birakilir.
+  const adaylar = [];
+  if(serit){
+    // A) Seridin ALTI - tam genislik
+    adaylar.push({ x0:B, y0:serit.bottom + B, x1:vw - B, y1:vh - B });
+    // B) Seridin SAGI + masanin ALTI (serit yatay kaydirmali bir kutudur;
+    //    gorunur alani KENDI dikdortgeni kadardir)
+    // Dar bantta her piksel degerli: masanin ALT kenarina yapisir ve
+    // ekranin alt kenarina 4px kalir. Masa da serit de ORTULMEZ.
+    adaylar.push({ x0:serit.right + 6,
+                   y0:Math.max(serit.top, masa ? masa.bottom : serit.top),
+                   x1:vw - 6, y1:vh - 4 });
+  }else if(masa){
+    adaylar.push({ x0:B, y0:masa.bottom + B, x1:vw - B, y1:vh - B });
+  }
+  for(let i = 0; i < adaylar.length; i++){
+    const a = adaylar[i];
+    const gen = a.x1 - a.x0, yuk = a.y1 - a.y0;
+    if(gen >= DAVET_OVERLAY_GEN_MIN && yuk >= DAVET_OVERLAY_YUK_MIN){
+      const w = Math.min(DAVET_OVERLAY_GEN_MAX, gen);
+      const h = Math.min(DAVET_OVERLAY_YUK_MAX, yuk);
+      kutu.style.position = 'absolute';
+      kutu.style.width  = Math.round(w) + 'px';
+      // CSS'teki min-height hesaplanan olcuyu EZMESIN: acikca ayarlanir.
+      kutu.style.height = Math.round(h) + 'px';
+      kutu.style.minHeight = Math.round(h) + 'px';
+      kutu.style.left   = Math.round(a.x1 - w) + 'px';
+      kutu.style.top    = Math.round(a.y1 - h) + 'px';
+      kutu.classList.toggle('dar', h < DAVET_OVERLAY_DAR);
+      o.style.paddingBottom = '';
+      return;
+    }
+  }
+  // C) Son care: seridin USTU. Istaka secimi yine ACIK kalir; yalnizca
+  //    masanin sag alt kosesi kismen ortulur.
+  const w = Math.min(DAVET_OVERLAY_GEN_MAX, vw - B * 2);
+  const tavan = serit ? (serit.top - B) : (vh - B);
+  const h = Math.min(DAVET_OVERLAY_YUK_MAX, Math.max(DAVET_OVERLAY_YUK_MIN, tavan - B));
+  kutu.style.position = 'absolute';
+  kutu.style.width  = Math.round(w) + 'px';
+  kutu.style.height = Math.round(h) + 'px';
+  kutu.style.minHeight = Math.round(h) + 'px';
+  kutu.style.left   = Math.round(vw - B - w) + 'px';
+  kutu.style.top    = Math.round(tavan - h) + 'px';
+  kutu.classList.toggle('dar', h < DAVET_OVERLAY_DAR);
+  o.style.paddingBottom = '';
+}
+// Pencere boyutu degisince yeniden hesaplanir; overlay kapaliyken no-op.
+window.addEventListener('resize', function(){ try{ davetOverlayYerlestir(); }catch(e){} });
+
 function davetSohbetEkraniAc(){
   const o = document.getElementById('screen-chat');
   if(!o) return false;
@@ -5121,6 +5337,9 @@ function davetSohbetEkraniAc(){
   CHAT.acik = true;
   try{ i18nUygula(o); }catch(e){}
   try{ if(CHAT.katildi) chatPaneliAc(); else chatNickPaneliAc(); }catch(e){}
+  try{ davetOverlayYerlestir(); }catch(e){}
+  // Masa yerlesimi acilistan hemen sonra oturabilir; bir kez daha olc.
+  setTimeout(function(){ try{ davetOverlayYerlestir(); }catch(e){} }, 350);
   return true;
 }
 function davetOzelSohbetAc(peerNick){
@@ -8894,6 +9113,12 @@ function chatMsgIsle(m){
         CHAT.nick = m.nick || CHAT.nick;
         CHAT.oda  = m.room || CHAT.oda;
         chatSidYaz(m.sid);           // [V2.1a] sunucunun verdigi jeton saklanir
+        _davetNickDeneme = 0;
+        // [DAVET] Yeni SID oyun soketine bildirilir; aksi halde mac
+        // basladiktan SONRA kurulan kimlik sunucuya ulasmaz.
+        try{ davetSidYayinla(); }catch(e){}
+        // Daveti bekleyenler ANINDA cozulur: yoklama gecikmesi olmaz.
+        try{ davetHazirBildir(); }catch(e){}
         chatWsGonder({ type:'chat_block_list' });   // [V2.1b] engel listesi
         chatOdalariCiz();
         chatPaneliAc();
@@ -8963,6 +9188,20 @@ function chatMsgIsle(m){
       // gonderilirse not_joined doner. Her ikisinde de katilim yeniden
       // denenir (sinirli). Ilk giristeki gercek nick_taken bu yola
       // GIRMEZ: katildiOnce false oldugu icin chatYenidenKatil() reddeder.
+      // [DAVET] ARKA PLAN kimlik: sohbet ekrani KAPALIYKEN nick catismasi
+      // kullaniciya panel gosteremez. Turetilen ada kisa sonek eklenip
+      // SINIRLI sayida yeniden denenir. Ekran acikken bu yola GIRILMEZ:
+      // gercek kullanici girisi eski davranisini korur.
+      if(m.code === 'nick_taken' && !CHAT.acik && _davetNickDeneme < 3 &&
+         CHAT_WS && CHAT_WS.readyState === WebSocket.OPEN){
+        _davetNickDeneme++;
+        let kok = String(CHAT.nick || '').replace(/_\d{1,4}$/, '');
+        kok = Array.from(kok).slice(0, 11).join('');
+        const aday = davetNickTemizle(kok + '_' + Math.floor(Math.random() * 9000 + 1000));
+        CHAT.nick = aday || ('Player_' + Math.floor(Math.random() * 9000 + 1000));
+        chatWsGonder({ type:'chat_join', nick: CHAT.nick, room: CHAT.oda, sid: chatSidOku() });
+        break;
+      }
       if((m.code === 'nick_taken' || m.code === 'not_joined') &&
          chatYenidenKatil()) break;
       if(document.getElementById('chat-govde').style.display === 'none'){
@@ -9057,6 +9296,10 @@ function chatAc(){
     if(!o) return;
     o.style.display = 'flex';
     o.classList.remove('mac-modu');   // menuden acilis DAIMA tam ekran
+    o.style.paddingBottom = '';
+    const kk0 = o.querySelector('.chat-kutu');
+    if(kk0){ kk0.style.position=''; kk0.style.left=''; kk0.style.top='';
+             kk0.style.width=''; kk0.style.height=''; kk0.style.minHeight=''; kk0.classList.remove('dar'); }
     CHAT.acik = true;
     i18nUygula(o);                     // overlay metinlerini secili dile getir
     const kayitli = (function(){ try{ return localStorage.getItem('inferno_chat_nick') || ''; }catch(e){ return ''; } })();
@@ -9068,7 +9311,16 @@ function chatAc(){
 }
 function chatKapat(){
   const o = document.getElementById('screen-chat');
-  if(o){ o.style.display = 'none'; o.classList.remove('mac-modu'); }
+  if(o){
+    o.style.display = 'none';
+    o.classList.remove('mac-modu');
+    // Mac modunda verilen satir ici olculer temizlenir; menuden
+    // acilan TAM EKRAN sohbet bunlardan ETKILENMEZ.
+    o.style.paddingBottom = '';
+    const kk = o.querySelector('.chat-kutu');
+    if(kk){ kk.style.position=''; kk.style.left=''; kk.style.top='';
+            kk.style.width=''; kk.style.height=''; kk.style.minHeight=''; kk.classList.remove('dar'); }
+  }
   CHAT.acik = false;
   chatBaglantiKapat();
   // G.phase, showScreen ve oyun durumu DEGISMEZ.

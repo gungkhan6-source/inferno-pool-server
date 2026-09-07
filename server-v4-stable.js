@@ -171,6 +171,13 @@ wss.on('connection', (ws) => {
         case 'rematch_decline':
           relay(ws, msg); break;
         case 'turn_end': turnEnd(ws, msg); break;
+        // [DAVET] Sohbet kimligi mac SIRASINDA da kurulabilir; ws.chatSid
+        // yalnizca find_match aninda yakalandigi icin burada TAZELENIR.
+        // Jetonun kendisi dogrulanmaz: davetChatKimligi() her kullanimda
+        // chatSidDogrula()'dan gecirir, gecersiz jeton ise sonuc vermez.
+        case 'chat_sid':
+          if(msg && typeof msg.sid === 'string' && msg.sid.length <= 256) ws.chatSid = msg.sid;
+          break;
         // [DAVET] Sohbet daveti. Hedef SUNUCU tarafindan belirlenir.
         case 'chat_invite':         davetGonder(ws, msg); break;
         case 'chat_invite_accept':  davetKabul(ws, msg);  break;
@@ -304,10 +311,16 @@ function davetGonder(ws, msg){
   // Chat kimligi: her iki taraf da chat'e katilmis olmali (DM icin sart).
   const ben = davetChatKimligi(msg && msg.sid);
   if(!ben) return davetHata(ws, 'chat_required');
+  // ALICININ sohbet kimligi ZORUNLU DEGILDIR. Hic kimse yalnizca online
+  // mac oynadigi icin sohbete katilmak zorunda kalmasin diye, alici
+  // kimligi KABUL aninda (alicinin KENDI gonderdigi sid ile) cozulur.
+  // Kimlik ZATEN varsa self-invite ve engel kontrolu BURADA yapilir;
+  // yoksa ayni kontroller davetKabul() icinde tekrarlanir.
   const o = davetChatKimligi(hedef.chatSid);
-  if(!o) return davetHata(ws, 'opponent_chat_required');
-  if(ben.nickAlt === o.nickAlt) return davetHata(ws, 'self_invite');
-  if(davetBlokVar(ben, o)) return davetHata(ws, 'blocked');
+  if(o){
+    if(ben.nickAlt === o.nickAlt) return davetHata(ws, 'self_invite');
+    if(davetBlokVar(ben, o)) return davetHata(ws, 'blocked');
+  }
 
   // Cooldown + saatlik tavan.
   let k = davetSayac.get(ws.id);
@@ -330,8 +343,8 @@ function davetGonder(ws, msg){
 
   const tok = davetToken();
   davetler.set(tok, { gonderenId: ws.id, aliciId: hedef.id, odaId: oda.id,
-                      gonderen: ben, alici: o,
-                      gonderenAlt: ben.nickAlt, aliciAlt: o.nickAlt,
+                      gonderen: ben, alici: o || null,
+                      gonderenAlt: ben.nickAlt, aliciAlt: o ? o.nickAlt : '',
                       bitis: simdi + DAVET_TTL_MS, kullanildi: false });
   k.son.set(hedef.id, simdi);
   k.saat.push(simdi);
@@ -365,6 +378,21 @@ function davetKabul(ws, msg){
   const r = davetCoz(ws, msg);
   if(r.hata) return davetHata(ws, r.hata);
   const d = r.d;
+  // Alicinin sohbet kimligi KABUL aninda cozulur/TAZELENIR: kabul mesaji
+  // alicinin KENDI sid jetonunu tasir. Jeton yine chatSidDogrula() ile
+  // dogrulanir; istemcinin iddiasina GUVENILMEZ.
+  // NEDEN TAZELEME: kimlik artik davet AKISIYLA kuruldugu icin, davet
+  // gonderildiginde alicinin sid kaydinda ONCEKI oturumdan kalan bir
+  // nickAlt bulunabilir. Bayat nick kullanilirsa gonderene yanlis peer
+  // gider ve o tarafta DM ACILMAZ.
+  {
+    const al = davetChatKimligi(msg && msg.sid) ||
+               davetChatKimligi(ws.chatSid) || d.alici;
+    if(!al) return davetHata(ws, 'chat_required');
+    if(al.nickAlt === d.gonderenAlt) return davetHata(ws, 'self_invite');
+    d.alici = al; d.aliciAlt = al.nickAlt;
+    if(msg && typeof msg.sid === 'string' && msg.sid.length <= 256) ws.chatSid = msg.sid;
+  }
   // Blok kabul aninda TEKRAR kontrol edilir (arada eklenmis olabilir).
   if(davetBlokVar(d.gonderen, d.alici)) { davetler.delete(r.tok); return davetHata(ws, 'blocked'); }
   // TEK KULLANIMLIK: ikinci kabul no-op olur (yukarida 'already_used').
@@ -2038,6 +2066,7 @@ function chatYonlendir(ws, ham){
     case 'chat_ping':          chatGonder(ws, { type:'chat_pong', ts: Date.now() }); break;
     // [DAVET] Bu uc tip OYUN tarafinda ele alinir; chat dispatcher'i
     // yalnizca gecer (yoksa 'unknown_type' gurultusu uretirdi).
+    case 'chat_sid':
     case 'chat_invite':
     case 'chat_invite_accept':
     case 'chat_invite_decline': break;
