@@ -1438,9 +1438,12 @@ async function showMidrollAd() {
 }
 function cgGameplayStart() {
   try { if (cgReady) CG_SDK.game.gameplayStart(); } catch (e) {}
+  // [YANDEX] Ayni an, ayni anlam. SDK yoksa sessizce gecer.
+  try { if (typeof yaGameplayStart === 'function') yaGameplayStart(); } catch (e) {}
 }
 function cgGameplayStop() {
   try { if (cgReady) CG_SDK.game.gameplayStop(); } catch (e) {}
+  try { if (typeof yaGameplayStop === 'function') yaGameplayStop(); } catch (e) {}
 }
 
 initCrazyGames();
@@ -8263,6 +8266,9 @@ function skipLoading() {
 function showIntro() {
     if (G.phase === 'intro') return;   // cift cagriya karsi (SKIP + wakeServer)
     showScreen('intro');
+    // [YANDEX] Yukleme bitti ve ekran ETKILESIME HAZIR: LoadingAPI.ready().
+    // SDK henuz hazir degilse bayrak kalir, init bitince oradan cagrilir.
+    try{ _yaAcilisBitti = true; yaOyunHazir(); }catch(e){}
 
     // #intro-logo / #intro-sub / #intro-btn CSS'te opacity:0 ile basliyor,
     // ustelik #intro-btn'de pointer-events:none var. '.show' sinifi
@@ -8577,6 +8583,41 @@ function _adDuraklat(){
   // Suren nisan/atis girisimi iptal: reklam kapaninca kazara atis olmasin.
   try{ if(typeof drag !== 'undefined' && drag){ drag.active = false; drag.power = 0; } }catch(e){}
 }
+// ── [ODAK] Sekme/pencere odagi kaybolunca SES DURUR ────────────────
+// Yandex kurali: oyun odagi kaybettiginde ses calmaya devam etmemeli.
+// Reklam acikken DEVREYE GIRMEZ: reklam kendi duraklatmasini yapar ve
+// kullanicinin sessiz tercihini kendi geri yukler.
+let _odakSessiz = false;
+let _odakOncekiMute = null;
+function _odakDuraklat(){
+  if(_odakSessiz || _adAcik) return;
+  _odakSessiz = true;
+  try{
+    _odakOncekiMute = G_muted;          // kullanici tercihi saklanir
+    G_muted = true;
+    _activeAudio.forEach(function(n){ try{ n.pause(); }catch(e){} });
+    _activeAudio = [];
+    if(AC) try{ AC.suspend(); }catch(e){}
+  }catch(e){}
+}
+function _odakDevam(){
+  if(!_odakSessiz) return;
+  _odakSessiz = false;
+  try{
+    G_muted = (_odakOncekiMute === true);   // KULLANICI tercihine donulur
+    if(!G_muted && !_adAcik && AC) try{ AC.resume(); }catch(e){}
+  }catch(e){}
+  _odakOncekiMute = null;
+}
+try{
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden) _odakDuraklat(); else _odakDevam();
+  });
+  window.addEventListener('blur',  function(){ _odakDuraklat(); });
+  window.addEventListener('focus', function(){ _odakDevam(); });
+  window.addEventListener('pagehide', function(){ _odakDuraklat(); });
+}catch(e){}
+
 function _adDevam(){
   if(!_adAcik) return;
   _adAcik = false;
@@ -8675,26 +8716,124 @@ AD.register('crazygames', {
 // gosterilmemesini soyler; bu yuzden tek tetikleyici mac sonu (endGame).
 let _ysdk = null;            // YaGames.init() sonucu
 let _ysdkInit = null;        // init promise'i (bir kez)
+// ── [YANDEX] ORTAM TESPITI ──────────────────────────────────────────
+// CrazyGames tespitiyle AYNI kalip: yalnizca portala ozgu isaretlere bakar.
+// SDK'nin yuklenmis olmasini BEKLEMEZ; bu yuzden erken cagrilar yanlis
+// platform dondurmez.
+const YA_ALAN = /(^|\.)(yandex\.[a-z.]{2,6}|ya\.ru|yandex\.net|games\.s3\.yandex\.net)$/i;
+function _yaOrtamiMi(){
+  try{
+    if(typeof window.INFERNO_PLATFORM === 'string')
+      return window.INFERNO_PLATFORM === 'yandex';
+    if(window.YaGames) return true;
+    const h = (location.hostname || '').toLowerCase();
+    if(YA_ALAN.test(h)) return true;
+    // Oyun portal icinde iframe ile calisir: ust cerceve kokenine bak.
+    try{
+      const a = document.location.ancestorOrigins;
+      if(a) for(let i = 0; i < a.length; i++){
+        const u = new URL(a[i]);
+        if(YA_ALAN.test((u.hostname || '').toLowerCase())) return true;
+      }
+    }catch(e){}
+    try{
+      if(document.referrer){
+        const r = new URL(document.referrer);
+        if(YA_ALAN.test((r.hostname || '').toLowerCase())) return true;
+      }
+    }catch(e){}
+  }catch(e){}
+  return false;
+}
+// SDK'yi YALNIZCA Yandex ortaminda ve YALNIZCA BIR KEZ yukler.
+// Paketteki index.html statik <script src="/sdk.js"> tasiyorsa window.YaGames
+// zaten vardir ve burada HICBIR SEY yapilmaz.
+let _yaYuklemeSozu = null;
+function yaSdkYukle(){
+  if(_yaYuklemeSozu) return _yaYuklemeSozu;
+  _yaYuklemeSozu = new Promise(function(coz){
+    if(!_yaOrtamiMi()) return coz(false);
+    if(window.YaGames) return coz(true);            // statik etiket kazanir
+    try{
+      const s = document.createElement('script');
+      s.src = '/sdk.js';                            // Yandex sunucusunda barinan oyun
+      s.onload  = function(){ coz(!!window.YaGames); };
+      s.onerror = function(){ coz(false); };        // basarisizlik OYUNU DURDURMAZ
+      document.head.appendChild(s);
+    }catch(e){ coz(false); }
+  });
+  return _yaYuklemeSozu;
+}
+// [YANDEX] Oyun gercekten oynanabilir oldugunda TEK KEZ isaretlenir.
+// Zamanlayiciya DEGIL, yukleme ekraninin kapanip etkilesimin acilmasina
+// baglidir; moderasyon bunu kontrol eder.
+let _yaHazirBildirildi = false;
+function yaOyunHazir(){
+  if(_yaHazirBildirildi) return;
+  _yaHazirBildirildi = true;
+  try{
+    if(_ysdk && _ysdk.features && _ysdk.features.LoadingAPI &&
+       typeof _ysdk.features.LoadingAPI.ready === 'function'){
+      _ysdk.features.LoadingAPI.ready();
+    }
+  }catch(e){}
+}
+// [YANDEX] Oynanis isaretleri. CrazyGames'in gameplayStart/Stop cagrildigi
+// AYNI iki noktadan cagrilir; anlam birebir aynidir.
+function yaGameplayStart(){
+  try{
+    if(_ysdk && _ysdk.features && _ysdk.features.GameplayAPI &&
+       typeof _ysdk.features.GameplayAPI.start === 'function')
+      _ysdk.features.GameplayAPI.start();
+  }catch(e){}
+}
+function yaGameplayStop(){
+  try{
+    if(_ysdk && _ysdk.features && _ysdk.features.GameplayAPI &&
+       typeof _ysdk.features.GameplayAPI.stop === 'function')
+      _ysdk.features.GameplayAPI.stop();
+  }catch(e){}
+}
+// [YANDEX] Otomatik dil. YALNIZCA kullanici daha once ELLE dil secmemisse
+// uygulanir; manuel secim (localStorage['inferno_lang']) DAIMA ustundur.
+function yaDiliUygula(){
+  try{
+    let elle = null;
+    try{ elle = localStorage.getItem(I18N_ANAHTAR); }catch(e){}
+    if(elle) return;                                 // kullanici sectiyse DOKUNMA
+    const d = _ysdk && _ysdk.environment && _ysdk.environment.i18n &&
+              _ysdk.environment.i18n.lang;
+    if(typeof d !== 'string' || !d) return;
+    const kod = d.toLowerCase().slice(0, 2);
+    if(I18N_DILLER.indexOf(kod) < 0) return;         // desteklenmeyen dil: varsayilan kalir
+    setLang(kod);
+    // setLang localStorage'a YAZAR; boylece sonraki acilislarda da ayni
+    // dil gelir ve kullanici isterse menuden degistirebilir.
+  }catch(e){}
+}
 function _yandexBaslat(){
   if(_ysdkInit) return _ysdkInit;
-  try{
-    if(typeof window.YaGames === 'undefined' || !window.YaGames ||
-       typeof window.YaGames.init !== 'function'){
-      _ysdkInit = Promise.resolve(null);
-      return _ysdkInit;
-    }
-    _ysdkInit = Promise.resolve(window.YaGames.init())
+  _ysdkInit = yaSdkYukle().then(function(yuklendi){
+    if(!yuklendi || typeof window.YaGames === 'undefined' || !window.YaGames ||
+       typeof window.YaGames.init !== 'function') return null;
+    return Promise.resolve(window.YaGames.init())
       .then(function(s){
         _ysdk = s || null;
+        // Otomatik dil, SDK hazir olur olmaz uygulanir.
+        try{ yaDiliUygula(); }catch(e){}
+        // Oyun bu noktada zaten oynanabilir hale gelmis olabilir.
+        try{ if(_yaAcilisBitti) yaOyunHazir(); }catch(e){}
         // [ALTIN KARTI] SDK hazir: kart varsa aninda aktiflesir.
         try{ if(typeof colAdCoinTazele === 'function') colAdCoinTazele(); }catch(e){}
         try{ if(typeof reklamCoinTazele === 'function') reklamCoinTazele(); }catch(e){}
         return _ysdk;
       })
       .catch(function(){ _ysdk = null; return null; });
-  }catch(e){ _ysdkInit = Promise.resolve(null); }
+  }).catch(function(){ _ysdk = null; return null; });
   return _ysdkInit;
 }
+// Oyun acilisi tamamlandi mi? (LoadingAPI.ready sirasi icin)
+let _yaAcilisBitti = false;
 
 // Tek yardimci: fullscreen ve rewarded ayni yasam dongusunu paylasir.
 // ASLA reject etmez, HER ZAMAN tek kez cozer, ses/oyun durumunu geri verir.
