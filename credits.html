@@ -132,8 +132,12 @@ SOFTWARE.</pre>
   <div class="sat" id="font-lisans" style="color:rgba(255,255,255,0.5);font-size:0.84rem;margin-top:6px;"></div>
 </div>
 
-<!-- ─────────────── BEKLEYEN ─────────────── -->
-<h2>GAME ART &amp; AUDIO</h2>
+<!-- ─────────────── SES EFEKTLERI (DOGRULANDI) ─────────────── -->
+<h2>SOUND EFFECTS</h2>
+<div class="kart" id="ses-dogrulandi"></div>
+
+<!-- ─────────────── BEKLEYEN: ISTAKA GORSELLERI ─────────────── -->
+<h2>CUE ARTWORK</h2>
 <div class="bekliyor" id="bekliyor"></div>
 
 <footer>
@@ -156,10 +160,50 @@ SOFTWARE.</pre>
     en:'Both are released under the SIL Open Font License 1.1. Cinzel Decorative — © 2012 Natanael Gama (Reserved Font Name ‘Cinzel’). Rajdhani — © 2014 Indian Type Foundry. The licence texts are distributed with the font files in assets/fonts/web/OFL-*.txt.',
     ru:'Оба шрифта выпущены под SIL Open Font License 1.1. Cinzel Decorative — © 2012 Natanael Gama (Reserved Font Name ‘Cinzel’). Rajdhani — © 2014 Indian Type Foundry. Тексты лицензий распространяются вместе со шрифтами: assets/fonts/web/OFL-*.txt.'
   };
+  // Dogrulanmis ses efektleri. Kaynak/lisans kayitlari:
+  //   assets/audio/ATTRIBUTION-sfx.txt  (pakete dahil)
+  //   licenses/                         (depo ici ayrintili kanit)
+  var SES = {
+    tr:'<div class="ad">SES EFEKTLER\u0130 \u2014 DO\u011eRULANDI<span class="rozet">4 ses \u00b7 do\u011frulanm\u0131\u015f</span></div>'
+      +'<div class="sat">Oyundaki d\u00f6rt ses efektinin kayna\u011f\u0131 ve lisans\u0131 do\u011frulanm\u0131\u015ft\u0131r:</div>'
+      +'<ul>'
+      +'<li><b>Istaka vuru\u015fu</b> \u2014 \u201cBilliard Pool Hit\u201d, contributor u_7fupvvf5ym \u2014 <b>Pixabay Content License</b></li>'
+      +'<li><b>Top \u00e7arp\u0131\u015fmas\u0131</b> \u2014 \u201c057082_Snooker &amp; pool balls.mp3\u201d, Freesound Community \u2014 <b>Pixabay Content License</b></li>'
+      +'<li><b>Fizik sesleri</b> (bant, cep, faul) \u2014 <code>impactWood_heavy_004</code>, Kenney \u2014 <b>CC0 1.0</b></li>'
+      +'<li><b>Aray\u00fcz sesi</b> \u2014 <code>select_002</code>, Kenney \u2014 <b>CC0 1.0</b></li>'
+      +'</ul>'
+      +'<div class="sat">D\u00f6rd\u00fc de ticari kullan\u0131ma ve oyuna g\u00f6m\u00fcl\u00fc da\u011f\u0131t\u0131ma a\u00e7\u0131kt\u0131r; hi\u00e7biri at\u0131f gerektirmez.</div>'
+      +'<div class="sat" style="color:rgba(255,255,255,0.5);font-size:0.84rem;margin-top:6px;">Ayr\u0131nt\u0131l\u0131 kay\u0131t, indirme tarihleri ve SHA-256 de\u011ferleri i\u00e7in: <code>assets/audio/ATTRIBUTION-sfx.txt</code></div>'
+      +'<div class="sat" style="color:rgba(255,255,255,0.5);font-size:0.84rem;">\u00d6nceki s\u00fcr\u00fcmlerde kullan\u0131lan \u00fc\u00e7 ses efektinin kaynaklar\u0131 da geriye d\u00f6n\u00fck olarak tespit edilmi\u015f ve kayda ge\u00e7irilmi\u015ftir.</div>',
+    en:'<div class="ad">SOUND EFFECTS \u2014 VERIFIED<span class="rozet">4 sounds \u00b7 verified</span></div>'
+      +'<div class="sat">The source and licence of all four sound effects in the game have been verified:</div>'
+      +'<ul>'
+      +'<li><b>Cue strike</b> \u2014 \u201cBilliard Pool Hit\u201d by u_7fupvvf5ym \u2014 <b>Pixabay Content License</b></li>'
+      +'<li><b>Ball collision</b> \u2014 \u201c057082_Snooker &amp; pool balls.mp3\u201d by Freesound Community \u2014 <b>Pixabay Content License</b></li>'
+      +'<li><b>Physics sounds</b> (cushion, pocket, foul) \u2014 <code>impactWood_heavy_004</code> by Kenney \u2014 <b>CC0 1.0</b></li>'
+      +'<li><b>Interface sound</b> \u2014 <code>select_002</code> by Kenney \u2014 <b>CC0 1.0</b></li>'
+      +'</ul>'
+      +'<div class="sat">All four permit commercial use and embedded distribution in a game; none require attribution.</div>'
+      +'<div class="sat" style="color:rgba(255,255,255,0.5);font-size:0.84rem;margin-top:6px;">For the detailed record, download dates and SHA-256 values see <code>assets/audio/ATTRIBUTION-sfx.txt</code></div>'
+      +'<div class="sat" style="color:rgba(255,255,255,0.5);font-size:0.84rem;">The sources of the three sound effects used in earlier versions have also been identified retrospectively and placed on record.</div>',
+    ru:'<div class="ad">\u0417\u0412\u0423\u041a\u041e\u0412\u042b\u0415 \u042d\u0424\u0424\u0415\u041a\u0422\u042b \u2014 \u041f\u0420\u041e\u0412\u0415\u0420\u0415\u041d\u041e<span class="rozet">4 \u0437\u0432\u0443\u043a\u0430 \u00b7 \u043f\u0440\u043e\u0432\u0435\u0440\u0435\u043d\u043e</span></div>'
+      +'<div class="sat">\u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a \u0438 \u043b\u0438\u0446\u0435\u043d\u0437\u0438\u044f \u0432\u0441\u0435\u0445 \u0447\u0435\u0442\u044b\u0440\u0451\u0445 \u0437\u0432\u0443\u043a\u043e\u0432\u044b\u0445 \u044d\u0444\u0444\u0435\u043a\u0442\u043e\u0432 \u0432 \u0438\u0433\u0440\u0435 \u043f\u0440\u043e\u0432\u0435\u0440\u0435\u043d\u044b:</div>'
+      +'<ul>'
+      +'<li><b>\u0423\u0434\u0430\u0440 \u043a\u0438\u0435\u043c</b> \u2014 \u201cBilliard Pool Hit\u201d, \u0430\u0432\u0442\u043e\u0440 u_7fupvvf5ym \u2014 <b>Pixabay Content License</b></li>'
+      +'<li><b>\u0421\u0442\u043e\u043b\u043a\u043d\u043e\u0432\u0435\u043d\u0438\u0435 \u0448\u0430\u0440\u043e\u0432</b> \u2014 \u201c057082_Snooker &amp; pool balls.mp3\u201d, Freesound Community \u2014 <b>Pixabay Content License</b></li>'
+      +'<li><b>\u0417\u0432\u0443\u043a\u0438 \u0444\u0438\u0437\u0438\u043a\u0438</b> (\u0431\u043e\u0440\u0442, \u043b\u0443\u0437\u0430, \u0444\u043e\u043b) \u2014 <code>impactWood_heavy_004</code>, Kenney \u2014 <b>CC0 1.0</b></li>'
+      +'<li><b>\u0417\u0432\u0443\u043a \u0438\u043d\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430</b> \u2014 <code>select_002</code>, Kenney \u2014 <b>CC0 1.0</b></li>'
+      +'</ul>'
+      +'<div class="sat">\u0412\u0441\u0435 \u0447\u0435\u0442\u044b\u0440\u0435 \u0434\u043e\u043f\u0443\u0441\u043a\u0430\u044e\u0442 \u043a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u043e\u0435 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u0438\u0435 \u0438 \u0440\u0430\u0441\u043f\u0440\u043e\u0441\u0442\u0440\u0430\u043d\u0435\u043d\u0438\u0435 \u0432 \u0441\u043e\u0441\u0442\u0430\u0432\u0435 \u0438\u0433\u0440\u044b; \u043d\u0438 \u043e\u0434\u0438\u043d \u043d\u0435 \u0442\u0440\u0435\u0431\u0443\u0435\u0442 \u0443\u043a\u0430\u0437\u0430\u043d\u0438\u044f \u0430\u0432\u0442\u043e\u0440\u0441\u0442\u0432\u0430.</div>'
+      +'<div class="sat" style="color:rgba(255,255,255,0.5);font-size:0.84rem;margin-top:6px;">\u041f\u043e\u0434\u0440\u043e\u0431\u043d\u0430\u044f \u0437\u0430\u043f\u0438\u0441\u044c, \u0434\u0430\u0442\u044b \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438 \u0438 \u0437\u043d\u0430\u0447\u0435\u043d\u0438\u044f SHA-256: <code>assets/audio/ATTRIBUTION-sfx.txt</code></div>'
+      +'<div class="sat" style="color:rgba(255,255,255,0.5);font-size:0.84rem;">\u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a\u0438 \u0442\u0440\u0451\u0445 \u0437\u0432\u0443\u043a\u043e\u0432\u044b\u0445 \u044d\u0444\u0444\u0435\u043a\u0442\u043e\u0432, \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0432\u0448\u0438\u0445\u0441\u044f \u0432 \u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0438\u0445 \u0432\u0435\u0440\u0441\u0438\u044f\u0445, \u0442\u0430\u043a\u0436\u0435 \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u044b \u0437\u0430\u0434\u043d\u0438\u043c \u0447\u0438\u0441\u043b\u043e\u043c \u0438 \u0437\u0430\u043d\u0435\u0441\u0435\u043d\u044b \u0432 \u0440\u0435\u0435\u0441\u0442\u0440.</div>'
+  };
+  // ISTAKA GORSELLERI: kaynak/lisans HENUZ DOGRULANMADI. Bu blok,
+  // dogrulanmis bilgiyle doldurulmadan yayina cikilmamalidir.
   var BEKLIYOR = {
-    tr:'<b>YAYINDAN ÖNCE TAMAMLANACAK.</b> Oyundaki ıstaka görselleri ve ses efektlerinin kaynak/lisans bilgileri dosyalardan tespit edilemedi (görsellerde ve ses dosyalarında gömülü üretici bilgisi bulunmuyor). Bu bölüm, doğrulanmış bilgiyle doldurulmadan yayına çıkılmamalıdır.',
-    en:'<b>TO BE COMPLETED BEFORE RELEASE.</b> The source and licence of the cue artwork and sound effects could not be determined from the files (no embedded creator metadata is present in the images or audio). This section must be filled in with verified information before publication.',
-    ru:'<b>ЗАПОЛНИТЬ ПЕРЕД ПУБЛИКАЦИЕЙ.</b> Источник и лицензию изображений киев и звуковых эффектов не удалось определить из файлов (встроенные метаданные автора отсутствуют). Этот раздел необходимо заполнить проверенными сведениями до публикации.'
+    tr:'<b>YAYINDAN \u00d6NCE TAMAMLANACAK.</b> Oyundaki <b>106 \u0131staka g\u00f6rselinin</b> kaynak ve lisans bilgileri <b>hen\u00fcz do\u011frulanmam\u0131\u015ft\u0131r.</b> G\u00f6rsel dosyalar\u0131nda g\u00f6m\u00fcl\u00fc \u00fcretici bilgisi bulunmamaktad\u0131r ve proje kay\u0131tlar\u0131nda kayna\u011f\u0131 belirten bir belge yoktur. Bu b\u00f6l\u00fcm, do\u011frulanm\u0131\u015f bilgiyle doldurulmadan yay\u0131na \u00e7\u0131k\u0131lmamal\u0131d\u0131r.',
+    en:'<b>TO BE COMPLETED BEFORE RELEASE.</b> The source and licence of the <b>106 cue artworks</b> in the game <b>have not yet been verified.</b> The image files contain no embedded creator metadata and the project records contain no document identifying their origin. This section must be filled in with verified information before publication.',
+    ru:'<b>\u0417\u0410\u041f\u041e\u041b\u041d\u0418\u0422\u042c \u041f\u0415\u0420\u0415\u0414 \u041f\u0423\u0411\u041b\u0418\u041a\u0410\u0426\u0418\u0415\u0419.</b> \u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a \u0438 \u043b\u0438\u0446\u0435\u043d\u0437\u0438\u044f <b>106 \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0439 \u043a\u0438\u0435\u0432</b> \u0432 \u0438\u0433\u0440\u0435 <b>\u0435\u0449\u0451 \u043d\u0435 \u043f\u0440\u043e\u0432\u0435\u0440\u0435\u043d\u044b.</b> \u0424\u0430\u0439\u043b\u044b \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0439 \u043d\u0435 \u0441\u043e\u0434\u0435\u0440\u0436\u0430\u0442 \u0432\u0441\u0442\u0440\u043e\u0435\u043d\u043d\u044b\u0445 \u043c\u0435\u0442\u0430\u0434\u0430\u043d\u043d\u044b\u0445 \u0430\u0432\u0442\u043e\u0440\u0430, \u0430 \u0432 \u0437\u0430\u043f\u0438\u0441\u044f\u0445 \u043f\u0440\u043e\u0435\u043a\u0442\u0430 \u043d\u0435\u0442 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0430, \u0443\u043a\u0430\u0437\u044b\u0432\u0430\u044e\u0449\u0435\u0433\u043e \u0438\u0445 \u043f\u0440\u043e\u0438\u0441\u0445\u043e\u0436\u0434\u0435\u043d\u0438\u0435. \u042d\u0442\u043e\u0442 \u0440\u0430\u0437\u0434\u0435\u043b \u043d\u0435\u043e\u0431\u0445\u043e\u0434\u0438\u043c\u043e \u0437\u0430\u043f\u043e\u043b\u043d\u0438\u0442\u044c \u043f\u0440\u043e\u0432\u0435\u0440\u0435\u043d\u043d\u044b\u043c\u0438 \u0441\u0432\u0435\u0434\u0435\u043d\u0438\u044f\u043c\u0438 \u0434\u043e \u043f\u0443\u0431\u043b\u0438\u043a\u0430\u0446\u0438\u0438.'
   };
   function sec(kod){
     if(DILLER.indexOf(kod) < 0) kod = 'en';
@@ -171,6 +215,7 @@ SOFTWARE.</pre>
     });
     document.getElementById('meta').textContent = META[kod];
     document.getElementById('font-lisans').textContent = FONT[kod];
+    document.getElementById('ses-dogrulandi').innerHTML = SES[kod];
     document.getElementById('bekliyor').innerHTML = BEKLIYOR[kod];
     document.getElementById('foot').textContent = 'Inferno Pool — NovaRec Studio';
     document.documentElement.setAttribute('lang', kod);
