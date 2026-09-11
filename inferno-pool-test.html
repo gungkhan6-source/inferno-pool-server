@@ -1650,11 +1650,9 @@ let _NICK = 'Player_' + Math.random().toString(36).substr(2,5).toUpperCase();
 const WS_URL = 'wss://inferno-pool-server.onrender.com';
 
 function startOnlineMode(){
-  // If server not ready, show loading first
-  if(!_serverReady){
-    var ls=document.getElementById('loading-screen');
-    if(ls) ls.style.display='flex';
-  }
+  // [ACILIS] Yukleme ekrani ARTIK burada ACILMAZ. Kullanici cevrimici
+  // ekraninda ("screen-online") bekler ve durum metnini gorur; boylece
+  // sunucu uykudayken bile arayuz BLOKLANMAZ.
   var screens=['intro','menu','game','over','shop','online','lb'];
   screens.forEach(function(s){
     var sc=document.getElementById('screen-'+s);
@@ -1664,43 +1662,116 @@ function startOnlineMode(){
   var onl=document.getElementById('screen-online');
   if(onl) onl.classList.add('active');
   G.phase='online-waiting';
-  el('online-msg').textContent='Sunucuya baglaniyor...';
+  el('online-msg').textContent=t('online.connectingShort');
   el('online-room-info').textContent='';
   fbFindMatch();
 }
 
+// [BAGLANTI] Acik baglanti denemesi durumu. Ayni anda BIRDEN FAZLA
+// WebSocket olusmasini ve eski/iptal edilmis soketlerin geri cagrilarinin
+// yeni baglantiyi bozmasini engeller.
+let _wsNesil      = 0;      // her deneme icin artan kimlik
+let _wsBaglaniyor = false;  // su an bir deneme devam ediyor mu
+let _wsRetryTimer = null;   // bekleyen yeniden deneme zamanlayicisi
+const WS_TIMEOUT_MS = 7000; // CONNECTING tavani (Yandex iframe icin SART)
+const WS_RETRY_MS   = 2500; // yeniden deneme araligi
+
+function _wsRetryTemizle(){
+  if(_wsRetryTimer){ clearTimeout(_wsRetryTimer); _wsRetryTimer = null; }
+}
+// Cevrimici ekranindaki durum metni. MEVCUT i18n sistemi kullanilir.
+function _wsDurum(anahtar){
+  try{
+    const e = el('online-msg');
+    if(e) e.textContent = t(anahtar);
+  }catch(e){}
+}
+
 function wsConnect(onOpen) {
   if (WS && WS.readyState === WebSocket.OPEN) { onOpen && onOpen(); return; }
-  
-  var ls=document.getElementById('loading-screen');
-  
+  if (_wsBaglaniyor) return;              // ayni anda TEK deneme
+  _wsRetryTemizle();
+
+  var ls = document.getElementById('loading-screen');
+
   function tryConnect(){
-    WS = new WebSocket(WS_URL);
-    WS.onopen = () => {
+    _wsBaglaniyor = true;
+    const nesil = ++_wsNesil;             // bu denemenin kimligi
+    const gecerli = () => (nesil === _wsNesil);
+    let sonuclandi = false;
+    let zamanlayici = null;
+
+    let soket;
+    try{
+      soket = new WebSocket(WS_URL);
+    }catch(e){
+      _wsBaglaniyor = false;
+      return yenidenDene();
+    }
+    WS = soket;
+
+    function bitir(){
+      sonuclandi = true;
+      if(zamanlayici){ clearTimeout(zamanlayici); zamanlayici = null; }
+      _wsBaglaniyor = false;
+    }
+    function yenidenDene(){
+      // YALNIZCA kullanici hala cevrimici bekliyorsa tekrar denenir.
+      if(G.phase !== 'online-waiting') return;
+      _wsRetryTemizle();
+      _wsDurum('online.retrying');
+      _wsRetryTimer = setTimeout(function(){
+        _wsRetryTimer = null;
+        if(G.phase === 'online-waiting') tryConnect();
+      }, WS_RETRY_MS);
+    }
+
+    // [KRITIK] Explicit CONNECTING timeout. Yandex/iframe ortaminda soket
+    // onopen/onerror/onclose'u HIC tetiklemeden askida kalabilir; yalnizca
+    // bu olaylara guvenmek SONSUZ beklemeye yol acar.
+    zamanlayici = setTimeout(function(){
+      if(sonuclandi || !gecerli()) return;
+      bitir();
+      _wsNesil++;                          // bu soketin geri cagrilari ARTIK GECERSIZ
+      try{ soket.onopen = soket.onclose = soket.onerror = soket.onmessage = null; }catch(e){}
+      try{ soket.close(); }catch(e){}
+      if(WS === soket) WS = null;
+      yenidenDene();
+    }, WS_TIMEOUT_MS);
+
+    soket.onopen = () => {
+      if(!gecerli()) { try{ soket.close(); }catch(e){} return; }
+      bitir();
+      _serverReady = true;
       console.log('WS connected');
       if(ls) ls.style.display='none';
       var sc=document.getElementById('screen-online');
       if(sc) sc.classList.add('active');
       onOpen && onOpen();
     };
-    WS.onmessage = (e) => { try { handleWsMsg(JSON.parse(e.data)); } catch(ex) {} };
-    WS.onclose = () => { 
+    soket.onmessage = (e) => {
+      if(!gecerli()) return;
+      try { handleWsMsg(JSON.parse(e.data)); } catch(ex) {}
+    };
+    soket.onclose = () => {
+      if(!gecerli()) return;               // eski/iptal edilmis soket: YOK SAY
+      bitir();
       console.log('WS disconnected, phase='+G.phase);
       if(G.phase==='online-waiting'){
-        // Server uykuda, tekrar dene
-        console.log('Retrying in 3s...');
-        setTimeout(tryConnect, 3000);
+        yenidenDene();                     // sunucu uyaniyor olabilir
       } else if(G.phase!=='over' && G.phase!=='menu'){
         if(ls) ls.style.display='none';
-        toast2('Baglanti kesildi!');
+        toast2(t('online.disconnected'));
         showScreen('menu');
       }
     };
-    WS.onerror = () => {
+    soket.onerror = () => {
+      if(!gecerli()) return;
       console.log('WS error, will retry...');
+      // onclose genelde hemen ardindan gelir; gelmezse timeout yakalar.
     };
   }
-  
+
   tryConnect();
 }
 
@@ -1855,7 +1926,7 @@ function handleRelay(msg) {
 
 async function fbFindMatch() {
   setOnlineStatus('searching');
-  el('online-msg').textContent = 'Connecting to game server…';
+  el('online-msg').textContent = t('online.connectingServer');
   wsConnect(() => {
     // [DAVET] Public profil ve chat sid'i de gonderilir; sunucu sanitize eder.
     let _sid = '';
@@ -1967,7 +2038,11 @@ async function fbSaveProfile() {}
 async function fbSubmitScore() {}
 async function fbLoadLeaderboard() { return []; }
 async function fbCancelMatch() {
-  if (WS) WS.close();
+  // [BAGLANTI] Bekleyen yeniden deneme zamanlayicisi ve devam eden deneme
+  // IPTAL edilir; aksi halde iptalden sonra arka planda yeni soket acilirdi.
+  try{ _wsRetryTemizle(); }catch(e){}
+  try{ _wsNesil++; _wsBaglaniyor = false; }catch(e){}
+  if (WS) { try{ WS.close(); }catch(e){} }
   setOnlineStatus('idle');
 }
 async function fbCleanupRoom(winner, reason) {
@@ -3548,6 +3623,8 @@ en: {
   'online.declined':'Opponent declined the rematch',
   'online.connectingServer':'Connecting to game server…',
   'online.connectingShort':'Connecting to server...',
+  'online.retrying':'Server is waking up, retrying...',
+  'online.disconnected':'Connection lost!',
   'online.disconnected':'Connection lost!',
   'online.statusOffline':'● OFFLINE',
   'online.statusConnecting':'◉ CONNECTING...',
@@ -3962,6 +4039,8 @@ tr: {
   'online.declined':'Rakip revanşı reddetti',
   'online.connectingServer':'Oyun sunucusuna bağlanılıyor…',
   'online.connectingShort':'Sunucuya bağlanılıyor...',
+  'online.retrying':'Sunucu uyanıyor, tekrar deneniyor...',
+  'online.disconnected':'Bağlantı kesildi!',
   'online.disconnected':'Bağlantı kesildi!',
   'online.statusOffline':'● ÇEVRİMDIŞI',
   'online.statusConnecting':'◉ BAĞLANIYOR...',
@@ -4369,6 +4448,8 @@ ru: {
   'online.declined':'Соперник отклонил реванш',
   'online.connectingServer':'Подключение к игровому серверу…',
   'online.connectingShort':'Подключение к серверу...',
+  'online.retrying':'Сервер просыпается, повторная попытка...',
+  'online.disconnected':'Соединение потеряно!',
   'online.disconnected':'Соединение потеряно!',
   'online.statusOffline':'● ОФЛАЙН',
   'online.statusConnecting':'◉ ПОДКЛЮЧЕНИЕ...',
@@ -8549,41 +8630,28 @@ function showIntro() {
     // Parcacik dongusu intro pasifken durmustu; yeniden baslat.
     if (typeof window.__introAnim === 'function') window.__introAnim();
 }
-(function wakeServer(){
-  var st=document.getElementById('load-status');
-  var dots=document.getElementById('load-dots');
-  var dotFrames=['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
-  var di=0;
-  var dotInt=setInterval(()=>{
-    if(dots) dots.textContent=dotFrames[di%dotFrames.length];
-    di++;
-  },150);
-  var startTime=Date.now();
-  if(st) st.textContent='Waking up Inferno server...';
-
-  function tryWake(){
-    var elapsed=Math.round((Date.now()-startTime)/1000);
-    if(st) st.textContent='Waking up Inferno server... ('+elapsed+'s)';
-    try{
-      var testWS=new WebSocket(WS_URL);
-      testWS.onopen=()=>{
-        if(st) st.textContent='Inferno server is ready!';
-        clearInterval(dotInt);
-        _serverReady=true;
-        testWS.close();
-        setTimeout(skipLoading,400);
-      };
-      testWS.onerror=()=>{};
-      testWS.onclose=()=>{
-        if(!_serverReady){
-          setTimeout(tryWake,3000);
-        }
-      };
-    }catch(e){
-      setTimeout(tryWake,3000);
-    }
+// ════════════════════════════════════════════════════════════════════
+// [ACILIS] Sayfa acilisi ARTIK WebSocket'e BAGLI DEGIL.
+// ════════════════════════════════════════════════════════════════════
+// ESKI DAVRANIS (KALDIRILDI): acilista wakeServer() ayri bir "uyandirma"
+// WebSocket'i aciyordu ve skipLoading() YALNIZCA testWS.onopen icinden
+// cagriliyordu. Soket CONNECTING durumunda takilirsa (Yandex iframe /
+// Render free instance) onopen/onerror/onclose HIC tetiklenmez, yukleme
+// ekrani SONSUZA KADAR acik kalirdi ("Waking up Inferno server... (0s)" —
+// sayac da tek sefer yazildigi icin 0'da donardi).
+//
+// YENI DAVRANIS: acilista HICBIR WebSocket kurulmaz. Yukleme ekrani hemen
+// kapanir, intro gosterilir. Gercek baglanti YALNIZCA kullanici
+// "PLAY ONLINE" dedigi anda wsConnect() ile kurulur.
+//
+// Yandex LoadingAPI akisi DEGISMEDI: showIntro() -> yaOyunHazir().
+(function acilisiTamamla(){
+  function hazir(){ try{ skipLoading(); }catch(e){} }
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', hazir, { once:true });
+  } else {
+    setTimeout(hazir, 0);
   }
-  tryWake();
 })();
 
 // ── Main Loop ──
