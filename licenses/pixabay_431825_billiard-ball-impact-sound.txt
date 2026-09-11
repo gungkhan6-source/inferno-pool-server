@@ -1,0 +1,37 @@
+PIXABAY SES KAYNAGI  -  TARIHSEL KAYIT (ARTIK KULLANILMIYOR)
+============================================================
+Baslik          : billiard ball impact sound
+Contributor     : izafi   (81 takipci)
+Sayfa           : https://pixabay.com/sound-effects/billiard-ball-impact-sound-431825/
+Medya tipi      : MP3
+Sure            : 0:07   (schema.org: PT0M7.026938S ; olculen 7.027 s)
+Yayin tarihi    : 6 Kasim 2025
+Etiketler       : Billiard Ball Collision, Pool Impact, Cue Sport Sound,
+                  Snooker Hit, Ball Clack, Impact Effect, Game Sound,
+                  Cue Strike, Ai Generated
+Lisans          : "Free for use under the Pixabay Content License"
+Lisans URL      : https://pixabay.com/service/license-summary/
+Dogrulama tar.  : 2026-09-11
+bayt            : 224862
+sha256          : 6a009ae0919a36ce3865af8ce9a01991e4c188693b603af7406207851cc21ca0
+
+*********************************************************************
+*  DIKKAT: BU SES PIXABAY SAYFASINDA "AI GENERATED" ETIKETLIDIR.    *
+*                                                                    *
+*  Sayfada acikca "AI generated" ibaresi ve "Ai Generated" etiketi   *
+*  bulunmaktadir. Yapay zeka ile uretilen icerigin telif statusu     *
+*  bazi yargi bolgelerinde belirsizdir. Pixabay'in kendi uyarisi     *
+*  ("Certain Content may be subject to additional intellectual       *
+*   property rights") bu icerik icin de gecerlidir.                  *
+*                                                                    *
+*  Bu nedenle bu ses YENI SES SISTEMINDE KULLANILMAMAKTADIR.         *
+*********************************************************************
+
+TARIHSEL DURUM
+  26 Mart 2026 - bu surum :
+      Eski SFX_IMPACT olarak HTML'e base64 gomuluydu (224.862 bayt,
+      base64 olarak 292.8 KB). Ancak kodda HICBIR playSFX(SFX_IMPACT)
+      cagrisi YOKTU - olu koddu ve oyunda HICBIR ZAMAN CALMADI.
+  Bu surum:
+      Tamamen kaldirildi. Yerine 057082_Snooker & pool balls (81296,
+      AI etiketi YOK) kaynakli kirpilmis 0.200 s'lik ses kullaniliyor.

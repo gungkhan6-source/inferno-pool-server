@@ -1,0 +1,27 @@
+PIXABAY SES KAYNAGI  -  TARIHSEL KAYIT (ARTIK KULLANILMIYOR)
+============================================================
+Baslik          : pool-ball-strike
+Sanatci         : mccarthy@bedmas.com (Freesound)
+Contributor     : freesound_community
+Sayfa           : https://pixabay.com/sound-effects/pool-ball-strike-93210/
+Medya tipi      : MP3
+Sure            : 0:02   (schema.org: PT0M1.776S ; olculen 1.776 s)
+Yayin tarihi    : 24 Agustos 2022
+Etiketler       : Ball, Pool, Strike
+AI isareti      : YOK
+Lisans          : "Free for use under the Pixabay Content License"
+Lisans URL      : https://pixabay.com/service/license-summary/
+Dogrulama tar.  : 2026-09-11
+bayt            : 35520
+sha256          : bc121ff052cf2518ad09f952d9949f99397dbd308421d4dc590020939e6f5bce
+
+TARIHSEL DURUM
+  26 Mart 2026 - bu surum :
+      Eski SFX_STRIKE olarak HTML'e gomuluydu. TEK BASINA dort ayri
+      islevi gorurdu: bant/duvar sekmesi, top-top carpismasi, cebe
+      girme, faul VE menu/UI olaylari (istaka kusanma, satin alma,
+      power-up acilisi).
+  Bu surum:
+      Yerini Kenney impactWood_heavy_004 (CC0 1.0) aldi. Ayrica UI
+      olaylari fizik sesinden ayrilarak yeni SFX_UI'ye tasindi ve
+      top-top carpismasi kendi sesine (SFX_IMPACT) kavustu.

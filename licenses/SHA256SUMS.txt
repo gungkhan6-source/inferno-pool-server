@@ -1,0 +1,31 @@
+SHA-256 KONTROL LISTESI  -  Inferno Pool ses varliklari
+=======================================================
+Olusturma / dogrulama tarihi: 2026-09-11
+
+INDIRILEN ORIJINAL KAYNAKLAR
+----------------------------
+029d734af1582474edf3a694d1b0cebc97c1c152f2f39fa34d4c2bafc5de77f8     800850  kenney_impact-sounds.zip
+f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232     834536  kenney_interface-sounds.zip
+d8c1f7b5866d3ab83ff5fc9f2393b197f76cd915fa7f724ff9a317251309fd85      21733  pixabay_371618_billiard-pool-hit.mp3
+0ed6ce7bd2bbe12a0c148f148c4c8b01479cfcdf3749384181bb6c614d83a939     189120  pixabay_81296_snooker-and-pool-balls.mp3
+
+ZIP ICINDEN CIKARILAN SES DOSYALARI
+-----------------------------------
+2c647ae6bd29c72ae2523f7e16e325d8d331b75cc99ab4f637c48a0e11c34677       6253  impactWood_heavy_004.ogg
+4cc6ac5341b9b2c86fef80c347de028e9ab9f2e037586ac7d9fa59a403a1c012       5463  select_002.ogg
+
+ESKI SESLERIN DOGRULANMIS KAYNAKLARI (tarihsel)
+-----------------------------------------------
+6a009ae0919a36ce3865af8ce9a01991e4c188693b603af7406207851cc21ca0     224862  pixabay_431825_billiard-ball-impact.mp3
+bc121ff052cf2518ad09f952d9949f99397dbd308421d4dc590020939e6f5bce      35520  pixabay_93210_pool-ball-strike.mp3
+
+ISLENMIS CIKTILAR (inferno-pool-test.html icine base64 gomulu)
+--------------------------------------------------------------
+f14feea64b6f4d48f45b0f8dec4529c769537e0435f765ca4354dff04a09213b      17684  islenmis_SFX_BREAK.wav
+37d8b5cb4c5651a16c2b51a40aafe91bdd4a4b95b5d73b149f7a7899921d08cb      17684  islenmis_SFX_IMPACT.wav
+f27cb7bf40bccf3f4f11c873c436f33eaed6fe668107265b1e96ce88fc3b0c94      27398  islenmis_SFX_STRIKE.wav
+dd36fb6c61d99870c185b6df79d2e076f797432c3b3c60aa0fc69a3971627888       3606  islenmis_SFX_UI.wav
+
+NOT: Islenmis WAV dosyalari depoda AYRI DOSYA olarak tutulmaz;
+     yalnizca inferno-pool-test.html icinde base64 olarak bulunur.
+     Yukaridaki hash degerleri o gomulu verinin cozulmus halidir.

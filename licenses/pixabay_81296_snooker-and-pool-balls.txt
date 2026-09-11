@@ -1,0 +1,41 @@
+PIXABAY SES KAYNAGI  -  KULLANIMDA
+==================================
+Baslik          : 057082_Snooker & pool balls.mp3
+Contributor     : Freesound Community (freesound_community)
+                  Pixabay'in Freesound toplu ice aktarma hesabi
+                  (77.303 yukleme, 18.170 takipci)
+Sayfa           : https://pixabay.com/sound-effects/057082-snooker-amp-pool-ballsmp3-81296/
+Medya tipi      : MP3
+Sure            : 0:09   (schema.org: PT0M9.456S ; olculen 9.456 s)
+Yayin tarihi    : 8 Agustos 2022
+Etiketler       : Snooker, Pool, Balls, Sfx, Foley
+AI isareti      : YOK
+Lisans          : "Free for use under the Pixabay Content License"
+Lisans URL      : https://pixabay.com/service/license-summary/
+Indirme URL     : https://cdn.pixabay.com/download/audio/2022/03/15/audio_15a38d5aaa.mp3
+                  ?filename=freesound_community-057082_snooker-amp-pool-ballsmp3-81296.mp3
+Indirme tarihi  : 2026-09-11
+Orijinal bayt   : 189120
+Orijinal sha256 : 0ed6ce7bd2bbe12a0c148f148c4c8b01479cfcdf3749384181bb6c614d83a939
+
+KULLANIM  : Inferno Pool  ->  SFX_IMPACT  (top-top carpismasi)
+ISLEME    : 9.456 s'lik kayit 2 ms cozunurlukle tarandi, 14 transient
+            bulundu. 8.3265 s'deki vurus, 200 ms icinde IKINCI bir darbe
+            icermeyen TEK aday oldugu icin secildi.
+            Kirpma 8.3245 - 8.5245 s
+            stereo -> mono (kanal ortalamasi), 44100 Hz, 16-bit PCM
+            3 ms fade-in (atak oncesi zemin 0.10 oldugu icin sart),
+            10 ms fade-out
+            -1.0 dBFS normalize  (uygulanan kazanc +4.23 dB)
+Islenmis sure   : 0.200 s
+
+TARIHSEL NOT
+  Bu dosyanin TAMAMI (9.456 s) 26 Mart 2026'dan bu surume kadar oyunda
+  eski SFX_BREAK olarak gomuluydu. Uzunlugu nedeniyle kodda
+  fadeShotAudioTail() adli bir kuyruk-susturma gecici cozumu gerekmisti.
+  Bu surumde yerini Billiard Pool Hit (371618) aldi.
+
+KAYNAK ZINCIRI UYARISI
+  Dosya adindaki "057082_" oneki ticari bir SFX kutuphanesinin
+  numaralandirma duzenine benziyor. Freesound'daki orijinal kayit
+  dogrudan dogrulanamadi; dogrulanabilir zincir Pixabay'de bitiyor.

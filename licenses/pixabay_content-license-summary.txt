@@ -1,0 +1,40 @@
+PIXABAY CONTENT LICENSE - OZET
+==============================
+Kaynak : https://pixabay.com/service/license-summary/
+Alindi : 2026-09-11
+
+Pixabay'in kendi ozet sayfasindan alinan ilgili maddeler:
+
+IZIN VERILENLER
+  - Icerigi UCRETSIZ kullanma
+  - Yazara ATIF YAPMADAN kullanma
+    "Use Content without having to attribute the author
+     (although giving credit is always appreciated by our community!)"
+  - Icerigi degistirme / yeni eserlere uyarlama
+    "Modify or adapt Content into new works"
+
+YASAK KULLANIMLAR (Prohibited Uses)
+  - Icerigi TEK BASINA (Standalone) satmak veya dagitmak:
+    "You cannot sell or distribute Content (either in digital or physical
+     form) on a Standalone basis. Standalone means where no creative effort
+     has been applied to the Content and it remains in substantially the
+     same form as it exists on our website."
+  - Taninabilir marka/logo iceren icerigi urun uzerine basip satmak
+  - Ahlaka aykiri veya yasa disi kullanim
+  - Yaniltici kullanim
+  - Marka veya isletme tanimlayicisi olarak kullanim
+
+PIXABAY'IN KENDI UYARISI
+  "Certain Content may be subject to additional intellectual property
+   rights ... It is your responsibility to check whether you require
+   the consent of a third party."
+
+INFERNO POOL ICIN DEGERLENDIRME
+  - Sesler oyuna GOMULU dagitilir, tek basina satilmaz  -> uygun
+  - Ticari kullanim (reklam gelirli oyun)               -> uygun
+  - Kirpma/normalize edilerek uyarlandi                 -> izinli
+  - Atif ZORUNLU DEGIL; yine de bu klasorde ve oyun ici
+    CREDITS bolumunde kayit altina aliniyor.
+
+NOT: Yalnizca tam Content License hukuken baglayicidir.
+     Tam metin: https://pixabay.com/service/terms/

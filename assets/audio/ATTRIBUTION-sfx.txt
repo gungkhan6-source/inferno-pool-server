@@ -1,0 +1,118 @@
+Inferno Pool - Ses Efektleri: Kaynak ve Lisans
+==============================================
+Son guncelleme: 2026-09-11
+Ayrintili kanit: /licenses/  (depo ici)
+
+Oyundaki TUM ses efektleri ucuncu taraf kaynaklardan alinmistir ve
+oyuna gomulu olarak dagitilir. Hicbiri atif gerektirmez; bu kayit
+seffaflik icin tutulmaktadir.
+
+--------------------------------------------------------------------
+KULLANIMDA OLAN SESLER
+--------------------------------------------------------------------
+
+[SFX_BREAK]  Istaka vurusu
+  Baslik      : Billiard Pool Hit
+  Contributor : u_7fupvvf5ym
+  Kaynak      : https://pixabay.com/sound-effects/billiard-pool-hit-371618/
+  Lisans      : Pixabay Content License
+  Lisans URL  : https://pixabay.com/service/license-summary/
+  Yayin       : 2025-07-09
+  Indirme     : 2026-09-11
+  Atif        : GEREKLI DEGIL
+  AI uretimi  : HAYIR
+  Degisiklik  : 0.036-0.236 s kirpma, mono, 44.1 kHz, 16-bit PCM,
+                3 ms fade-in, 8 ms fade-out, -1.0 dBFS (+6.07 dB)
+  Son sure    : 0.200 s
+  Kullanim    : sfxCue()  (oyuncu ve bot atisi), sfxWin()
+
+[SFX_IMPACT]  Top-top carpismasi
+  Baslik      : 057082_Snooker & pool balls.mp3
+  Contributor : Freesound Community (freesound_community)
+  Kaynak      : https://pixabay.com/sound-effects/057082-snooker-amp-pool-ballsmp3-81296/
+  Lisans      : Pixabay Content License
+  Lisans URL  : https://pixabay.com/service/license-summary/
+  Yayin       : 2022-08-08
+  Indirme     : 2026-09-11
+  Atif        : GEREKLI DEGIL
+  AI uretimi  : HAYIR
+  Degisiklik  : 9.456 s'lik kayittan 8.3245-8.5245 s araligindaki IZOLE
+                tek carpisma kirpildi; stereo->mono, 44.1 kHz, 16-bit PCM,
+                3 ms fade-in, 10 ms fade-out, -1.0 dBFS (+4.23 dB)
+  Son sure    : 0.200 s
+  Kullanim    : sfxTopCarp()  (resolveBalls icindeki top-top carpismasi)
+  Not         : Dosya adindaki "057082_" oneki ticari bir SFX kutuphanesi
+                numaralandirmasina benziyor; Freesound'daki orijinal kayit
+                dogrudan dogrulanamadi.
+
+[SFX_STRIKE]  Bant/duvar sekmesi, cebe girme, faul
+  Dosya       : impactWood_heavy_004.ogg
+  Paket       : Kenney - Impact Sounds 1.0 (19-12-2019)
+  Yaratici    : Kenney  (www.kenney.nl)
+  Kaynak      : https://kenney.nl/assets/impact-sounds
+  Lisans      : CREATIVE COMMONS ZERO (CC0 1.0)
+  Lisans URL  : http://creativecommons.org/publicdomain/zero/1.0/
+  Lisans metni: /licenses/kenney_impact-sounds_License.txt  (paket icinden)
+  Indirme     : 2026-09-11
+  Atif        : GEREKLI DEGIL  ("crediting Kenney ... is not mandatory")
+  AI uretimi  : HAYIR
+  Degisiklik  : Kirpma yok. stereo->mono, 44.1 kHz, 16-bit PCM,
+                2 ms fade-out, -1.0 dBFS (-0.04 dB)
+  Son sure    : 0.310 s
+  Kullanim    : sfxBounce() (resolveWall), sfxPocket(), sfxFoul()
+
+[SFX_UI]  Menu ve arayuz olaylari
+  Dosya       : select_002.ogg
+  Paket       : Kenney - Interface Sounds 1.0 (11-02-2020)
+  Yaratici    : Kenney  (www.kenney.nl)
+  Kaynak      : https://kenney.nl/assets/interface-sounds
+  Lisans      : CREATIVE COMMONS ZERO (CC0 1.0)
+  Lisans URL  : http://creativecommons.org/publicdomain/zero/1.0/
+  Lisans metni: /licenses/kenney_interface-sounds_License.txt  (paket icinden)
+  Indirme     : 2026-09-11
+  Atif        : GEREKLI DEGIL
+  AI uretimi  : HAYIR
+  Degisiklik  : Kirpma yok. stereo->mono, 44.1 kHz, 16-bit PCM,
+                2 ms fade-out, -1.0 dBFS (-0.03 dB)
+  Son sure    : 0.040 s
+  Kullanim    : sfxPU()  (istaka kusanma, satin alma, power-up acilisi)
+
+--------------------------------------------------------------------
+TARIHSEL KAYIT - ONCEKI SURUMLERDE KULLANILAN SESLER
+--------------------------------------------------------------------
+26 Mart 2026 - bu surum arasinda oyunda uc MP3 gomuluydu. Kaynaklari
+o donemde belgelenmemisti; bu surumde byte-identik hash eslesmesiyle
+geriye donuk olarak tespit edildi ve asagiya kaydedildi.
+
+[eski SFX_BREAK]  9.456 s
+  057082_Snooker & pool balls.mp3 - Freesound Community
+  https://pixabay.com/sound-effects/057082-snooker-amp-pool-ballsmp3-81296/
+  Pixabay Content License. AI uretimi: HAYIR.
+  Ayni kayit bu surumde SFX_IMPACT icin kirpilarak kullanilmaktadir.
+
+[eski SFX_IMPACT]  7.027 s  - OLU KOD, HIC CALMADI
+  billiard ball impact sound - izafi
+  https://pixabay.com/sound-effects/billiard-ball-impact-sound-431825/
+  Pixabay Content License.
+  *** UYARI: Bu ses Pixabay sayfasinda "AI Generated" etiketlidir. ***
+  Kodda hicbir playSFX(SFX_IMPACT) cagrisi yoktu; oyunda hicbir zaman
+  calmadi. Bu surumde tamamen kaldirildi.
+
+[eski SFX_STRIKE]  1.776 s
+  pool-ball-strike - mccarthy@bedmas.com (Freesound) / freesound_community
+  https://pixabay.com/sound-effects/pool-ball-strike-93210/
+  Pixabay Content License. AI uretimi: HAYIR.
+  Tek basina bant sekmesi, top carpismasi, cep, faul ve menu/UI
+  olaylarinin tamaminda calardi.
+
+--------------------------------------------------------------------
+OZET
+--------------------------------------------------------------------
+Kaynak              Lisans                    Atif      AI
+------------------  ------------------------  --------  ------
+Pixabay (2 ses)     Pixabay Content License   gerekmez  hayir
+Kenney  (2 ses)     CC0 1.0                   gerekmez  hayir
+
+Ticari kullanim : izinli (dort ses icin de)
+Oyuna gomme     : izinli (dort ses icin de)
+Tek basina satis: YASAK (Pixabay) - bu oyunda soz konusu degil

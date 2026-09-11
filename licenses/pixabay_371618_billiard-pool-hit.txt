@@ -1,0 +1,26 @@
+PIXABAY SES KAYNAGI  -  KULLANIMDA
+==================================
+Baslik          : Billiard Pool Hit
+Contributor     : u_7fupvvf5ym   (anonim Pixabay hesabi; profilde kimlik yok,
+                  27 Kasim 2023 kaydi, 3 yukleme)
+Sayfa           : https://pixabay.com/sound-effects/billiard-pool-hit-371618/
+Medya tipi      : MP3
+Sure            : 0:01   (schema.org: PT0M0.679156S ; olculen 0.6792 s)
+Yayin tarihi    : 9 Temmuz 2025
+Etiketler       : Billiard, Sports, Bmx
+AI isareti      : YOK
+Lisans          : "Free for use under the Pixabay Content License"
+Lisans URL      : https://pixabay.com/service/license-summary/
+Indirme URL     : https://cdn.pixabay.com/download/audio/2025/07/08/audio_8bc5ac99ba.mp3
+                  ?filename=u_7fupvvf5ym-billiard-pool-hit-371618.mp3
+Indirme tarihi  : 2026-09-11
+Orijinal bayt   : 21733
+Orijinal sha256 : d8c1f7b5866d3ab83ff5fc9f2393b197f76cd915fa7f724ff9a317251309fd85
+
+KULLANIM  : Inferno Pool  ->  SFX_BREAK  (istaka vurusu)
+ISLEME    : 0.036 - 0.236 s kirpma (39.8 ms bastaki sessizlik atildi ve
+            0.34 s civarindaki ikincil yuvarlanma olayi disarida birakildi)
+            mono, 44100 Hz, 16-bit PCM
+            3 ms fade-in, 8 ms fade-out
+            -1.0 dBFS normalize  (uygulanan kazanc +6.07 dB)
+Islenmis sure   : 0.200 s
