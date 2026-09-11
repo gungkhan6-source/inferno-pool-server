@@ -1420,6 +1420,8 @@ async function initCrazyGames() {
     if (!CG_SDK) return;
     await CG_SDK.init();
     cgReady = true;
+    // [CG-PLATFORM] Ayarlar, dinleyici ve instant-multiplayer kancasi.
+    try{ if(typeof cgHazirKancasi === 'function') cgHazirKancasi(); }catch(e){}
     // [ALTIN KARTI] SDK hazir: kart varsa aninda aktiflesir.
     try{ if(typeof colAdCoinTazele === 'function') colAdCoinTazele(); }catch(e){}
     try{ if(typeof reklamCoinTazele === 'function') reklamCoinTazele(); }catch(e){}
@@ -1444,6 +1446,187 @@ function cgGameplayStart() {
 function cgGameplayStop() {
   try { if (cgReady) CG_SDK.game.gameplayStop(); } catch (e) {}
   try { if (typeof yaGameplayStop === 'function') yaGameplayStop(); } catch (e) {}
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  [CG-PLATFORM] CrazyGames SDK v3 platform ozellikleri
+// ════════════════════════════════════════════════════════════════════
+// KAPSAM: yalnizca PLATFORM katmani. Render WebSocket multiplayer mantigi,
+// Yandex entegrasyonu, bot/offline oynanis ve chat moderasyonu DEGISMEZ.
+//
+// GUVENLIK: cgAktif() false iken (Yandex, normal tarayici, yerel test)
+// buradaki TUM fonksiyonlar sessizce no-op doner. Hicbiri oyunu durdurmaz,
+// hicbiri istisna sizdirmaz.
+//
+// Resmi API (docs.crazygames.com/sdk/game):
+//   game.updateRoom({roomId, isJoinable, inviteParams})
+//   game.isInstantMultiplayer
+//   game.inviteLink({...}) / game.getInviteParam(key)
+//   game.settings.disableChat / game.settings.muteAudio
+//   game.addSettingsChangeListener(cb) / removeSettingsChangeListener(cb)
+let CG_ODA_ID = null;                                  // aktif CG oda kimligi
+let CG_AYAR   = { disableChat: false, muteAudio: false };
+let _cgAyarDinleyici = null;
+
+function cgAktif(){
+  try{ return cgReady === true && !!CG_SDK && !!CG_SDK.game; }catch(e){ return false; }
+}
+
+// ── [CG-1] CrazyGames kullanici adi ─────────────────────────────────
+// Giris yapilmamissa null doner; cagiran taraf mevcut guest nick'ine duser.
+// Mevcut nickname sistemi DEGISMEZ, yalnizca CG ortaminda tercih edilir.
+function cgKullaniciAdi(){
+  try{
+    if(!cgAktif() || !CG_SDK.user) return null;
+    const k = CG_SDK.user.getUser;
+    if(typeof k !== 'function') return null;
+    const s = CG_SDK.user.getUser();
+    if(s && typeof s.then === 'function') return null;   // async surum: profilYukle kullanir
+    if(s && typeof s.username === 'string' && s.username) return s.username.slice(0, 24);
+  }catch(e){}
+  return null;
+}
+// Oyuna gonderilecek takma ad. CG kullanici adi > kayitli nick > rastgele.
+function cgOyuncuAdi(){
+  const cg = cgKullaniciAdi();
+  if(cg) return cg;
+  try{ return P.nickname || _NICK; }catch(e){ return _NICK; }
+}
+
+// ── [CG-2] Oda bildirimi (updateRoom) ───────────────────────────────
+// KAYNAK: Render sunucusunun 'waiting' paketindeki roomId. CrazyGames oda
+// sistemi ile Render oda sistemi KARISTIRILMAZ: CG yalnizca platform
+// duzeyinde invite/join bilgisini tasir, eslesmeyi DAIMA Render yapar.
+function cgOdaBildir(odaId, katilabilir){
+  if(!cgAktif()) return false;
+  if(typeof odaId !== 'string' || !odaId) return false;
+  try{
+    if(typeof CG_SDK.game.updateRoom !== 'function') return false;
+    CG_ODA_ID = odaId;
+    CG_SDK.game.updateRoom({
+      roomId: odaId,
+      isJoinable: !!katilabilir,
+      inviteParams: { room: odaId }
+    });
+    return true;
+  }catch(e){ return false; }
+}
+// Oda doldu / mac bitti: platform davetine KAPAT. roomId korunur ki
+// revansta ayni oda yeniden acilabilsin.
+function cgOdaKapat(){
+  if(!cgAktif() || !CG_ODA_ID) return false;
+  try{
+    if(typeof CG_SDK.game.updateRoom !== 'function') return false;
+    CG_SDK.game.updateRoom({ roomId: CG_ODA_ID, isJoinable: false,
+                             inviteParams: { room: CG_ODA_ID } });
+    return true;
+  }catch(e){ return false; }
+}
+// [CG-6] Revans / yeni round: AYNI CG odasi yeniden katilima acilir.
+function cgOdaYenidenAc(){
+  if(!CG_ODA_ID) return false;
+  return cgOdaBildir(CG_ODA_ID, true);
+}
+
+// ── [CG-3] Instant multiplayer ──────────────────────────────────────
+function cgInstantMi(){
+  try{ return cgAktif() && CG_SDK.game.isInstantMultiplayer === true; }
+  catch(e){ return false; }
+}
+
+// ── [CG-4] Davet linki / davet parametresi ──────────────────────────
+function cgDavetLinki(odaId){
+  if(!cgAktif()) return null;
+  try{
+    if(typeof CG_SDK.game.inviteLink !== 'function') return null;
+    return CG_SDK.game.inviteLink({ room: odaId || CG_ODA_ID || '' }) || null;
+  }catch(e){ return null; }
+}
+function cgDavetParam(anahtar){
+  if(!cgAktif()) return null;
+  try{
+    if(typeof CG_SDK.game.getInviteParam !== 'function') return null;
+    const v = CG_SDK.game.getInviteParam(anahtar || 'room');
+    return (typeof v === 'string' && v) ? v : null;
+  }catch(e){ return null; }
+}
+
+// ── [CG-7/8] Platform ayarlari: disableChat + muteAudio ─────────────
+// muteAudio SDK'da true iken oyun ici ses dugmesi sesi ACAMAZ (resmi
+// dokuman: "should take priority over your in-game audio settings").
+function cgAyarlariOku(){
+  if(!cgAktif()) return false;
+  try{
+    const a = CG_SDK.game.settings;
+    if(!a || typeof a !== 'object') return false;
+    CG_AYAR.disableChat = (a.disableChat === true);
+    CG_AYAR.muteAudio   = (a.muteAudio   === true);
+    return true;
+  }catch(e){ return false; }
+}
+function cgSohbetKapali(){ return CG_AYAR.disableChat === true; }
+function cgSesKapali(){    return CG_AYAR.muteAudio   === true; }
+
+// Ayarlari oyuna uygular. CG disinda CAGRILMAZ (cgAktif korumasi).
+function cgAyarUygula(){
+  if(!cgAktif()) return;
+  // --- sohbet ---
+  try{
+    const b = document.getElementById('menu-chat');
+    if(b) b.style.display = CG_AYAR.disableChat ? 'none' : '';
+    if(CG_AYAR.disableChat){
+      // Acik sohbet ekrani varsa kapat. Sunucu tarafi moderasyon ve
+      // chat protokolu DEGISMEZ; yalnizca arayuz devre disi kalir.
+      try{ if(typeof chatKapat === 'function') chatKapat(); }catch(e){}
+      const o = document.getElementById('screen-chat');
+      if(o) o.style.display = 'none';
+    }
+  }catch(e){}
+  // --- ses ---
+  try{
+    if(CG_AYAR.muteAudio){
+      if(!G_muted){
+        G_muted = true;
+        _activeAudio.forEach(function(n){ try{ n.pause(); n.currentTime = 0; }catch(e){} });
+        _activeAudio = [];
+        if(AC) try{ AC.suspend(); }catch(e){}
+      }
+      const sb = document.getElementById('sound-toggle');
+      if(sb) sb.textContent = '\uD83D\uDD07';
+    }
+  }catch(e){}
+}
+function cgAyarDinleyiciKur(){
+  if(!cgAktif() || _cgAyarDinleyici) return;
+  try{
+    if(typeof CG_SDK.game.addSettingsChangeListener !== 'function') return;
+    _cgAyarDinleyici = function(){
+      try{ cgAyarlariOku(); cgAyarUygula(); }catch(e){}
+    };
+    CG_SDK.game.addSettingsChangeListener(_cgAyarDinleyici);
+  }catch(e){ _cgAyarDinleyici = null; }
+}
+
+// ── [CG-3/5] SDK hazir olduktan sonra calisan acilis kancasi ────────
+// initCrazyGames() basariyla bittiginde cagrilir.
+function cgHazirKancasi(){
+  if(!cgAktif()) return;
+  try{ cgAyarlariOku(); cgAyarUygula(); cgAyarDinleyiciKur(); }catch(e){}
+  // Instant multiplayer VEYA davet linkiyle gelis: dogrudan cevrimici
+  // akisa gir. Menu/onboarding adimi atlanir.
+  try{
+    const davetOdasi = cgDavetParam('room');
+    if(cgInstantMi() || davetOdasi){
+      if(davetOdasi){
+        CG_ODA_ID = davetOdasi;
+        // [CG-5] fbFindMatch bunu gorup find_match yerine join_room yollar.
+        try{ _CG_KATIL_ODA = davetOdasi; }catch(e){}
+      }
+      setTimeout(function(){
+        try{ if(typeof startOnlineMode === 'function') startOnlineMode(); }catch(e){}
+      }, 400);
+    }
+  }catch(e){}
 }
 
 initCrazyGames();
@@ -1530,18 +1713,62 @@ function wsSend(data) {
   }
 }
 
+// [CG-4/5] Platform davet linkinden gelen oda kimligi. cgHazirKancasi()
+// tarafindan doldurulur, fbFindMatch() tarafindan BIR KEZ tuketilir.
+let _CG_KATIL_ODA = null;
+
+// [CG-5] join_room hata kodlari -> kullaniciya gosterilecek metin.
+// Sunucu YALNIZCA sabit kod gonderir; metin burada uretilir.
+function _cgKatilHataMetni(kod){
+  return kod === 'room_full'       ? 'Room is full'
+       : kod === 'room_not_found'  ? 'Room not found'
+       : kod === 'room_closed'     ? 'Room closed'
+       : kod === 'room_invalid'    ? 'Invalid room'
+       : kod === 'room_self'       ? 'That is your own room'
+       : kod === 'already_in_room' ? 'Already in a match'
+       : 'Could not join room';
+}
+
 function handleWsMsg(msg) {
   // [DAVET] Davet mesajlari once ele alinir; OYUN AKISINA dokunmaz.
   try{ if(davetMesaj(msg)) return; }catch(e){}
   switch(msg.type) {
+    // [CG-5] Davet edilen oda kullanilamadi. Oyuncu ORTADA BIRAKILMAZ:
+    // uyari gosterilir ve NORMAL eslestirmeye dusulur.
+    case 'join_error':
+      try{
+        const _m = _cgKatilHataMetni(msg && msg.code);
+        const _e = document.getElementById('online-msg');
+        if(_e) _e.textContent = _m + ' \u2014 searching for another opponent\u2026';
+        if(typeof toast2 === 'function') toast2(_m);
+      }catch(e){}
+      // Normal kuyruga gec (davet odasi zaten tuketildi).
+      setTimeout(function(){
+        try{ if(typeof fbFindMatch === 'function') fbFindMatch(); }catch(e){}
+      }, 900);
+      break;
     case 'waiting':
       el('online-msg').textContent = 'Waiting for opponent…';
       setOnlineStatus('waiting');
+      // [CG-2] Render'in oda kimligi CrazyGames'e bildirilir: oda su an
+      // KATILIMA ACIK. Render eslestirme mantigi DEGISMEZ.
+      try{ if(typeof cgOdaBildir === 'function' && msg && msg.roomId)
+             cgOdaBildir(String(msg.roomId), true); }catch(e){}
       break;
     case 'game_start':
       MY_SLOT = msg.slot;
       // [DAVET] Sunucudan gelen SANITIZE edilmis public profiller.
       try{ RAKIP_PROFIL = (MY_SLOT === 1) ? msg.hostProfile : msg.guestProfile; }catch(e){ RAKIP_PROFIL = null; }
+      // [CG-2] Sunucu artik roomId'yi IKI tarafa da gonderiyor; guest de
+      // kendi oda kimligini ogrenir. Oda 2/2 doldugu icin isJoinable=false.
+      try{
+        if(msg && typeof msg.roomId === 'string' && msg.roomId &&
+           typeof cgOdaBildir === 'function'){
+          cgOdaBildir(String(msg.roomId), false);
+        } else if(typeof cgOdaKapat === 'function'){
+          cgOdaKapat();
+        }
+      }catch(e){}
       startOnlineGame(msg.ballSeed, msg.hostNick, msg.guestNick);
       break;
     case 'relay':
@@ -1549,6 +1776,9 @@ function handleWsMsg(msg) {
       break;
     case 'opponent_left':
       toast2('Opponent left the game!');
+      // [CG-6] Rakip ayrildi: oda artik 1/2. Platform tarafinda tekrar
+      // katilima acilir. Oyun akisi (otomatik yeniden eslestirme) DEGISMEZ.
+      try{ if(typeof cgOdaYenidenAc === 'function') cgOdaYenidenAc(); }catch(e){}
       setTimeout(function(){
         // D7 — rakip ayrildi: eski maç state'ini TAMAMEN kapat, sonra
         // oyuncuyu otomatik olarak yeniden matchmaking'e al.
@@ -1630,8 +1860,27 @@ async function fbFindMatch() {
     // [DAVET] Public profil ve chat sid'i de gonderilir; sunucu sanitize eder.
     let _sid = '';
     try{ _sid = (typeof chatSidOku === 'function') ? chatSidOku() : ''; }catch(e){}
-    wsSend({ type: 'find_match', nickname: P.nickname || _NICK,
-             profil: (typeof profilAl === 'function') ? profilAl() : null, chatSid: _sid });
+    // [CG-1] CrazyGames ortaminda giris yapilmis kullanicinin adi tercih
+    // edilir; giris yoksa MEVCUT guest/nickname sistemi aynen calisir.
+    let _ad = P.nickname || _NICK;
+    try{ if(typeof cgOyuncuAdi === 'function') _ad = cgOyuncuAdi() || _ad; }catch(e){}
+    const _paket = { nickname: _ad,
+                     profil: (typeof profilAl === 'function') ? profilAl() : null,
+                     chatSid: _sid };
+    // [CG-4/5] Platform davet linkiyle gelindiyse BELIRLI odaya katil.
+    // Davet yoksa MEVCUT kor eslestirme (find_match) aynen calisir.
+    // _CG_KATIL_ODA yalnizca BIR KEZ kullanilir; basarisiz olursa
+    // handleWsMsg icindeki join_error normal eslestirmeye duser.
+    if(_CG_KATIL_ODA){
+      const _oda = _CG_KATIL_ODA;
+      _CG_KATIL_ODA = null;
+      _paket.type = 'join_room';
+      _paket.roomId = _oda;
+      wsSend(_paket);
+    } else {
+      _paket.type = 'find_match';
+      wsSend(_paket);
+    }
     setOnlineStatus('searching');
   });
 }
@@ -1703,6 +1952,10 @@ function startOnlineGame(seed, nick1, nick2) {
   selectedSkin=P.equipped; applyCueStats(); refreshSkinBar(); updateHdrTurn(); resetTimer();
   showScreen('game'); G.phase='playing';
   setOnlineStatus('playing');
+  // [CG-9] Cevrimici mac da bir oynanis baslangicidir. Yerel/bot modu
+  // startGame() icinde zaten bildiriyordu; cevrimici yol bildirmiyordu.
+  // Revans da bu fonksiyondan gectigi icin yeni round da kapsanir.
+  try{ cgGameplayStart(); }catch(e){}
 }
 
 
@@ -2929,6 +3182,14 @@ let AC=null;
 let G_muted=false;
 let _activeAudio=[];
 function toggleSound(){
+  // [CG-8] CrazyGames muteAudio ayari ACIKKEN oyun ici dugme sesi ACAMAZ.
+  // Resmi dokuman: platform ayari oyun ici ses ayarina gore ONCELIKLIDIR.
+  try{ if(typeof cgSesKapali === 'function' && cgSesKapali()){
+         G_muted = true;
+         var _b = document.getElementById('sound-toggle');
+         if(_b) _b.textContent = '\uD83D\uDD07';
+         return;
+       } }catch(e){}
   G_muted=!G_muted;
   var btn=document.getElementById('sound-toggle');
   if(btn) btn.textContent=G_muted?'🔇':'🔊';
@@ -9958,6 +10219,9 @@ function chatNickPaneliAc(){
 // ── Acilis / kapanis ──────────────────────────────────────────────────
 // Chat YALNIZCA menude veya mac sonunda acilir. G.phase yalnizca OKUNUR.
 function chatAcilabilir(){
+  // [CG-7] CrazyGames disableChat ayari acikken sohbet arayuzu TAMAMEN
+  // devre disidir. Sunucu tarafi moderasyon sistemi DEGISMEZ.
+  try{ if(typeof cgSohbetKapali === 'function' && cgSohbetKapali()) return false; }catch(e){}
   try{ return G.phase === 'menu' || G.phase === 'over'; }catch(e){ return false; }
 }
 function chatAc(){

@@ -48,7 +48,55 @@ const httpServer = http.createServer((req, res) => {
 const wss = new WebSocket.Server({ server: httpServer });
 
 const rooms = new Map();
-let waitingRoom = null;
+
+// ════════════════════════════════════════════════════════════════════
+// [ODA-MAP] Bekleyen odalar: TEK global slot yerine Map.
+// ════════════════════════════════════════════════════════════════════
+// NEDEN: davet linkiyle gelen oyuncunun BELIRLI bir odaya katilabilmesi
+// icin ayni anda birden fazla bekleyen oda bulunabilmeli.
+//
+// GERILEME YOK: Map ekleme sirasini korudugu icin bekleyenBul() daima
+// EN ESKI uygun odayi secer -> mevcut FIFO davranisi BIREBIR AYNI kalir.
+// Tek bekleyen oda varken davranis eskisiyle tamamen ozdestir.
+//
+// DEPOLAMA: RAM. Veritabani/disk YOKTUR; restart hepsini siler.
+const bekleyenOdalar   = new Map();          // odaId -> room
+const BEKLEYEN_TTL_MS  = 10 * 60 * 1000;     // sahipsiz bekleyen oda omru
+const BEKLEYEN_MAX     = 200;                // bellek tavani
+
+// FIFO: en eski, sahibi ACIK ve istekte bulunan olmayan oda.
+function bekleyenBul(ws){
+  for (const [id, oda] of bekleyenOdalar) {
+    if (!oda || !oda.host) { bekleyenOdalar.delete(id); continue; }
+    if (oda.host === ws) continue;
+    if (oda.host.readyState !== WebSocket.OPEN) { bekleyenOdalar.delete(id); continue; }
+    return oda;
+  }
+  return null;
+}
+// Bu soketin sahibi oldugu bekleyen oda (varsa).
+function bekleyenKendi(ws){
+  for (const [id, oda] of bekleyenOdalar) {
+    if (oda && oda.host === ws) return oda;
+  }
+  return null;
+}
+// Suresi dolmus / sahibi kopmus bekleyen odalari dusurur.
+// AYRI ZAMANLAYICI EKLENMEZ: mevcut heartbeat dongusunden cagrilir.
+function bekleyenSupur(simdi){
+  for (const [id, oda] of bekleyenOdalar) {
+    if (!oda || !oda.host ||
+        oda.host.readyState !== WebSocket.OPEN ||
+        (oda.olusturma && (simdi - oda.olusturma) > BEKLEYEN_TTL_MS)) {
+      bekleyenOdalar.delete(id);
+    }
+  }
+  while (bekleyenOdalar.size > BEKLEYEN_MAX) {
+    const enEski = bekleyenOdalar.keys().next();
+    if (enEski.done) break;
+    bekleyenOdalar.delete(enEski.value);
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // HEARTBEAT — yarim-acik (half-open) baglanti tespiti
@@ -117,6 +165,9 @@ const heartbeatTimer = setInterval(() => {
   hbTick++;
   const simdi = Date.now();
   const protoTuru = (hbTick % PROTO_PING_EVERY) === 0;
+  // [ODA-MAP] Sahipsiz / suresi dolmus bekleyen odalari dusur.
+  // Yeni zamanlayici EKLENMEZ; mevcut heartbeat dongusune binilir.
+  try { bekleyenSupur(simdi); } catch (e) {}
 
   wss.clients.forEach((ws) => {
     // 1) UYGULAMA SEVIYESI — proxy'yi gecer, Render'da ASIL calisan yol.
@@ -165,6 +216,9 @@ wss.on('connection', (ws) => {
 
       switch(msg.type) {
         case 'find_match': findMatch(ws, msg); break;
+        // [ODA-MAP] Platform davet linkiyle BELIRLI odaya katilma.
+        // find_match AKISINA DOKUNMAZ; yanina eklenmistir.
+        case 'join_room':  joinRoom(ws, msg); break;
         case 'relay':
         case 'rematch_request':
         case 'rematch_decline':
@@ -204,8 +258,10 @@ wss.on('connection', (ws) => {
     // gecersizlesir; kopmus bir maca ait davet kabul edilemez.
     try { davetleriIptal(ws.id); } catch(e) {}
 
-    if (waitingRoom && waitingRoom.host === ws) {
-      waitingRoom = null;
+    // [ODA-MAP] Bekleyen odanin sahibi ayrildi: oda dusurulur.
+    const _bek = bekleyenKendi(ws);
+    if (_bek) {
+      bekleyenOdalar.delete(_bek.id);
       return;
     }
 
@@ -455,7 +511,7 @@ function findMatch(ws, msg) {
   // yaziliyordu -> ilk maç hicbir bildirim olmadan kopuyordu (maç hijacking).
   if (ws.roomId && rooms.has(ws.roomId)) return;
   // Zaten bekleme odasinin sahibiyse yeni oda acma; eskisi oksuz kalirdi.
-  if (waitingRoom && waitingRoom.host === ws) return;
+  if (bekleyenKendi(ws)) return;
 
   // D6 — takma adi socket uzerinde sakla (game_start ile iletilecek).
   if (msg && typeof msg.nickname === 'string') {
@@ -468,15 +524,18 @@ function findMatch(ws, msg) {
     ws.chatSid = msg.chatSid;
   }
 
-  if (waitingRoom && waitingRoom.host !== ws) {
-    const room = waitingRoom;
+  // [ODA-MAP] FIFO: en eski uygun bekleyen oda. Tek oda varken davranis
+  // eskisiyle BIREBIR AYNI.
+  const _bekleyen = bekleyenBul(ws);
+  if (_bekleyen) {
+    const room = _bekleyen;
 
     room.guest = ws;
     ws.roomId = room.id;
     ws.slot = 1;
 
     rooms.set(room.id, room);
-    waitingRoom = null;
+    bekleyenOdalar.delete(room.id);
 
     const seed = Math.floor(Math.random() * 999999);
 
@@ -490,10 +549,13 @@ function findMatch(ws, msg) {
     const guestProfil = room.guest.profil || { ad:'', avatar:'', kaynak:'guest' };
     // [DAVET] Yeni mac: iki taraf da onceki macin cooldown'undan kurtulur.
     try{ davetMacSinirindaSifirla(room.host); davetMacSinirindaSifirla(room.guest); }catch(e){}
+    // [ODA-MAP] roomId artik IKI tarafa da bildirilir. Istemci bunu
+    // yalnizca platform (CrazyGames updateRoom) bilgisi icin kullanir;
+    // oyun akisinda hicbir islevi YOKTUR.
     send(room.host,  {type:'game_start', slot:0, ballSeed:seed, hostNick:hostNick, guestNick:guestNick,
-                      hostProfile:hostProfil, guestProfile:guestProfil});
+                      hostProfile:hostProfil, guestProfile:guestProfil, roomId:room.id});
     send(room.guest, {type:'game_start', slot:1, ballSeed:seed, hostNick:hostNick, guestNick:guestNick,
-                      hostProfile:hostProfil, guestProfile:guestProfil});
+                      hostProfile:hostProfil, guestProfile:guestProfil, roomId:room.id});
 
     console.log('MATCH', room.id, hostNick, 'vs', guestNick);
 
@@ -504,7 +566,11 @@ function findMatch(ws, msg) {
     // NOT: sunucu fizik CALISTIRMAZ; turn'u istemcilerin turn_end raporundan
     // ogrenir. Bu, "sirasi olmayan oyuncu atis yapamaz" ve "ball-in-hand
     // sahibi olmayan oyuncu beyaz topu yerlestiremez" garantilerini saglar.
-    waitingRoom = { id, host: ws, guest: null, turn: 0, inHandFor: null, pending: false };
+    // [ODA-MAP] Oda nesnesi DEGISMEDI; yalnizca 'olusturma' zaman damgasi
+    // eklendi (TTL supurmesi icin) ve tek slot yerine Map'e yazilir.
+    const oda = { id, host: ws, guest: null, turn: 0, inHandFor: null,
+                  pending: false, olusturma: Date.now() };
+    bekleyenOdalar.set(id, oda);
 
     ws.roomId = id;
     ws.slot = 0;
@@ -513,6 +579,75 @@ function findMatch(ws, msg) {
 
     console.log('WAIT', id);
   }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// [ODA-MAP] join_room — BELIRLI bir bekleyen odaya katilma
+// ════════════════════════════════════════════════════════════════════
+// KULLANIM: platform davet linki (CrazyGames inviteParams.room).
+// Esleme kodu findMatch ile AYNIDIR; yalnizca oda SECIMI farklidir.
+// Oda basina en fazla 2 oyuncu; dolu/yok/kendi odasi guvenli hata doner.
+const ODA_ID_DESEN = /^[A-Za-z0-9_-]{4,32}$/;
+
+function joinRoom(ws, msg) {
+  // --- girdi dogrulama (istemciye ASLA guvenilmez) ---
+  const ham = (msg && typeof msg.roomId === 'string') ? msg.roomId : '';
+  if (!ham || ham.length > 32 || !ODA_ID_DESEN.test(ham)) {
+    return send(ws, {type:'join_error', code:'room_invalid'});
+  }
+  // --- cagiran zaten bir macta mi? ---
+  if (ws.roomId && rooms.has(ws.roomId)) {
+    return send(ws, {type:'join_error', code:'already_in_room'});
+  }
+  // --- oda DOLU mu? (aktif mac) ---
+  if (rooms.has(ham)) {
+    return send(ws, {type:'join_error', code:'room_full'});
+  }
+  // --- oda var mi? ---
+  const room = bekleyenOdalar.get(ham);
+  if (!room || !room.host) {
+    return send(ws, {type:'join_error', code:'room_not_found'});
+  }
+  if (room.host === ws) {
+    return send(ws, {type:'join_error', code:'room_self'});
+  }
+  if (room.host.readyState !== WebSocket.OPEN) {
+    bekleyenOdalar.delete(ham);
+    return send(ws, {type:'join_error', code:'room_closed'});
+  }
+  // --- cagiran baska bir bekleyen odanin sahibiyse o oda dusurulur ---
+  const kendi = bekleyenKendi(ws);
+  if (kendi) bekleyenOdalar.delete(kendi.id);
+
+  // --- kimlik alanlari: findMatch ile AYNI islem ---
+  if (msg && typeof msg.nickname === 'string') {
+    ws.nick = msg.nickname.slice(0, 24);
+  }
+  ws.profil = davetProfilTemizle(msg && msg.profil);
+  if (msg && typeof msg.chatSid === 'string' && msg.chatSid.length <= 128) {
+    ws.chatSid = msg.chatSid;
+  }
+
+  // --- esleme: findMatch'teki kodun AYNISI ---
+  room.guest = ws;
+  ws.roomId = room.id;
+  ws.slot = 1;
+  rooms.set(room.id, room);
+  bekleyenOdalar.delete(room.id);
+
+  const seed = Math.floor(Math.random() * 999999);
+  const hostNick  = room.host.nick  || 'Player 1';
+  const guestNick = room.guest.nick || 'Player 2';
+  const hostProfil  = room.host.profil  || { ad:'', avatar:'', kaynak:'guest' };
+  const guestProfil = room.guest.profil || { ad:'', avatar:'', kaynak:'guest' };
+  try { davetMacSinirindaSifirla(room.host); davetMacSinirindaSifirla(room.guest); } catch(e) {}
+
+  send(room.host,  {type:'game_start', slot:0, ballSeed:seed, hostNick:hostNick, guestNick:guestNick,
+                    hostProfile:hostProfil, guestProfile:guestProfil, roomId:room.id});
+  send(room.guest, {type:'game_start', slot:1, ballSeed:seed, hostNick:hostNick, guestNick:guestNick,
+                    hostProfile:hostProfil, guestProfile:guestProfil, roomId:room.id});
+
+  console.log('JOIN', room.id, hostNick, 'vs', guestNick);
 }
 
 // RELAY
