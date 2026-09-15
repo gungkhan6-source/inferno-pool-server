@@ -1898,9 +1898,14 @@ function handleWsMsg(msg) {
       // korlemesine toggle yerine sunucunun mutlak degeri uygulanir.
       // Forfeit EDEN icin bu no-op (yerel olarak zaten degistirmisti);
       // RAKIP icin sira degisikligini ogrendigi tek yoldur.
+      if(G.phase!=='playing' || !G.onlineMode) break;
       if(msg.turn===0||msg.turn===1) G.turn=msg.turn;
-      G.inHand=false;
+      // [KURAL] Zaman asiminda sira alan oyuncu ball-in-hand alir.
+      // Eski sunucu inHand yollamaz -> false (sunucu da yetki vermez).
+      G.inHand=(msg.inHand===true);
+      G._cueFoul=false; G.sunkThisShot=false;
       drag.active=false; drag.power=0;
+      if(G.inHand && G.turn===G.mySlot){ foulT(t('event.shotTimeout')); sfxFoul(); }
       updateHdrTurn(); resetTimer();
       break;
     case 'pong': break;
@@ -3583,6 +3588,8 @@ en: {
   'event.eightPotted':'🔥 8-Ball Potted — Victory!',
   'event.eightScratch':'💀 8-Ball + Scratch — Loss!',
   'event.eightEarly':'💀 8-Ball too early — Forfeit!',
+  'event.shotTimeout':'TIME OUT — BALL IN HAND',
+  'event.eightFirst':'8-BALL HIT FIRST — BALL IN HAND',
   'event.opponentFrozen':'OPPONENT FROZEN!',
   // botShot() icinde — Asama 1'de BAGLANMAZ
   'event.botFrozen':'BOT FROZEN!',
@@ -4002,6 +4009,8 @@ tr: {
   'event.eightPotted':'🔥 8 Numara cebe — Zafer!',
   'event.eightScratch':'💀 8 Numara + faul — Kayıp!',
   'event.eightEarly':'💀 8 Numara çok erken — Kayıp!',
+  'event.shotTimeout':'SÜRE DOLDU — TOP ELDE',
+  'event.eightFirst':'ÖNCE 8 NUMARAYA VURULDU — TOP ELDE',
   'event.opponentFrozen':'RAKİP DONDU!',
   'event.botFrozen':'BOT DONDU!',
   'event.levelUp':'SEVİYE ATLADIN!',
@@ -4411,6 +4420,8 @@ ru: {
   'event.eightPotted':'🔥 Восьмёрка забита — Победа!',
   'event.eightScratch':'💀 Восьмёрка + фол — Поражение!',
   'event.eightEarly':'💀 Восьмёрка слишком рано — Поражение!',
+  'event.shotTimeout':'ВРЕМЯ ВЫШЛО — МЯЧ В РУКЕ',
+  'event.eightFirst':'СНАЧАЛА ЗАДЕТА ВОСЬМЁРКА — МЯЧ В РУКЕ',
   'event.opponentFrozen':'СОПЕРНИК ЗАМОРОЖЕН!',
   'event.botFrozen':'БОТ ЗАМОРОЖЕН!',
   'event.levelUp':'НОВЫЙ УРОВЕНЬ!',
@@ -7059,6 +7070,14 @@ function isMyBall(b){
   return b.stripe === G.assignedStripe[G.turn];
 }
 
+// [KURAL] Atisin ilk temasi. Yasallik, nisan cizgisindeki uyari isaretiyle
+// (isMyBall) AYNI kuraldir: grup bitmeden 8 numara ilk temas olamaz.
+function ilkTemasKaydet(top){
+  if(!top) return;
+  G._ilkTemas = top.type;
+  G._erkenSiyahFaul = (top.type==='8ball' && !isMyBall(top));
+}
+
 function findFirstBallHit(ox,oy,dx,dy){
   const balls=G.balls.filter(b=>b&&!b.sunk);
   let best=null;
@@ -7483,6 +7502,7 @@ function resolveBalls(a,b){
     const imp=rv*0.92;
     a.vx-=imp*nx; a.vy-=imp*ny;
     b.vx+=imp*nx; b.vy+=imp*ny;
+    if(G._ilkTemas===null && (a.type==='cue'||b.type==='cue')) ilkTemasKaydet(a.type==='cue'?b:a);
     spawnCol((a.x+b.x)/2,(a.y+b.y)/2,a.type,b.type);
     if(Math.abs(rv)>1.5) sfxTopCarp();
   }
@@ -7735,34 +7755,34 @@ function resetTimer(){
     if(G.onlineMode && G.turn !== G.mySlot) return;
     G.timer--;el('gh-timer').textContent=G.timer;
     el('gh-timer').style.color=G.timer<=5?'#ff3300':'#fff';
-    if(G.timer<=0){clearInterval(G.timerInt); autoShot();}
+    if(G.timer<=0){clearInterval(G.timerInt); atisSuresiDoldu();}
   },1000);
 }
-function autoShot(){
-  if(!G.cue||G.cue.sunk)return;
-  if(G.onlineMode&&G.turn!==G.mySlot)return;
-  // Oyuncu su anda istakayi cekiyorsa onun atisinin uzerine binme.
-  // (autoShot rastgele aci + 5-11 guc uretir; surukleme sirasinda
-  //  tetiklenirse ekranda %100 guc gorunurken top yavas ve yanlis
-  //  yone giderdi.) Atisi oyuncunun kendi mouseup'i tamamlar.
-  if(drag.active) return;
-  // D5-B" — ONLINE: shot clock dolunca RASTGELE otomatik atis YAPILMAZ.
-  // Oyuncu kendi turunu rakibe devreder. AYRI 'forfeit_turn' mesaji kullanilir;
-  // 'turn_end' artik YALNIZCA normal fizik cozumunun mesajidir. Gonderilen
-  // govdede turn/inHand YOKTUR - sunucu zaten okumaz. Sunucu dogruladiktan
-  // sonra iki istemciye de 'turn_forfeited' yollar.
-  // OFFLINE (bot / yerel PvP) davranisi asagida AYNEN korunur.
-  if(G.onlineMode){
-    switchTurn(false);
-    try{ wsSend({type:'forfeit_turn'}); }catch(e){}
-    return;
-  }
-  const ang=rnd(0,Math.PI*2);
-  const svx=Math.round(Math.cos(ang)*rnd(5,11)*1000)/1000;
-  const svy=Math.round(Math.sin(ang)*rnd(5,11)*1000)/1000;
-  G.cue.vx=svx;G.cue.vy=svy;
-  G.moving=true;G.shots[G.turn]++;sfxCue();
-  if(G.onlineMode)wsSend({type:'relay',sub:'shot',vx:svx,vy:svy});
+// ═══════════════════════════════════════════════════════════════════
+//  [KURAL] SHOT CLOCK ZAMAN ASIMI — TUM MODLAR ICIN TEK KURAL
+// -------------------------------------------------------------------
+//  Bot, 2 Player, Online (CrazyGames / Yandex / Pixidus paketleri de ayni
+//  kodu calistirir). Sure dolunca:
+//    * HICBIR otomatik atis yapilmaz (eski rastgele atis kaldirildi),
+//    * yarim kalan surukleme (mouse/dokunma) iptal edilir,
+//    * sira rakibe gecer ve rakip ball-in-hand alir.
+//  Online: istemci 'forfeit_turn' yollar; sunucu ayrica kendi saatiyle
+//  dogrular (istemci hic yollamasa bile turu devreder).
+// ═══════════════════════════════════════════════════════════════════
+function atisSuresiDoldu(){
+  if(G.phase!=='playing' || G.moving) return;
+  if(G.onlineMode && G.turn!==G.mySlot) return;
+  drag.active=false; drag.power=0;
+  // Bot kendi turunda nisan aliyorsa animasyon durdurulur.
+  if(!G.onlineMode && G.mode==='bot' && G.turn===1){ try{ botAimDur(); }catch(e){} }
+  // Secili guc TUKETILMEDEN kapatilir (atis yapilmadi).
+  G.activePU=null; G.aimEx=false; G.turbo=false;
+  try{ renderPU(); }catch(e){}
+  G._cueFoul=false; G.sunkThisShot=false;
+  foulT(t('event.shotTimeout')); sfxFoul();
+  switchTurn(true);
+  G.inHand=true;
+  if(G.onlineMode){ try{ wsSend({type:'forfeit_turn'}); }catch(e){} }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -8670,9 +8690,14 @@ function startPhysTick(){
       // Toplar durdu -> uzayan atis sesi kuyrugunu kisa fade ile kes.
       try{ fadeShotAudioTail(240); }catch(e){}
       if(G.phase!=='playing') return;
-      if(G._cueFoul){
+      // [KURAL] Once 8 numaraya vurmak (grup bitmeden) FAULDUR.
+      const erkenSiyah = (G._erkenSiyahFaul===true);
+      G._erkenSiyahFaul=false; G._ilkTemas=undefined;
+      if(erkenSiyah && !G._cueFoul){ foulT(t('event.eightFirst')); sfxFoul(); }
+      if(G._cueFoul || erkenSiyah){
+        const beyazDustu = G._cueFoul;
         G._cueFoul=false; G.sunkThisShot=false;
-        if(G.cue){ G.cue.sunk=false; G.cue.x=CW*0.27; G.cue.y=CH/2; G.cue.vx=0; G.cue.vy=0; }
+        if(G.cue && (beyazDustu || G.cue.sunk)){ G.cue.sunk=false; G.cue.x=CW*0.27; G.cue.y=CH/2; G.cue.vx=0; G.cue.vy=0; }
         switchTurn(true);
         // Bot da ball-in-hand hakkini kullanir; yerlestirmeyi
         // botShot() icindeki aiPlaceCueBall() kurallar dahilinde yapar.
@@ -8702,7 +8727,11 @@ const _origMovingSetter=(function(){
   let _mov=false;
   Object.defineProperty(G,'moving',{
     get(){return _mov;},
-    set(v){_mov=v; if(v) startPhysTick();}
+    set(v){
+      // [KURAL] Yeni atis basliyor: ilk temas takibi her modda BURADA kurulur.
+      if(v && !_mov){ G._ilkTemas=null; G._erkenSiyahFaul=false; }
+      _mov=v; if(v) startPhysTick();
+    }
   });
 })();
 

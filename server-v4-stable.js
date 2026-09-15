@@ -269,6 +269,7 @@ wss.on('connection', (ws) => {
     if (room) {
       const other = ws.slot === 0 ? room.guest : room.host;
       send(other, {type:'opponent_left'});
+      atisSaatiDurdur(room);
       rooms.delete(ws.roomId);
     }
   });
@@ -557,6 +558,7 @@ function findMatch(ws, msg) {
     send(room.guest, {type:'game_start', slot:1, ballSeed:seed, hostNick:hostNick, guestNick:guestNick,
                       hostProfile:hostProfil, guestProfile:guestProfil, roomId:room.id});
 
+    atisSaatiBaslat(room);
     console.log('MATCH', room.id, hostNick, 'vs', guestNick);
 
   } else {
@@ -647,6 +649,7 @@ function joinRoom(ws, msg) {
   send(room.guest, {type:'game_start', slot:1, ballSeed:seed, hostNick:hostNick, guestNick:guestNick,
                     hostProfile:hostProfil, guestProfile:guestProfil, roomId:room.id});
 
+  atisSaatiBaslat(room);
   console.log('JOIN', room.id, hostNick, 'vs', guestNick);
 }
 
@@ -668,6 +671,8 @@ function relay(ws, msg) {
     if (slot !== room.turn) return reject(ws, 'not_your_turn', room);
     if (room.pending)       return reject(ws, 'shot_in_progress', room);
     room.pending = true;
+    room.zamanAsimiZincir = 0;
+    atisSaatiDurdur(room);
 
   } else if (msg.sub === 'place_cue') {
     // D4 — beyaz topu yalnizca ball-in-hand hakki olan SIRADAKI oyuncu koyar.
@@ -678,6 +683,8 @@ function relay(ws, msg) {
   } else if (msg.sub === 'rematch_yes') {
     // Yeni maç: yetkilendirme state'ini sifirla.
     room.turn = 0; room.inHandFor = null; room.pending = false;
+    room.zamanAsimiZincir = 0;
+    atisSaatiBaslat(room);
   }
 
   const other = slot === 0 ? room.guest : room.host;
@@ -708,6 +715,7 @@ function turnEnd(ws, msg) {
   room.turn = t;
   room.inHandFor = (msg.inHand === true) ? t : null;
   room.pending = false;
+  atisSaatiBaslat(room);
 }
 
 // D5-B" — SHOT CLOCK FORFEIT. 'turn_end' den KESIN olarak ayrilmistir.
@@ -721,13 +729,42 @@ function forfeitTurn(ws) {
   const slot = (ws === room.host) ? 0 : 1;
   if (room.pending) return;           // cozulmemis atis varken forfeit YOK
   if (slot !== room.turn) return;     // rakibin sirasi CALINAMAZ
+  room.zamanAsimiZincir = 0;          // istemci canli: zincir sayilmaz
+  turuZamanAsimi(room, slot, 'client');
+}
+
+// [KURAL] SHOT CLOCK — tek zaman asimi kurali (istemci bildirimi VEYA
+// sunucu saati). Otomatik atis YOKTUR; tur rakibe gecer ve rakip
+// ball-in-hand alir (place_cue yetkisi inHandFor ile verilir).
+const ATIS_SURESI_MS   = 30 * 1000;   // istemci sayaci ile ayni
+const ATIS_TOLERANS_MS = 10 * 1000;   // ag gecikmesi / sekme gecikmesi payi
+const ATIS_ZINCIR_MAX  = 2;           // arka arkaya 2 sunucu zaman asimi -> iki taraf da bosta, saat durur
+
+function turuZamanAsimi(room, slot, kaynak) {
   room.turn = (slot === 0) ? 1 : 0;   // tur yalnizca RAKIBE gecer
-  room.inHandFor = null;              // forfeit ile ball-in-hand VERILMEZ
-  console.log('FORFEIT room', room.id, 'slot', slot, '-> turn', room.turn);
-  // Rakip sira degisikligini OGRENMELI; aksi halde iki istemci de
-  // "sira bende degil" gorup maç kilitlenir.
-  send(room.host,  { type:'turn_forfeited', turn: room.turn });
-  send(room.guest, { type:'turn_forfeited', turn: room.turn });
+  room.inHandFor = room.turn;         // rakip beyaz topu yerlestirebilir
+  console.log('TIMEOUT room', room.id, 'slot', slot, '-> turn', room.turn, kaynak);
+  send(room.host,  { type:'turn_forfeited', turn: room.turn, inHand: true, reason: 'timeout' });
+  send(room.guest, { type:'turn_forfeited', turn: room.turn, inHand: true, reason: 'timeout' });
+  atisSaatiBaslat(room);
+}
+
+function atisSaatiDurdur(room) {
+  if (room && room.saat) { clearTimeout(room.saat); room.saat = null; }
+}
+
+function atisSaatiBaslat(room) {
+  atisSaatiDurdur(room);
+  if (!room || !room.host || !room.guest || room.pending) return;
+  if ((room.zamanAsimiZincir || 0) >= ATIS_ZINCIR_MAX) return;
+  const tur = room.turn;
+  room.saat = setTimeout(function () {
+    room.saat = null;
+    if (rooms.get(room.id) !== room) return;   // oda kapanmis
+    if (room.pending || room.turn !== tur) return;
+    room.zamanAsimiZincir = (room.zamanAsimiZincir || 0) + 1;
+    turuZamanAsimi(room, tur, 'server');
+  }, ATIS_SURESI_MS + ATIS_TOLERANS_MS);
 }
 
 // SEND
