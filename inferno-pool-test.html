@@ -287,6 +287,74 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dk);font-famil
 #ball3d-canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}
 #aim-canvas,#part-canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}
 #part-canvas{z-index:5;}
+/* [MOBIL-KONTROL] Inferno Aim Core. YALNIZCA dokunmatik cihazda ve 'core'
+   modunda gorunur (html.mk-cihaz / html.mk-core). Masaustu HIC etkilenmez. */
+#mk-sol,#mk-sag,#mk-mod{display:none;}
+html.mk-cihaz #mk-mod{display:flex;}
+html.mk-core #mk-sol,html.mk-core #mk-sag{display:flex;}
+html.mk-core #power-wrap,html.mk-core #hint-txt{display:none!important;}
+.mk-panel{position:fixed;z-index:30;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  box-sizing:border-box;padding:0;background:none;border:0;box-shadow:none;
+  touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+#mk-mod{position:fixed;z-index:31;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;
+  font-family:'Rajdhani',sans-serif;font-size:0.62rem;font-weight:700;letter-spacing:2px;color:#ffd9a8;
+  background:rgba(20,4,34,0.9);border:1px solid rgba(255,130,40,0.35);box-shadow:0 0 10px rgba(255,90,0,0.18);
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+#mk-mod::before{content:'';width:7px;height:7px;border-radius:50%;background:#ff7a1a;box-shadow:0 0 6px #ff7a1a;}
+html.mk-cihaz:not(.mk-core) #mk-mod::before{background:#6b5a7a;box-shadow:none;}
+#mk-mod[data-yer="yan"]{justify-content:center;gap:0;padding:4px 1px;font-size:0.5rem;letter-spacing:0;white-space:nowrap;overflow:hidden;box-sizing:border-box;}
+#mk-mod[data-yer="yan"]::before{display:none;}
+.mk-aci{font-family:'Rajdhani',sans-serif;font-size:0.82rem;font-weight:700;letter-spacing:2px;color:#ffd9a8;
+  text-shadow:0 0 8px rgba(255,120,0,0.45);min-height:1em;}
+.mk-dial-sira{display:flex;align-items:center;gap:8px;width:100%;flex:1;min-height:0;}
+.mk-dial{position:relative;flex:1;align-self:stretch;min-height:44px;max-height:64px;border-radius:14px;overflow:hidden;
+  background:rgba(30,6,48,0.9);border:1px solid rgba(255,140,60,0.25);}
+.mk-dial-cizgi{position:absolute;inset:0;background-image:repeating-linear-gradient(90deg,rgba(255,170,90,0.55) 0 1px,transparent 1px 12px);}
+.mk-dial::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(90deg,rgba(18,3,30,1),rgba(18,3,30,0) 22%,rgba(18,3,30,0) 78%,rgba(18,3,30,1));}
+.mk-dial-igne{position:absolute;left:50%;top:6px;bottom:6px;width:2px;margin-left:-1px;border-radius:2px;z-index:1;
+  background:#ffb066;box-shadow:0 0 8px #ff7a1a,0 0 2px #fff;}
+.mk-dial.basili{border-color:rgba(255,160,80,0.6);}
+.mk-itme{width:44px;height:44px;flex-shrink:0;padding:0;border-radius:50%;font-size:1.05rem;color:#ffd9a8;
+  background:rgba(40,8,60,0.9);border:1px solid rgba(255,140,60,0.3);box-shadow:0 0 8px rgba(255,90,0,0.15);touch-action:none;-webkit-tap-highlight-color:transparent;}
+.mk-itme.basili{background:rgba(120,40,10,0.9);}
+.mk-ipucu{font-size:0.5rem;letter-spacing:1px;color:rgba(255,255,255,0.38);text-align:center;line-height:1.3;}
+.mk-panel[data-yer="yan"] .mk-dial-sira{flex-direction:column;}
+/* Yatay core: sutun icerigi masaya yaslanir (sol sutun sagdan, sag sutun soldan). */
+#mk-sol[data-yer="yan"]{align-items:flex-end;}
+#mk-sol[data-yer="yan"] .mk-dial-sira{align-items:flex-end;}
+#mk-sol[data-yer="yan"] .mk-dial{align-self:flex-end;}
+#mk-sag[data-yer="yan"]{align-items:flex-start;}
+#mk-sag[data-yer="yan"] .mk-core{max-width:none;}
+/* Mobil core: cebe giren toplar masanin iki yanindaki dikey neon seritlerde (#mk-cep-sol / #mk-cep-sag)
+   gosterilir. Masaustu #sunk-left / #sunk-right duzeni DEGISMEZ; yalnizca html.mk-cep iken gizlenir. */
+html.mk-cep #sunk-left,html.mk-cep #sunk-right{display:none!important;}
+.mk-cep-serit{position:fixed;z-index:29;display:none;flex-direction:column;flex-wrap:wrap;align-content:center;align-items:center;
+  justify-content:flex-start;gap:var(--mk-cep-ara,3px);box-sizing:border-box;padding:4px;border-radius:14px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(46,10,70,0.55),rgba(12,2,22,0.8));border:1px solid rgba(255,120,40,0.28);
+  box-shadow:inset 0 0 8px rgba(120,40,255,0.18),0 0 6px rgba(255,90,0,0.10);pointer-events:none;}
+html.mk-cep .mk-cep-serit{display:flex;}
+.mk-cep-serit>img,.mk-cep-serit>div{width:var(--mk-top)!important;height:var(--mk-top)!important;flex-shrink:0;display:block;
+  box-sizing:border-box;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.65));}
+.mk-cep-serit>div{border-width:1px!important;font-size:calc(var(--mk-top) * 0.4)!important;display:flex;}
+.mk-panel[data-yer="yan"] .mk-dial{align-self:center;width:40px;max-height:none;flex:1;}
+.mk-panel[data-yer="yan"] .mk-aci{font-size:0.7rem;letter-spacing:0.5px;}
+.mk-panel[data-yer="yan"] .mk-itme{width:44px;height:44px;}
+.mk-panel[data-yer="yan"] .mk-dial-cizgi{background-image:repeating-linear-gradient(0deg,rgba(255,170,90,0.55) 0 1px,transparent 1px 12px);}
+.mk-panel[data-yer="yan"] .mk-dial::after{background:linear-gradient(0deg,rgba(18,3,30,1),rgba(18,3,30,0) 22%,rgba(18,3,30,0) 78%,rgba(18,3,30,1));}
+.mk-panel[data-yer="yan"] .mk-dial-igne{left:6px;right:6px;top:50%;bottom:auto;width:auto;height:2px;margin:-1px 0 0 0;}
+.mk-panel[data-yer="yan"] .mk-ipucu{display:none;}
+.mk-core{position:relative;width:100%;max-width:150px;aspect-ratio:1;max-height:100%;touch-action:none;}
+.mk-halka{position:absolute;inset:0;width:100%;height:100%;overflow:visible;}
+.mk-iz{fill:none;stroke:rgba(255,255,255,0.09);stroke-width:9;stroke-linecap:round;}
+.mk-dolgu{fill:none;stroke:url(#mk-kor);stroke-width:9;stroke-linecap:round;stroke-dasharray:209.44;stroke-dashoffset:209.44;
+  filter:drop-shadow(0 0 4px rgba(255,110,0,0.6));}
+.mk-cekirdek{position:absolute;left:28%;top:28%;width:44%;height:44%;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 38%,#4a1570,#16042a 72%);border:1px solid rgba(255,140,60,0.35);
+  box-shadow:0 0 12px rgba(255,90,0,0.18),inset 0 0 10px rgba(255,120,40,0.15);transition:box-shadow 0.12s;}
+.mk-cekirdek span{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:0.9rem;color:#ffe2bd;}
+.mk-core.basili .mk-cekirdek{box-shadow:0 0 22px rgba(255,110,0,0.55),inset 0 0 14px rgba(255,160,60,0.35);}
+.mk-core.basili.kul .mk-cekirdek{border-style:dashed;border-color:rgba(200,180,220,0.5);box-shadow:none;}
 #game-footer{width:100%;max-width:var(--shell-w,780px);display:flex;align-items:center;gap:6px;
   padding:4px 8px;background:rgba(10,0,20,0.9);border-radius:0 0 8px 8px;flex-wrap:nowrap;}
 
@@ -936,6 +1004,32 @@ font-family:sans-serif;
     <div id="pu-display"></div>
 
   </div>
+
+  <!-- [MOBIL-KONTROL] Inferno Aim Core. Yalnizca dokunmatik + core modunda gorunur. -->
+  <button type="button" id="mk-mod" data-mk="mod"></button>
+  <div id="mk-sol" class="mk-panel">
+    <div id="mk-aci" class="mk-aci">0.0&deg;</div>
+    <div class="mk-dial-sira">
+      <button type="button" class="mk-itme" id="mk-itme-eksi" aria-label="-0.5">&#8634;</button>
+      <div id="mk-dial" class="mk-dial"><div class="mk-dial-cizgi" id="mk-dial-cizgi"></div><div class="mk-dial-igne"></div></div>
+      <button type="button" class="mk-itme" id="mk-itme-arti" aria-label="+0.5">&#8635;</button>
+    </div>
+    <div id="mk-ipucu" class="mk-ipucu"></div>
+  </div>
+  <div id="mk-sag" class="mk-panel">
+    <div id="mk-core" class="mk-core">
+      <svg class="mk-halka" viewBox="0 0 120 120" aria-hidden="true">
+        <defs><linearGradient id="mk-kor" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stop-color="#6d28ff"/><stop offset="0.55" stop-color="#ff6a00"/><stop offset="1" stop-color="#fff1c9"/>
+        </linearGradient></defs>
+        <path class="mk-iz" d="M16.7 85 A50 50 0 1 1 103.3 85"/>
+        <path class="mk-dolgu" id="mk-dolgu" d="M16.7 85 A50 50 0 1 1 103.3 85"/>
+      </svg>
+      <div class="mk-cekirdek"><span id="mk-yuzde">0</span></div>
+    </div>
+  </div>
+  <div id="mk-cep-sol" class="mk-cep-serit" aria-hidden="true"></div>
+  <div id="mk-cep-sag" class="mk-cep-serit" aria-hidden="true"></div>
 
 </div>
 
@@ -2258,7 +2352,13 @@ function handleRelay(msg) {
       sfxCue(); clearInterval(G.timerInt);
     }
   } else if(msg.sub==='place_cue'){
-    if(G.cue){ G.cue.x=msg.x; G.cue.y=msg.y; G.cue.sunk=false; }
+    // [BALL-IN-HAND] Ayni merkezi dogrulama: gecerli koordinat aynen, gecersizse en yakin gecerli nokta.
+    if(G.cue){
+      const mx=+msg.x, my=+msg.y;
+      const yer=cueYerGecerliMi(mx,my) ? {x:mx,y:my} : cueYerCoz(mx,my,{x:G.cue.x,y:G.cue.y});
+      if(yer){ G.cue.x=yer.x; G.cue.y=yer.y; }
+      G.cue.sunk=false;
+    }
     G.inHand=false;
   } else if(msg.sub==='rematch_yes'){
     startOnlineGame(msg.ballSeed,'Player 1','Player 2');
@@ -3291,7 +3391,7 @@ function computeViewSize(){
   // ve emniyet payi 20 -> 6 dusurulur. MASAUSTU/TABLET DALI DEGISMEDI.
   const kisaYatay = vh <= 560;
   const gutter = kisaYatay ? 16 : (vw >= 900 ? VIEW_GUTTER : 16);
-  const availW = Math.max(200, vw - gutter);
+  const availW = Math.max(200, Math.min(vw - gutter, _mkGenislikSiniri(vw, vh)));
   const availH = Math.max(140, vh - hdrH - ftrH - (kisaYatay ? 6 : 20));
 
   // Hedef kompozisyon: masaustunde viewport genisliginin ~%72'si
@@ -3360,6 +3460,7 @@ function layoutTable(){
   const sz = computeViewSize();
   applyViewCss(sz);
   applyViewBacking(sz);
+  try{ if(typeof mkYerlestir === 'function') mkYerlestir(); }catch(e){}
 }
 
 layoutTable();
@@ -3947,6 +4048,10 @@ en: {
   'cg.join.room_self':'This is your own room.',
   'cg.join.already_in_room':'You are already in a match.',
   'cg.join.generic':'Could not join the room.',
+  'mk.core':'AIM CORE',
+  'mk.klasik':'CLASSIC',
+  'mk.ipucu':'Turn on the table · fine-tune the dial · pull the core and release',
+  'mk.yerlestir':'Lift your finger to place the cue ball',
   'event.opponentFrozen':'OPPONENT FROZEN!',
   // botShot() icinde — Asama 1'de BAGLANMAZ
   'event.botFrozen':'BOT FROZEN!',
@@ -4381,6 +4486,10 @@ tr: {
   'cg.join.room_self':'Bu senin kendi odan.',
   'cg.join.already_in_room':'Zaten bir maçtasın.',
   'cg.join.generic':'Odaya katılınamadı.',
+  'mk.core':'AIM CORE',
+  'mk.klasik':'KLASİK',
+  'mk.ipucu':'Masada çevir · şeritle ince ayar · çekirdeği çek, bırak',
+  'mk.yerlestir':'Beyaz topu yerleştirmek için parmağını kaldır',
   'event.opponentFrozen':'RAKİP DONDU!',
   'event.botFrozen':'BOT DONDU!',
   'event.levelUp':'SEVİYE ATLADIN!',
@@ -4805,6 +4914,10 @@ ru: {
   'cg.join.room_self':'Это ваша собственная комната.',
   'cg.join.already_in_room':'Вы уже в матче.',
   'cg.join.generic':'Не удалось войти в комнату.',
+  'mk.core':'AIM CORE',
+  'mk.klasik':'КЛАССИКА',
+  'mk.ipucu':'Вращайте на столе · точная настройка · потяните ядро и отпустите',
+  'mk.yerlestir':'Отпустите палец, чтобы поставить биток',
   'event.opponentFrozen':'СОПЕРНИК ЗАМОРОЖЕН!',
   'event.botFrozen':'БОТ ЗАМОРОЖЕН!',
   'event.levelUp':'НОВЫЙ УРОВЕНЬ!',
@@ -5820,7 +5933,8 @@ const SIFIRLA_ANAHTARLAR = [
   'inferno_chat_mute',    // susturma listesi
   'inferno_ads',          // gunluk odullu reklam sayaci
   'inferno_bulut',        // [BULUT] bu cihazin bagli oldugu hesap ozeti + son senkron tabani
-  'inferno_p_yedek'       // [BULUT] hesap degisiminde alinan yerel profil yedegi
+  'inferno_p_yedek',      // [BULUT] hesap degisiminde alinan yerel profil yedegi
+  'inferno_mobil_kontrol' // [MOBIL-KONTROL] Klasik / Aim Core tercihi
 ];
 let _sifirlaOnaylandi = false;
 
@@ -7749,13 +7863,103 @@ function canPlaceCue(){
   return true;                                 // yerel PvP: tek fare, tek cihaz
 }
 
+// ═══════════════════════════════════════════════════════════
+//  [BALL-IN-HAND] Beyaz top yerlesim dogrulamasi — TEK MERKEZ
+//  Yetki/sira kurali canPlaceCue()'da kalir; burada yalnizca KONUM cozulur.
+//  Kurallar: mevcut masa sinirlari (PAD+R .. CW-PAD-R / CH-PAD-R) aynen korunur;
+//  beyaz top masadaki (cebe girmemis) hicbir topa merkezden 2R + epsilon'dan
+//  yakin olamaz. Dokunulan/tiklanan nokta gecersizse en yakin gecerli noktaya
+//  itilir; cozulemezse null doner ve yerlestirme reddedilir.
+//  Masaustu fare, mobil hayalet top, yerlestirme ve online place_cue ayni
+//  fonksiyonlari kullanir. Fizik/carpisma sistemine dokunmaz.
+// ═══════════════════════════════════════════════════════════
+const CUE_YER_HEDEF_EPS = 0.5;    // dunya px: cozucunun biraktigi bosluk (0.1 yuvarlamadan sonra da > 2R kalir)
+const CUE_YER_KABUL_EPS = 0.25;   // dunya px: gecerlilik esigi (2R + bu deger)
+const CUE_YER_ARAMA     = 8;      // R cinsinden: en yakin gecerli nokta arama yaricapi
+function cueYerYuvarla(v){ return Math.round(v * 10) / 10; }
+function cueYerSinirla(x, y){
+  return { x: clamp(x, PAD + R, CW - PAD - R), y: clamp(y, PAD + R, CH - PAD - R) };
+}
+function cueYerEngeller(){
+  const l = [];
+  const b = (G && G.balls) ? G.balls : [];
+  for(let i = 0; i < b.length; i++){ const t = b[i]; if(t && !t.sunk && t !== G.cue) l.push(t); }
+  return l;
+}
+function cueYerGecerliMi(x, y, engel){
+  if(!isFinite(x) || !isFinite(y)) return false;
+  const e = 1e-6;
+  if(x < PAD + R - e || x > CW - PAD - R + e || y < PAD + R - e || y > CH - PAD - R + e) return false;
+  const l = engel || cueYerEngeller(), min = 2 * R + CUE_YER_KABUL_EPS;
+  for(let i = 0; i < l.length; i++){
+    if(Math.hypot(x - l[i].x, y - l[i].y) < min) return false;
+  }
+  return true;
+}
+// (x,y): istenen nokta. onceki: (istege bagli) son gecerli konum; top tam merkeze konursa itme yonu buradan secilir.
+function cueYerCoz(x, y, onceki){
+  if(!isFinite(x) || !isFinite(y)) return null;
+  const engel = cueYerEngeller(), hedef = 2 * R + CUE_YER_HEDEF_EPS;
+  const p0 = cueYerSinirla(x, y);
+  const dene = function(px, py){
+    const q = cueYerSinirla(px, py), rx = cueYerYuvarla(q.x), ry = cueYerYuvarla(q.y);
+    return cueYerGecerliMi(rx, ry, engel) ? { x: rx, y: ry } : null;
+  };
+  let s = dene(p0.x, p0.y);
+  if(s) return s;
+  // 1) Iteratif itme: cakisan her topun disina, merkezden disari dogru it (tek/az top icin en dogal sonuc).
+  let q = { x: p0.x, y: p0.y };
+  for(let it = 0; it < 16; it++){
+    let itildi = false;
+    for(let i = 0; i < engel.length; i++){
+      const b = engel[i];
+      let dx = q.x - b.x, dy = q.y - b.y, d = Math.hypot(dx, dy);
+      if(d >= hedef - 1e-9) continue;
+      if(d < 1e-6){
+        // Tam merkez: onceki gecerli konum yonune, yoksa masa merkezine dogru it.
+        const ox = onceki && isFinite(onceki.x) ? onceki.x : CW / 2, oy = onceki && isFinite(onceki.y) ? onceki.y : CH / 2;
+        dx = ox - b.x; dy = oy - b.y; d = Math.hypot(dx, dy);
+        if(d < 1e-6){ dx = -1; dy = 0; d = 1; }
+      }
+      q.x = b.x + dx / d * hedef; q.y = b.y + dy / d * hedef;
+      q = cueYerSinirla(q.x, q.y);
+      itildi = true;
+    }
+    if(!itildi) break;
+  }
+  s = dene(q.x, q.y);
+  if(s) return s;
+  // 2) Sikisik alan / kenar: istenen noktaya en yakin gecerli adayi ara.
+  //    Adaylar: yakin toplarin temas cemberleri + istenen nokta etrafinda halkalar.
+  const aday = [], maks = CUE_YER_ARAMA * R;
+  for(let i = 0; i < engel.length; i++){
+    const b = engel[i];
+    if(Math.hypot(b.x - p0.x, b.y - p0.y) > maks + hedef) continue;
+    for(let k = 0; k < 72; k++){ const a = k * Math.PI / 36; aday.push(b.x + Math.cos(a) * hedef, b.y + Math.sin(a) * hedef); }
+  }
+  for(let rr = R / 2; rr <= maks + 1e-9; rr += R / 2){
+    const n = Math.max(12, Math.round(2 * Math.PI * rr / (R / 2)));
+    for(let k = 0; k < n; k++){ const a = k * 2 * Math.PI / n; aday.push(p0.x + Math.cos(a) * rr, p0.y + Math.sin(a) * rr); }
+  }
+  let en = null, enD = Infinity;
+  for(let i = 0; i < aday.length; i += 2){
+    const c = dene(aday[i], aday[i + 1]);
+    if(!c) continue;
+    const d = Math.hypot(c.x - p0.x, c.y - p0.y);
+    if(d <= maks && d < enD - 1e-9){ en = c; enD = d; }
+  }
+  return en;
+}
+
 function onDown(pos){
   if(G.phase!=='playing')return;
   if(G.moving)return; // Her modda moving'de engelle
   // Ball-in-hand: your turn only
   if(canPlaceCue()){
-    const cx=Math.round(clamp(pos.x,PAD+R,CW-PAD-R)*10)/10;
-    const cy=Math.round(clamp(pos.y,PAD+R,CH-PAD-R)*10)/10;
+    // [BALL-IN-HAND] Yalnizca dogrulanmis konum yerlesir; cozulemezse top elde kalir.
+    const yer=cueYerCoz(pos.x,pos.y,{x:G.cue.x,y:G.cue.y});
+    if(!yer) return;
+    const cx=yer.x, cy=yer.y;
     G.cue.x=cx; G.cue.y=cy;
     G.inHand=false;
     if(G.onlineMode) wsSend({type:'relay',sub:'place_cue',x:cx,y:cy});
@@ -7777,8 +7981,9 @@ function onMove(pos){
 
   // Yalnizca gercekten yerlestirme hakki olan oyuncunun faresi topu tasir.
   if(canPlaceCue()){
-    G.cue.x=clamp(pos.x,PAD+R,CW-PAD-R);
-    G.cue.y=clamp(pos.y,PAD+R,CH-PAD-R);
+    // [BALL-IN-HAND] Onizleme de ayni cozucuden gecer: hayalet top hicbir topun icine girmez.
+    const yer=cueYerCoz(pos.x,pos.y,{x:G.cue.x,y:G.cue.y});
+    if(yer){ G.cue.x=yer.x; G.cue.y=yer.y; }
     return;
   }
   // Hak yokken ball-in-hand fazindaysak fare atis/aci girdisi de uretmesin.
@@ -7848,11 +8053,480 @@ window.addEventListener('mousemove',e=>{
 window.addEventListener('mouseup',e=>{if(e.button===0)onUp();});
 // Odak kaybinda (alt-tab, baska pencere) mouseup hic gelmeyebilir.
 window.addEventListener('blur',()=>{ if(drag.active){ drag.active=false; drag.power=0; } });
-poolC.addEventListener('touchstart',e=>{e.preventDefault();onDown(canvasPos(e));},{passive:false});
-poolC.addEventListener('touchmove',e=>{e.preventDefault();onMove(canvasPos(e));},{passive:false});
-poolC.addEventListener('touchend',e=>{e.preventDefault();onUp();},{passive:false});
+// [MOBIL-KONTROL] Dokunma yonlendirici. 'core' modunda masa dokunuslari
+// Inferno Aim Core'a gider (orbit nisan / hayalet yerlestirme; ATIS YOK).
+// 'klasik' modda ve dokunmatik olmayan cihazda davranis ONCEKIYLE BIREBIR AYNI.
+poolC.addEventListener('touchstart',e=>{e.preventDefault(); if(mkAktif()){ mkMasaBasla(e); return; } onDown(canvasPos(e));},{passive:false});
+poolC.addEventListener('touchmove',e=>{e.preventDefault(); if(mkAktif()){ mkMasaHareket(e); return; } onMove(canvasPos(e));},{passive:false});
+poolC.addEventListener('touchend',e=>{e.preventDefault(); if(mkAktif()){ mkMasaBitir(e, false); return; } onUp();},{passive:false});
 // Dokunma kesilirse (sistem jesti, cagri vb.) surukleme askida kalmasin.
-poolC.addEventListener('touchcancel',e=>{ drag.active=false; drag.power=0; },{passive:true});
+poolC.addEventListener('touchcancel',e=>{ if(mkAktif()){ mkMasaBitir(e, true); return; } drag.active=false; drag.power=0; },{passive:true});
+
+// ═══════════════════════════════════════════════════════════════════
+//  [MOBIL-KONTROL] INFERNO AIM CORE
+// -------------------------------------------------------------------
+//  Nisan ve guc AYRI:
+//    * Orbit Grip : masanin HERHANGI bir yerinde beyaz topun etrafinda
+//                   parmak dondurulur; nisan GORELI doner (ziplamaz).
+//    * Ember Dial : serit ile ince ayar (~0.05 derece/px) + 0.25 derece adimlar.
+//    * Inferno Core: cekirdekten disari cek -> guc; birak -> atis.
+//                   Kul bolgesine (<%6) geri getirip birakmak = IPTAL.
+//  Guvenlik: masa dokunusu ASLA atis yapmaz; kisa dokunus / <%6 / <120 ms
+//  atis yapmaz; guc basiliyken nisan KILITLI; sure dolumu, sira degisimi,
+//  ekran degisimi ve sekme gizlenmesi aktif girdiyi iptal eder.
+//  Fizik / drawCue / online atis bicimi DEGISMEZ: gecerli birakmada mevcut
+//  onUp() cagrilir (drag.angle = teta - PI, drag.power = guc).
+// ═══════════════════════════════════════════════════════════════════
+const MK_ANAHTAR     = 'inferno_mobil_kontrol';
+const MK_OLU_BOLGE   = 45;                     // dunya px: bu yaricap icinde orbit acisi olculmez
+const MK_DIAL_RAD_PX = 0.05 * Math.PI / 180;   // 0.05 derece / css px
+const MK_ITME_RAD    = 0.5 * Math.PI / 180;    // tek dokunus adimi
+const MK_ITME_GECIKME = 250;                   // ms: bu sureden uzun basili tutma surekli donusu baslatir
+const MK_ITME_HIZ0   = 10;                     // derece/sn: surekli donus baslangic hizi
+const MK_ITME_HIZ1   = 48;                     // derece/sn: en yuksek hiz
+const MK_ITME_HIZLAN = 1200;                   // ms: HIZ0 -> HIZ1 gecis suresi
+const MK_ITME_KARE   = 34;                     // ms: tek karede islenecek en uzun sure (atlama olmaz)
+const MK_MIN_GUC     = 6;                      // %
+const MK_MIN_SURE    = 120;                    // ms
+const MK_YER_OFSET   = 40;                     // css px: hayalet top parmagin ustunde
+const MK_YAN_SUTUN   = 50;                     // yatayda kontrol sutunu (css px): 44 px dokunma alani + pay
+const MK_YAN_ARA     = 8;                      // yatayda kontrol ile masa kenari arasindaki gorsel bosluk (css px)
+const MK_YAN_OLUK    = 2 + MK_YAN_SUTUN + MK_YAN_ARA; // yatayda gereken yan bosluk: kenar + sutun + ara (dusen toplar bantta)
+const MK = { cihaz:false, mod:'core', teta:0, orbit:null, dial:null, guc:null, yer:null, itme:null, kilit:false };
+
+function mkNorm(a){ while(a > Math.PI) a -= 2*Math.PI; while(a < -Math.PI) a += 2*Math.PI; return a; }
+function mkAktif(){ return MK.cihaz && MK.mod === 'core'; }
+function mkAtisIzinli(){
+  if(G.phase !== 'playing' || G.moving) return false;
+  if(!G.cue || G.cue.sunk || G.inHand) return false;
+  if(!G.onlineMode && G.mode === 'bot' && G.turn === 1) return false;
+  if(G.onlineMode && G.turn !== G.mySlot) return false;
+  return true;
+}
+// Kisa yatayda masa genisligine ust sinir: yalnizca yan bosluk MK_YAN_OLUK'tan
+// kucuk kalacaksa devreye girer (sabit daraltma yok; yeterli bosluk varsa masa degismez).
+function _mkGenislikSiniri(vw, vh){
+  try{
+    if(!mkAktif()) return Infinity;
+    if(!(vw > vh && vh <= 560)) return Infinity;           // yalnizca kisa yatay
+    return vw - 2 * MK_YAN_OLUK;
+  }catch(e){ return Infinity; }
+}
+function mkDunya(t){
+  const r = poolC.getBoundingClientRect();
+  return { x:(t.clientX - r.left) * (CW / r.width), y:(t.clientY - r.top) * (CH / r.height), olcek: CH / r.height };
+}
+function mkDokunus(e, id){
+  const l = e.changedTouches || [];
+  for(let i = 0; i < l.length; i++) if(l[i].identifier === id) return l[i];
+  return null;
+}
+// Nisani drawCue'nun OKUDUGU alanlara yazar (drawCue degismez):
+// bekleme dali aciyi mouseX/Y'den, guc dali drag.angle'dan alir.
+function mkAciYaz(){
+  if(!mkAktif() || !G.cue) return;
+  const ang = MK.teta - Math.PI;
+  if(!MK.guc){ drag.angle = ang; }
+  drag.mouseX = G.cue.x - Math.cos(ang) * 60;
+  drag.mouseY = G.cue.y - Math.sin(ang) * 60;
+  const e = document.getElementById('mk-aci');
+  if(e){ let d = MK.teta * 180 / Math.PI; if(d < 0) d += 360; e.textContent = d.toFixed(1) + '\u00B0'; }
+}
+function mkHalka(p){
+  const d = document.getElementById('mk-dolgu');
+  if(d) d.style.strokeDashoffset = (209.44 * (1 - Math.max(0, Math.min(100, p)) / 100)).toFixed(2);
+  const y = document.getElementById('mk-yuzde');
+  if(y) y.textContent = Math.round(p);
+}
+function mkIpucu(anahtar){
+  const e = document.getElementById('mk-ipucu');
+  if(e) e.textContent = t(anahtar);
+}
+function mkIptal(neden){
+  if(MK.guc){
+    MK.guc = null;
+    drag.active = false; drag.power = 0;
+    const c = document.getElementById('mk-core'); if(c) c.classList.remove('basili', 'kul');
+    mkHalka(0);
+  }
+  MK.kilit = false; MK.orbit = null; MK.dial = null;
+  if(MK.itme){ clearTimeout(MK.itme.z); cancelAnimationFrame(MK.itme.r); const b = document.getElementById(MK.itme.el); if(b) b.classList.remove('basili'); MK.itme = null; }
+  const dl = document.getElementById('mk-dial'); if(dl) dl.classList.remove('basili');
+  if(MK.yer){ MK.yer = null; mkIpucu('mk.ipucu'); }
+}
+
+// ── Masa: orbit nisan + hayalet yerlestirme ─────────────────────────
+function mkMasaBasla(e){
+  const tt = e.changedTouches && e.changedTouches[0];
+  if(!tt || !G.cue) return;
+  if(canPlaceCue()){
+    if(MK.yer) return;
+    MK.yer = { id: tt.identifier };
+    mkIpucu('mk.yerlestir');
+    mkYerOnizle(tt);
+    return;
+  }
+  if(!mkAtisIzinli() || MK.kilit || MK.orbit) return;
+  MK.orbit = { id: tt.identifier, onceki: mkOrbitAci(mkDunya(tt)) };
+}
+function mkOrbitAci(p){
+  const dx = p.x - G.cue.x, dy = p.y - G.cue.y;
+  return Math.hypot(dx, dy) < MK_OLU_BOLGE ? null : Math.atan2(dy, dx);
+}
+function mkYerOnizle(tt){
+  if(!canPlaceCue()) return;
+  const p = mkDunya(tt);
+  const yer = cueYerCoz(p.x, p.y - MK_YER_OFSET * p.olcek, { x: G.cue.x, y: G.cue.y });   // parmagin USTUNDE, dogrulanmis
+  if(yer){ G.cue.x = yer.x; G.cue.y = yer.y; }
+  if(MK.yer) MK.yer.gecerli = !!yer;                  // parmagin su anki konumu cozulemiyorsa birakma reddedilir
+}
+function mkMasaHareket(e){
+  if(MK.yer){ const tt = mkDokunus(e, MK.yer.id); if(tt) mkYerOnizle(tt); return; }
+  if(!MK.orbit || MK.kilit || !mkAtisIzinli()) return;
+  const tt = mkDokunus(e, MK.orbit.id); if(!tt) return;
+  const a = mkOrbitAci(mkDunya(tt));
+  if(a === null){ MK.orbit.onceki = null; return; }
+  if(MK.orbit.onceki !== null){ MK.teta = mkNorm(MK.teta + mkNorm(a - MK.orbit.onceki)); mkAciYaz(); }
+  MK.orbit.onceki = a;
+}
+function mkMasaBitir(e, iptal){
+  if(MK.yer && mkDokunus(e, MK.yer.id)){
+    const gecerli = MK.yer.gecerli === true;
+    MK.yer = null;
+    mkIpucu('mk.ipucu');
+    // Parmak KALDIRILINCA yerlesir: mevcut onDown() yetki kontrolu, yuvarlama
+    // ve online place_cue gonderimini aynen yapar.
+    if(!iptal && gecerli && canPlaceCue()) onDown({ x: G.cue.x, y: G.cue.y });
+    return;
+  }
+  if(MK.orbit && mkDokunus(e, MK.orbit.id)) MK.orbit = null;   // masa dokunusu ASLA atis yapmaz
+}
+
+// ── Ember Dial + itme dugmeleri ────────────────────────────────────
+function mkDialEksen(tt){
+  const s = document.getElementById('mk-sol');
+  return (s && s.getAttribute('data-yer') === 'yan') ? tt.clientY : tt.clientX;
+}
+function mkDialBaglan(){
+  const d = document.getElementById('mk-dial'), c = document.getElementById('mk-dial-cizgi');
+  let kayma = 0;
+  d.addEventListener('touchstart', function(e){
+    e.preventDefault();
+    const tt = e.changedTouches[0];
+    if(!tt || MK.dial || MK.kilit || !mkAtisIzinli()) return;
+    MK.dial = { id: tt.identifier, son: mkDialEksen(tt), zaman: performance.now() };
+    d.classList.add('basili');
+  }, { passive:false });
+  d.addEventListener('touchmove', function(e){
+    e.preventDefault();
+    if(!MK.dial || MK.kilit || !mkAtisIzinli()) return;
+    const tt = mkDokunus(e, MK.dial.id); if(!tt) return;
+    const s = mkDialEksen(tt), simdi = performance.now();
+    const fark = s - MK.dial.son, dt = Math.max(1, simdi - MK.dial.zaman);
+    const hiz = Math.abs(fark) / dt;                                   // px / ms
+    const carpan = 1 + Math.min(4, Math.max(0, (hiz - 0.25) * 3));     // yavas = hassas, hizli = hizlanir
+    MK.teta = mkNorm(MK.teta + fark * MK_DIAL_RAD_PX * carpan);
+    MK.dial.son = s; MK.dial.zaman = simdi;
+    kayma += fark;
+    const yan = document.getElementById('mk-sol').getAttribute('data-yer') === 'yan';
+    if(c) c.style.backgroundPosition = yan ? ('0 ' + kayma + 'px') : (kayma + 'px 0');
+    mkAciYaz();
+  }, { passive:false });
+  const bitir = function(e){
+    if(MK.dial && mkDokunus(e, MK.dial.id)){ MK.dial = null; d.classList.remove('basili'); }
+  };
+  d.addEventListener('touchend', bitir, { passive:true });
+  d.addEventListener('touchcancel', bitir, { passive:true });
+
+  [['mk-itme-eksi', -1], ['mk-itme-arti', 1]].forEach(function(cift){
+    const b = document.getElementById(cift[0]);
+    // Surekli donus: zamana bagli hiz (kare hizindan bagimsiz), kare basina sure MK_ITME_KARE ile sinirli.
+    const kare = function(simdi){
+      const it = MK.itme;
+      if(!it || it.el !== cift[0]) return;
+      if(MK.kilit || !mkAtisIzinli()){ clearTimeout(it.z); MK.itme = null; b.classList.remove('basili'); return; }   // yalniz donusu durdur; guc girdisine dokunma
+      const dt = Math.min(MK_ITME_KARE, Math.max(0, simdi - it.son)); it.son = simdi;
+      const oran = Math.min(1, Math.max(0, (simdi - it.basla - MK_ITME_GECIKME) / MK_ITME_HIZLAN));
+      const hiz = MK_ITME_HIZ0 + (MK_ITME_HIZ1 - MK_ITME_HIZ0) * oran;             // derece/sn
+      MK.teta = mkNorm(MK.teta + cift[1] * hiz * dt / 1000 * Math.PI / 180);
+      mkAciYaz();
+      it.r = requestAnimationFrame(kare);
+    };
+    b.addEventListener('touchstart', function(e){
+      e.preventDefault();
+      if(MK.itme || MK.kilit || !mkAtisIzinli()) return;
+      MK.teta = mkNorm(MK.teta + cift[1] * MK_ITME_RAD); mkAciYaz();          // tek dokunus adimi
+      b.classList.add('basili');
+      const basla = performance.now();
+      MK.itme = { el: cift[0], id: e.changedTouches[0].identifier, r: 0, basla: basla, son: 0,
+                  z: setTimeout(function(){ if(MK.itme && MK.itme.el === cift[0]){ MK.itme.son = performance.now(); MK.itme.r = requestAnimationFrame(kare); } }, MK_ITME_GECIKME) };
+    }, { passive:false });
+    const dur = function(e){
+      if(!MK.itme || MK.itme.el !== cift[0] || !mkDokunus(e, MK.itme.id)) return;
+      clearTimeout(MK.itme.z); cancelAnimationFrame(MK.itme.r); MK.itme = null; b.classList.remove('basili');
+    };
+    b.addEventListener('touchend', dur, { passive:true });
+    b.addEventListener('touchcancel', dur, { passive:true });
+  });
+}
+
+// ── Inferno Core: guc ──────────────────────────────────────────────
+function mkCoreBaglan(){
+  const k = document.getElementById('mk-core');
+  k.addEventListener('touchstart', function(e){
+    e.preventDefault();
+    const tt = e.changedTouches[0];
+    if(!tt || MK.guc || !mkAtisIzinli()) return;
+    const r = k.getBoundingClientRect();
+    MK.guc = { id: tt.identifier, cx: r.left + r.width / 2, cy: r.top + r.height / 2,
+               ic: r.width * 0.22, menzil: Math.max(90, r.width * 0.95),
+               bas: performance.now(), tur: G.turn, p: 0 };
+    MK.kilit = true; MK.orbit = null; MK.dial = null;                  // guc basiliyken nisan KILITLI
+    k.classList.add('basili', 'kul');
+    mkHalka(0);
+  }, { passive:false });
+  k.addEventListener('touchmove', function(e){
+    e.preventDefault();
+    if(!MK.guc) return;
+    const tt = mkDokunus(e, MK.guc.id); if(!tt) return;
+    const m = Math.hypot(tt.clientX - MK.guc.cx, tt.clientY - MK.guc.cy);
+    const p = Math.max(0, Math.min(100, (m - MK.guc.ic) / MK.guc.menzil * 100));
+    MK.guc.p = p;
+    k.classList.toggle('kul', p < MK_MIN_GUC);
+    if(p >= MK_MIN_GUC && mkAtisIzinli()){
+      drag.angle = MK.teta - Math.PI; drag.power = p; drag.active = true;   // drawCue geri cekmeyi gosterir
+    } else { drag.active = false; drag.power = 0; }
+    mkHalka(p);
+  }, { passive:false });
+  const bitir = function(e, iptal){
+    if(!MK.guc || !mkDokunus(e, MK.guc.id)) return;
+    const g = MK.guc;
+    MK.guc = null; MK.kilit = false;
+    k.classList.remove('basili', 'kul');
+    mkHalka(0);
+    const gecerli = !iptal && g.p >= MK_MIN_GUC && (performance.now() - g.bas) >= MK_MIN_SURE &&
+                    mkAtisIzinli() && G.turn === g.tur;
+    if(gecerli){
+      drag.angle = MK.teta - Math.PI; drag.power = g.p; drag.active = true;
+      onUp();                                                           // MEVCUT atis yolu (online dahil)
+    } else {
+      drag.active = false; drag.power = 0;
+    }
+  };
+  k.addEventListener('touchend', function(e){ bitir(e, false); }, { passive:true });
+  k.addEventListener('touchcancel', function(e){ bitir(e, true); }, { passive:true });
+}
+
+// ── Mod secimi + yerlesim ──────────────────────────────────────────
+function mkModYaz(){
+  document.documentElement.classList.toggle('mk-cihaz', MK.cihaz);
+  document.documentElement.classList.toggle('mk-core', mkAktif());
+  const b = document.getElementById('mk-mod');
+  if(b) b.textContent = t(MK.mod === 'core' ? 'mk.core' : 'mk.klasik');
+}
+function mkYerlestir(){
+  mkModYaz();
+  document.documentElement.classList.remove('mk-cep');
+  if(!MK.cihaz) return;
+  const sol = document.getElementById('mk-sol'), sag = document.getElementById('mk-sag'), mod = document.getElementById('mk-mod');
+  const r = poolC.getBoundingClientRect();
+  if(!r.width || !sol || !sag || !mod) return;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const ftr = document.getElementById('game-footer');
+  const fb = ftr ? ftr.getBoundingClientRect().bottom : r.bottom;
+  const yatay = vw > vh && vh <= 560;
+  const px = function(n){ return Math.round(n) + 'px'; };
+  if(!yatay){
+    const ust = fb + 6, h = Math.max(96, Math.min(136, vh - ust - 10));
+    const w = Math.min(vw - 16, 460), sol0 = (vw - w) / 2, solW = w * 0.6;
+    Object.assign(sol.style, { left:px(sol0), top:px(ust + 24), width:px(solW - 5), height:px(h - 24), right:'' });
+    Object.assign(sag.style, { left:px(sol0 + solW + 5), top:px(ust), width:px(w - solW - 5), height:px(h), right:'' });
+    Object.assign(mod.style, { left:px(sol0), top:px(ust - 2), width:'', right:'', bottom:'' });
+    sol.setAttribute('data-yer', 'alt'); sag.setAttribute('data-yer', 'alt'); mod.setAttribute('data-yer', 'alt');
+  } else {
+    const oluk = Math.min(r.left, vw - r.right);
+    // Sutunlar masaya yaslanir: masa kenari ile kontrol arasinda yalnizca MK_YAN_ARA kalir.
+    const solW = MK_YAN_SUTUN;                                          // 44 px dugmeler + pay
+    let sagW = Math.max(MK_YAN_SUTUN, Math.min(96, oluk - 2 - 2));      // guc halkasi genis ekranda buyur
+    if(oluk - 6 - MK_YAN_SUTUN >= MK_CEP_DIS) sagW = Math.max(MK_YAN_SUTUN, Math.min(sagW, oluk - 6 - MK_CEP_DIS)); // dis tarafta top seridine yer
+    const halkaIc = sagW * 5.5 / 120;                                   // halka yayinin kutu icindeki boslugu (svg: yaricap 50 -> x=10, eksi stroke/2)
+    const sagAra = Math.max(2, MK_YAN_ARA - halkaIc);
+    sagW = Math.max(MK_YAN_SUTUN, Math.min(sagW, vw - r.right - sagAra - 2)); // ekran kenarini asma
+    const solDis = r.left - MK_YAN_ARA - solW - 2;                      // sol sutunun disinda kalan genislik
+    const solH = r.height - 24, cepRez = solDis >= MK_CEP_DIS ? 0 : Math.max(0, Math.min(104, solH - 160)); // dar ekranda seride alt alan
+    Object.assign(sol.style, { left:px(r.left - MK_YAN_ARA - solW), top:px(r.top + 24), width:px(solW), height:px(solH - cepRez), right:'' });
+    Object.assign(sag.style, { left:px(r.right + sagAra), top:px(r.top), width:px(sagW), height:px(r.height), right:'' });
+    const cipW = Math.min(80, Math.max(solW, oluk - MK_YAN_ARA - 2));
+    Object.assign(mod.style, { left:px(r.left - MK_YAN_ARA - cipW), top:px(r.top), width:px(cipW), right:'', bottom:'' });
+    sol.setAttribute('data-yer', 'yan'); sag.setAttribute('data-yer', 'yan'); mod.setAttribute('data-yer', 'yan');
+  }
+  mkCepYerlestir(yatay, r);
+  mkAciYaz();
+}
+// ── Cebe giren top seritleri (yalnizca mobil core) ─────────────────
+// Veri SADECE okunur: G.sunkBalls[0] sol oyuncu, G.sunkBalls[1] sag oyuncu. updateSunkPanels() her
+// cagrildiginda (#sunk-left/#sunk-right degisir) seritler yeniden cizilir. Top gorseli, oyundaki 3D
+// top modelinden (Ball3D / GLB) bir kez alinan kucuk goruntudur; 3D hazir degilse mevcut 2D top kopyalanir.
+// Yerlesim: yan bosluk yeterliyse serit kontrol sutununun DIS tarafinda (masa ile ekran kenari arasinda),
+// ust yon dugmesinin altindan masa altina kadar; yetmiyorsa alt yon dugmesinin / guc halkasinin ALTINDA.
+const MK_CEP_DIS = 34;                         // css px: dis serit icin gereken genislik (30 serit + 4 ara)
+const MK_CEP = { gozcu:null, alan:null, sprite:null, spriteDenendi:false, deneme:0 };
+function mkCepSpriteUret(){
+  if(MK_CEP.sprite || MK_CEP.spriteDenendi) return !!MK_CEP.sprite;
+  const B = window.Ball3D;
+  if(!B || !B.ready || !B.active || !B.renderer || typeof G === 'undefined') return false;
+  MK_CEP.spriteDenendi = true;
+  const rd = B.renderer, cv = rd.canvas || document.getElementById('ball3d-canvas');
+  if(!cv || !cv.width || !rd.width) return false;
+  const sonuc = {};
+  try{
+    const sx = cv.width / rd.width, sy = cv.height / rd.height, m = R + 2, merk = 20;
+    const S = Math.max(24, Math.min(96, Math.round(2 * m * sx)));
+    const k = document.createElement('canvas'); k.width = S; k.height = S;
+    const c = k.getContext('2d');
+    for(let id = 1; id <= 15; id++){
+      for(let i = 0; i <= 15; i++) rd.setBall(i, 0, 0, null, false);
+      rd.setBall(id, merk, merk, null, true);
+      rd.render(true);
+      c.clearRect(0, 0, S, S);
+      c.drawImage(cv, (merk - m) * sx, (merk - m) * sy, 2 * m * sx, 2 * m * sy, 0, 0, S, S);
+      const orta = c.getImageData(S >> 1, S >> 1, 1, 1).data;
+      if(orta[3] < 10) throw new Error('bos goruntu');           // tarayici WebGL tamponunu vermediyse 2D'ye dus
+      sonuc[id] = k.toDataURL('image/png');
+    }
+    MK_CEP.sprite = sonuc;
+  }catch(e){ MK_CEP.sprite = null; }
+  finally{
+    try{ if(rd._last) rd._last.clear(); B.sync(G); rd.render(true); }catch(e){}   // masadaki 3D toplari eski haline getir
+  }
+  return !!MK_CEP.sprite;
+}
+function mkCepCiz(){
+  if(!mkAktif()) return;
+  const kaynak = [document.getElementById('sunk-left'), document.getElementById('sunk-right')];
+  const hedef = [document.getElementById('mk-cep-sol'), document.getElementById('mk-cep-sag')];
+  const veri = (typeof G !== 'undefined' && G.sunkBalls) ? G.sunkBalls : [[], []];
+  if((veri[0] && veri[0].length) || (veri[1] && veri[1].length)) mkCepSpriteUret();
+  for(let t = 0; t < 2; t++){
+    const h = hedef[t]; if(!h) continue;
+    const liste = veri[t] || [];
+    const parca = document.createDocumentFragment();
+    for(let i = 0; i < liste.length; i++){
+      const b = liste[i], id = (b && typeof b === 'object') ? b.id : b;
+      if(MK_CEP.sprite && MK_CEP.sprite[id]){
+        const img = document.createElement('img');
+        img.src = MK_CEP.sprite[id]; img.alt = String(id); img.draggable = false;
+        parca.appendChild(img);
+      } else if(kaynak[t] && kaynak[t].children[i]){
+        parca.appendChild(kaynak[t].children[i].cloneNode(true));          // 2D yedek: oyunun kendi top gorunumu
+      }
+    }
+    h.textContent = '';
+    h.appendChild(parca);
+  }
+  mkCepBoyut();
+}
+function mkCepBoyut(){
+  const a = MK_CEP.alan; if(!a) return;
+  const veri = (typeof G !== 'undefined' && G.sunkBalls) ? G.sunkBalls : [[], []];
+  const ara = 3, dolgu = 5;                                   // 4 px ic bosluk + 1 px cerceve
+  const boy = function(al, adet){
+    const n = Math.max(8, adet);                              // 8 topa kadar boyut sabit; fazlasinda kuculur
+    const W = al.w - 2 * dolgu, H = al.h - 2 * dolgu;
+    const tek = Math.min(22, W, Math.floor((H + ara) / n) - ara);
+    if(!al.cift) return { top: tek, sar: false };
+    const ikiSig = Math.floor((W - ara) / 2);
+    const cift = ikiSig >= 10 ? Math.min(22, ikiSig, Math.floor((H + ara) / Math.ceil(n / 2)) - ara) : 0;
+    return (tek < 16 && cift > tek) ? { top: cift, sar: true } : { top: tek, sar: false };
+  };
+  [['mk-cep-sol', a.sol, (veri[0] || []).length], ['mk-cep-sag', a.sag, (veri[1] || []).length]].forEach(function(c){
+    const e = document.getElementById(c[0]); if(!e) return;
+    let al = c[1], b = boy(al, c[2]);
+    if(al.merkez != null){                                     // dikey: yer bol; cok top varsa serit iki sutuna genisler
+      const genis = { w: 44, h: al.h, cift: true };
+      const bg = b.top < 14 ? boy(genis, c[2]) : null;
+      al = (bg && bg.top > b.top) ? genis : { w: al.w, h: al.h };
+      if(bg && bg.top > b.top) b = bg;
+      e.style.width = Math.round(al.w) + 'px';
+      e.style.left = Math.round(Math.max(2, Math.min(window.innerWidth - 2 - al.w, c[1].merkez - al.w / 2))) + 'px';
+    }
+    e.style.setProperty('--mk-top', Math.max(6, b.top) + 'px');
+    e.style.setProperty('--mk-cep-ara', ara + 'px');
+    e.style.flexWrap = b.sar ? 'wrap' : 'nowrap';               // tek sutunda asla yan tarafa tasma
+  });
+}
+function mkCepYerlestir(yatay, r){
+  const html = document.documentElement;
+  if(!mkAktif()){ html.classList.remove('mk-cep'); MK_CEP.alan = null; return; }
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const R_ = function(id){ const e = document.getElementById(id); return e ? e.getBoundingClientRect() : null; };
+  const arti = R_('mk-itme-arti'), eksi = R_('mk-itme-eksi'), core = R_('mk-core'), sol = R_('mk-sol'), sag = R_('mk-sag');
+  const hs = document.getElementById('mk-cep-sol'), hd = document.getElementById('mk-cep-sag');
+  if(!arti || !eksi || !core || !sol || !sag || !hs || !hd) return;
+  // Olcum aninda kontroller henuz yerlesmemisse (0 boyut) yanlis konum kullanma; sonraki karede tekrar dene.
+  if(!arti.width || !core.width || !sol.width || !sag.width || !r.width){
+    html.classList.remove('mk-cep');
+    if(MK_CEP.deneme++ < 20) requestAnimationFrame(function(){ try{ mkYerlestir(); }catch(e){} });
+    return;
+  }
+  MK_CEP.deneme = 0;
+  const bosluk = 6, SW = 30;
+  let alan;
+  if(yatay){
+    const solDis = sol.left - 2 - 4, sagDis = vw - sag.right - 2 - 4;
+    const ustY = eksi.bottom + bosluk;
+    alan = {
+      sol: solDis >= SW - 4
+        ? { x: sol.left - 4 - Math.min(SW, solDis), y: ustY, w: Math.min(SW, solDis), h: r.bottom - ustY, cift:false }
+        : { x: sol.left, y: arti.bottom + bosluk, w: sol.width, h: r.bottom - (arti.bottom + bosluk), cift:true },
+      sag: sagDis >= SW - 4
+        ? { x: sag.right + 4, y: ustY, w: Math.min(SW, sagDis), h: r.bottom - ustY, cift:false }
+        : { x: sag.left, y: core.bottom + bosluk, w: sag.width, h: r.bottom - (core.bottom + bosluk), cift:true }
+    };
+  } else {
+    const solAlt = Math.max(sol.bottom, arti.bottom, eksi.bottom) + bosluk, sagAlt = Math.max(sag.bottom, core.bottom) + bosluk;
+    alan = {
+      sol: { x: Math.max(2, eksi.left + eksi.width / 2 - SW / 2), y: solAlt, w: SW, h: vh - 8 - solAlt, cift:false, merkez: eksi.left + eksi.width / 2 },
+      sag: { x: Math.min(vw - 2 - SW, core.left + core.width / 2 - SW / 2), y: sagAlt, w: SW, h: vh - 8 - sagAlt, cift:false, merkez: core.left + core.width / 2 }
+    };
+  }
+  const px = function(n){ return Math.round(n) + 'px'; };
+  [[hs, alan.sol], [hd, alan.sag]].forEach(function(c){
+    c[1].h = Math.max(0, c[1].h);
+    Object.assign(c[0].style, { left:px(c[1].x), top:px(c[1].y), width:px(c[1].w), height:px(c[1].h) });
+  });
+  MK_CEP.alan = alan;
+  html.classList.add('mk-cep');
+  mkCepCiz();
+  if(!MK_CEP.gozcu && window.MutationObserver){
+    MK_CEP.gozcu = new MutationObserver(function(){ try{ mkCepCiz(); }catch(e){} });
+    ['sunk-left', 'sunk-right'].forEach(function(id){ const e = document.getElementById(id); if(e) MK_CEP.gozcu.observe(e, { childList:true }); });
+  }
+}
+function mkModDegistir(){
+  mkIptal('mod');
+  drag.active = false; drag.power = 0;
+  MK.mod = (MK.mod === 'core') ? 'klasik' : 'core';
+  try{ localStorage.setItem(MK_ANAHTAR, MK.mod); }catch(e){}
+  layoutTable();
+}
+(function mkBaslat(){
+  try{
+    MK.cihaz = !!((navigator.maxTouchPoints > 0 || 'ontouchstart' in window) &&
+                  window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  }catch(e){ MK.cihaz = false; }
+  try{ const m = localStorage.getItem(MK_ANAHTAR); if(m === 'klasik' || m === 'core') MK.mod = m; }catch(e){}
+  try{ mkDialBaglan(); mkCoreBaglan(); }catch(e){}
+  try{
+    const b = document.getElementById('mk-mod');
+    b.addEventListener('click', function(e){ e.preventDefault(); mkModDegistir(); });
+  }catch(e){}
+  mkIpucu('mk.ipucu');
+  document.addEventListener('visibilitychange', function(){ if(document.hidden) mkIptal('gizli'); });
+  // Nisan her karede drawCue'nun okudugu alanlara yazilir (top hareket edince de dogru kalir).
+  (function kare(){ try{ if(mkAktif() && G.phase === 'playing' && !MK.guc) mkAciYaz(); }catch(e){} requestAnimationFrame(kare); })();
+  if(MK.cihaz) layoutTable(); else mkModYaz();
+})();
 
 // ── Cue Draw ──
 function isMyBall(b){
@@ -8483,6 +9157,7 @@ function consumePU(){
 function switchTurn(foul){
   if(!foul) consumePU();
   // Sira degisirken yarim kalmis surukleme girdisi tasinmasin.
+  try{ mkIptal('sira'); }catch(e){}
   drag.active=false; drag.power=0;
   G.sunkThisShot=false;
   G.turn = G.turn===0?1:0;
@@ -8570,6 +9245,7 @@ function atisSuresiDoldu(){
   if(G.phase!=='playing' || G.moving) return;
   if(G.onlineMode && G.turn!==G.mySlot) return;
   drag.active=false; drag.power=0;
+  try{ mkIptal('sure'); }catch(e){}
   // Bot kendi turunda nisan aliyorsa animasyon durdurulur.
   if(!G.onlineMode && G.mode==='bot' && G.turn===1){ try{ botAimDur(); }catch(e){} }
   // Secili guc TUKETILMEDEN kapatilir (atis yapilmadi).
@@ -9310,6 +9986,8 @@ function showScreen(n){
   if(n==='menu') refreshMenu();
   // [CG-13] Online odadan menuye donus (CrazyGames disinda no-op).
   if(n==='menu'){ try{ if(typeof cgMenuyeDonus === 'function') cgMenuyeDonus(); }catch(e){} }
+  try{ if(typeof mkIptal === 'function') mkIptal('ekran'); }catch(e){}
+  try{ if(n==='game' && typeof mkYerlestir === 'function') setTimeout(mkYerlestir, 0); }catch(e){}
   if(n==='shop') renderShop();
   if(n==='event') renderEvent();
   if(n==='collection') renderCollection();
