@@ -2,6 +2,27 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script>
+/* [ASSET-BASE] Sayfa URL'si '/' ile bitmediginde (orn. .../oyun yerine .../oyun/)
+   tarayici goreli 'assets/...' yollarini BIR UST klasore cozer; ball3d.bundle.js,
+   istaka PNG'leri ve fontlar 404 verir ve toplar 2D cizime duser.
+   Cozum: YALNIZCA bu durumda <base href="{yol}/"> eklenir. Koddaki yollar GORELI
+   kalir; '/' veya dosya adiyla (index.html) biten adreslerde HICBIR SEY yapilmaz.
+   Bu betik head'deki tum goreli kaynaklardan ONCE calismalidir. */
+(function(){
+  try{
+    var p = location.pathname || '/';
+    if(p.charAt(p.length - 1) === '/') return;
+    var son = p.substring(p.lastIndexOf('/') + 1);
+    if(!son || son.indexOf('.') >= 0) return;
+    if(document.getElementsByTagName('base').length) return;
+    var b = document.createElement('base');
+    b.href = p + '/';
+    var h = document.head || document.getElementsByTagName('head')[0];
+    if(h) h.insertBefore(b, h.firstChild);
+  }catch(e){}
+})();
+</script>
 <!-- [PLATFORM] CrazyGames SDK burada YUKLENMEZ. Kosullu ve dinamik
      olarak yalnizca CrazyGames ortaminda yuklenir; bkz. cgSdkYukle().
      Sebep: Yandex kural 4.1 (ucuncu taraf reklam SDK yok) ve diger
