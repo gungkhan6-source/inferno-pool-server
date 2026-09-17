@@ -724,6 +724,155 @@ html.mk-cep .mk-cep-serit{display:flex;}
 .over-btn.pr{background:linear-gradient(135deg,#ff4400,#cc1100);border-color:#ff4400;color:#fff;}
 .over-btn.sc{background:transparent;border-color:rgba(255,255,255,0.18);color:rgba(255,255,255,0.45);}
 .over-btn:hover{transform:scale(1.04);}
+
+/* ═══════════════════════════════════════════════════════════════════
+   [INFERNO CORE HUB] Ana menu duzeni. YALNIZCA gorunum: hicbir JS baglantisi,
+   ID veya olay degismedi. Oyun ekrani (#screen-game) bu bloktan ETKILENMEZ.
+   Karakter: koyu mor/siyah zemin, ince ateş turuncusu cizgiler, olcülü glow.
+   ═══════════════════════════════════════════════════════════════════ */
+#screen-menu{background:radial-gradient(120% 80% at 50% 0%,rgba(80,15,120,0.22),rgba(0,0,0,0.72) 60%);padding:10px;}
+#hub{width:min(100%,430px);max-width:430px;display:flex;flex-direction:column;gap:9px;
+  padding:12px;border-radius:16px;background:linear-gradient(180deg,rgba(26,6,44,0.92),rgba(10,2,18,0.95));
+  border:1px solid rgba(255,110,40,0.16);box-shadow:0 0 40px rgba(90,20,160,0.16),inset 0 1px 0 rgba(255,255,255,0.04);}
+
+/* ── Ust serit: marka · kimlik · kaynak ── */
+.hub-ust{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;
+  padding-bottom:9px;border-bottom:1px solid rgba(255,120,40,0.14);}
+.hub-marka{display:flex;flex-direction:column;gap:4px;min-width:0;}
+#hub .mt{font-size:clamp(0.82rem,3.6vw,1.05rem);margin:0;line-height:1.1;text-align:left;letter-spacing:1px;}
+.hub-kivilcim{display:block;height:2px;border-radius:2px;background:linear-gradient(90deg,#ff6a00,rgba(109,40,255,0.8),transparent);
+  box-shadow:0 0 8px rgba(255,90,0,0.4);}
+.hub-kimlik{min-width:0;display:flex;flex-direction:column;gap:3px;}
+.hub-oyuncu{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:0.56rem;letter-spacing:1px;}
+#hub #online-nick{color:rgba(255,255,255,0.55);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#hub #online-status{color:rgba(255,255,255,0.32);white-space:nowrap;}
+#hub .ml{margin:0;font-size:0.54rem;letter-spacing:1.4px;color:rgba(255,200,150,0.55);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#hub .xw{margin:0;height:4px;}
+.hub-kaynak{display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+#hub .mc{margin:0;font-size:0.82rem;padding:3px 9px;border-radius:999px;justify-content:flex-end;
+  background:rgba(255,150,0,0.08);border:1px solid rgba(255,150,0,0.22);}
+#hub .hs-row{margin:0;padding:3px 9px;gap:7px;font-size:0.54rem;border-radius:999px;
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);}
+#hub .hs-row span:last-child{color:#ffcc00;font-weight:700;}
+
+/* ── Merkez: oyun cekirdegi ── */
+.hub-cekirdek{display:flex;flex-direction:column;gap:9px;align-items:stretch;}
+.hub-secim{display:flex;flex-direction:column;gap:7px;}
+#hub .mode-cards{margin:0;gap:8px;}
+#hub .mode-card{padding:8px 6px;border-radius:10px;background:rgba(255,255,255,0.025);
+  border:1px solid rgba(255,255,255,0.07);transition:border-color 0.18s,box-shadow 0.18s,background 0.18s;}
+#hub .mode-card .mode-icon{font-size:1.05rem;}
+#hub .mode-card .mode-name{font-size:0.56rem;letter-spacing:1.4px;}
+#hub .mode-card.sel{background:linear-gradient(180deg,rgba(255,110,0,0.16),rgba(120,30,190,0.12));
+  border-color:rgba(255,140,50,0.55);box-shadow:0 0 14px rgba(255,90,0,0.16),inset 0 0 12px rgba(255,120,40,0.07);}
+#hub .diff-row{margin:0;gap:6px;}
+#hub .diff-btn{padding:8px 6px;min-height:32px;border-radius:8px;font-size:0.56rem;letter-spacing:1.2px;}
+#hub .diff-btn.sel{box-shadow:0 0 10px rgba(255,90,0,0.18);}
+
+/* PLAY: hub'in agirlik merkezi. Halka cok dusuk yogunluklu ember parlamasi. */
+.hub-oyna{position:relative;display:flex;align-items:center;justify-content:center;padding:4px 0 2px;}
+.hub-halka{position:absolute;left:50%;top:50%;width:min(230px,78%);aspect-ratio:1;transform:translate(-50%,-50%);
+  border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,rgba(255,90,0,0.16),rgba(120,30,200,0.09) 45%,transparent 68%);
+  animation:hubKor 5.5s ease-in-out infinite;}
+@keyframes hubKor{0%,100%{opacity:0.55;transform:translate(-50%,-50%) scale(0.97);}50%{opacity:0.95;transform:translate(-50%,-50%) scale(1.03);}}
+#hub #menu-play{position:relative;z-index:1;flex:none;width:min(260px,88%);min-height:64px;padding:16px 18px;
+  font-family:'Cinzel Decorative',serif;font-size:clamp(0.95rem,4.6vw,1.25rem);letter-spacing:5px;
+  clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);
+  background:linear-gradient(135deg,#ff6a00,#c42a00 55%,#6d28ff);border:0;color:#fff2e2;border-radius:0;
+  box-shadow:0 0 26px rgba(255,80,0,0.28),inset 0 1px 0 rgba(255,255,255,0.22);transition:transform 0.15s,box-shadow 0.2s;}
+#hub #menu-play:hover{transform:translateY(-1px);box-shadow:0 0 34px rgba(255,100,0,0.4),inset 0 1px 0 rgba(255,255,255,0.3);}
+#hub #menu-play:active{transform:translateY(1px);}
+.hub-yan{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+#hub #menu-online,#hub #menu-challenge{margin:0;width:auto;padding:10px 8px;border-radius:10px;cursor:pointer;
+  font-family:'Cinzel Decorative',serif;font-size:0.6rem;letter-spacing:1.6px;color:#f0e4ff;
+  background:linear-gradient(180deg,rgba(109,40,255,0.22),rgba(40,10,70,0.55));
+  border:1px solid rgba(150,90,255,0.32);box-shadow:none;transition:border-color 0.18s,box-shadow 0.18s;}
+#hub #menu-online{background:linear-gradient(180deg,rgba(0,150,255,0.18),rgba(8,20,60,0.55));border-color:rgba(60,160,255,0.32);}
+#hub #menu-online:hover{border-color:rgba(90,190,255,0.6);box-shadow:0 0 14px rgba(0,140,255,0.2);}
+#hub #menu-challenge:hover{border-color:rgba(180,120,255,0.6);box-shadow:0 0 14px rgba(120,40,255,0.2);}
+
+/* ── Cevre moduller: kompakt kartlar ── */
+.hub-moduller{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;}
+#hub .hub-moduller button{margin:0;width:auto;min-height:52px;padding:8px 5px;border-radius:11px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.56rem;font-weight:700;letter-spacing:1.1px;line-height:1.35;
+  color:rgba(255,236,220,0.88);text-align:center;white-space:normal;word-break:break-word;
+  background:rgba(255,255,255,0.028);border:1px solid rgba(255,255,255,0.075);box-shadow:none;
+  transition:border-color 0.18s,box-shadow 0.18s,background 0.18s,transform 0.15s;}
+#hub .hub-moduller button:hover{transform:translateY(-1px);background:rgba(255,120,40,0.07);
+  border-color:rgba(255,140,60,0.42);box-shadow:0 0 14px rgba(255,90,0,0.14);}
+#hub #menu-shop{border-color:rgba(255,170,40,0.28);}
+#hub #menu-collection{border-color:rgba(190,120,255,0.24);}
+#hub #menu-free{background:rgba(0,150,255,0.07);border-color:rgba(0,170,255,0.3);}
+#hub #menu-chat{background:rgba(0,190,120,0.06);border-color:rgba(0,220,140,0.24);color:#dff5e8;}
+#hub #menu-event{border-color:rgba(255,80,140,0.3);}
+#hub #menu-adcoin{border-color:rgba(255,210,60,0.28);}
+
+/* ── Alt: dusuk vurgulu yardimci satir ── */
+.hub-alt{display:flex;flex-direction:column;gap:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);}
+#hub .lang-row{margin:0;gap:6px;}
+#hub .lang-btn{padding:8px 2px;min-height:30px;font-size:0.52rem;}
+#hub #menu-yasal{margin:0;gap:6px;}
+#hub #menu-yasal button{padding:8px 2px;min-height:30px;font-size:0.52rem;}
+.hub-veri{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+#hub .hub-veri button{margin:0;width:auto;padding:7px 4px;min-height:30px;border-radius:7px;cursor:pointer;
+  font-family:'Rajdhani',sans-serif;font-size:0.5rem;letter-spacing:1.2px;background:transparent;}
+#hub #menu-reset{border:1px solid rgba(255,80,0,0.2);color:rgba(255,150,120,0.62);}
+#hub #menu-xfer{border:1px solid rgba(255,170,0,0.2);color:rgba(255,200,140,0.68);}
+
+/* ── Genis mobil / dikey buyuk ekran ── */
+@media (min-height:760px){
+  #hub{gap:11px;padding:14px;}
+  #hub #menu-play{min-height:74px;}
+  #hub .hub-moduller button{min-height:58px;font-size:0.6rem;}
+}
+
+/* ── Kisa yatay (telefon yan cevrilmis): 3 sutunlu kompozisyon, kaydirma yok ── */
+@media (orientation:landscape) and (max-height:560px){
+  #screen-menu{padding:6px;}
+  #hub .lang-btn,#hub #menu-yasal button,#hub .hub-veri button{min-height:28px;padding:6px 2px;font-size:0.48rem;}
+  .hub-kimlik{max-width:340px;margin:0 auto;}
+  #hub{width:min(100%,780px);max-width:780px;padding:9px 11px;gap:7px;
+    display:grid;grid-template-columns:1.05fr 1.25fr 1.05fr;grid-template-rows:auto 1fr;
+    grid-template-areas:'ust ust ust' 'sol orta sag';align-items:stretch;}
+  .hub-ust{grid-area:ust;padding-bottom:6px;}
+  .hub-cekirdek{grid-area:orta;justify-content:center;gap:7px;}
+  .hub-moduller{grid-area:sol;grid-template-columns:1fr 1fr;align-content:center;}
+  .hub-alt{grid-area:sag;justify-content:center;border-top:0;padding-top:0;}
+  #hub .hub-moduller button{min-height:42px;font-size:0.52rem;}
+  #hub #menu-play{min-height:54px;padding:12px;font-size:1rem;letter-spacing:4px;}
+  .hub-halka{width:min(170px,70%);}
+  #hub .mode-card{padding:6px 4px;}
+  #hub .mode-card .mode-icon{font-size:0.9rem;}
+}
+
+/* ── Masaustu: ayni tasarim, genis kompozisyon (mobilin buyutulmusu degil) ── */
+@media (min-width:900px) and (min-height:600px){
+  #screen-menu{padding:24px;}
+  #hub{width:min(100%,980px);max-width:980px;padding:22px 26px;gap:16px;
+    display:grid;grid-template-columns:270px minmax(320px,1fr) 270px;grid-template-rows:auto 1fr;
+    grid-template-areas:'ust ust ust' 'sol orta sag';}
+  .hub-ust{grid-area:ust;gap:18px;padding-bottom:14px;}
+  #hub .mt{font-size:1.5rem;letter-spacing:3px;}
+  #hub .mc{font-size:1.05rem;padding:5px 14px;}
+  #hub .hs-row{font-size:0.62rem;padding:5px 14px;}
+  #hub .ml,.hub-oyuncu{font-size:0.62rem;}
+  .hub-kimlik{max-width:430px;margin:0 auto;}
+  .hub-cekirdek{grid-area:orta;justify-content:center;gap:14px;}
+  .hub-moduller{grid-area:sol;grid-template-columns:1fr;align-content:center;gap:9px;}
+  #hub .hub-moduller button{min-height:50px;font-size:0.68rem;letter-spacing:1.6px;text-align:left;padding:10px 14px;}
+  .hub-alt{grid-area:sag;justify-content:center;align-content:center;border-top:0;padding-top:0;gap:9px;}
+  #hub .lang-btn,#hub #menu-yasal button{font-size:0.58rem;padding:8px 4px;}
+  #hub .hub-veri button{font-size:0.55rem;padding:8px 6px;}
+  #hub #menu-play{min-height:96px;width:min(360px,92%);font-size:1.45rem;letter-spacing:7px;}
+  .hub-halka{width:min(320px,86%);}
+  #hub .mode-card .mode-icon{font-size:1.4rem;}
+  #hub .mode-card .mode-name{font-size:0.66rem;}
+  #hub .diff-btn{font-size:0.62rem;padding:8px;}
+  #hub #menu-online,#hub #menu-challenge{font-size:0.7rem;padding:13px 10px;}
+}
+
 </style>
 <!-- [TEMIZLIK] Firebase SDK YUKLENMIYOR. Bu satirda vaktiyle CDN script
      etiketleri vardi; kaldirilmislar. Yorum da yaniltici oldugu icin
@@ -770,63 +919,78 @@ font-family:sans-serif;
 
 <!-- MENU -->
 <div id="screen-menu">
-  <div class="mb">
-    <div class="mt" data-i18n="app.title">INFERNO POOL</div>
-    <div class="mc">💰 <span id="menu-coins">0</span></div>
-    <div class="ml" id="menu-level">LVL 1 — Novice</div>
-    <div class="xw"><div class="xf" id="xp-bar" style="width:0%"></div></div>
-    <div class="mode-cards">
+  <!-- [INFERNO CORE HUB] Ana menu: ust kimlik seridi, merkezde oyun cekirdegi,
+       cevresinde kompakt moduller, altta dusuk vurgulu yardimci satir.
+       Tum dugme ID'leri, onclick'leri ve data-i18n anahtarlari KORUNDU. -->
+  <div class="mb" id="hub">
+
+    <header class="hub-ust">
+      <div class="hub-marka">
+        <div class="mt" data-i18n="app.title">INFERNO POOL</div>
+        <span class="hub-kivilcim" aria-hidden="true"></span>
+      </div>
+      <div class="hub-kimlik">
+        <div class="hub-oyuncu">
+          <span id="online-nick">---</span>
+          <span id="online-status">● OFFLINE</span>
+        </div>
+        <div class="ml" id="menu-level">LVL 1 — Novice</div>
+        <div class="xw"><div class="xf" id="xp-bar" style="width:0%"></div></div>
+      </div>
+      <div class="hub-kaynak">
+        <div class="mc">💰 <span id="menu-coins">0</span></div>
+        <div class="hs-row"><span data-i18n="menu.best">🏆 BEST</span><span id="hs-val">0</span></div>
+      </div>
+    </header>
+
+    <main class="hub-cekirdek">
+      <div class="hub-secim">
+        <div class="mode-cards">
       <div class="mode-card sel" data-mode="pvp"><div class="mode-icon">👥</div><div class="mode-name" data-i18n="menu.twoPlayer">2 PLAYER</div></div>
       <div class="mode-card" data-mode="bot"><div class="mode-icon">🤖</div><div class="mode-name" data-i18n="menu.vsBot">VS BOT</div></div>
     </div>
-    <div class="diff-row" id="diff-row" style="display:none">
+        <div class="diff-row" id="diff-row" style="display:none">
       <button class="diff-btn" data-d="easy" data-i18n="menu.easy">EASY</button>
       <button class="diff-btn sel" data-d="medium" data-i18n="menu.medium">MEDIUM</button>
       <button class="diff-btn" data-d="hard" data-i18n="menu.hard">HARD</button>
     </div>
-    <div class="hs-row"><span data-i18n="menu.best">🏆 BEST</span><span style="color:#ffcc00;font-weight:700" id="hs-val">0</span></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-      <span id="online-nick" style="font-size:0.6rem;letter-spacing:1px;color:rgba(255,255,255,0.35);">---</span>
-      <span id="online-status" style="font-size:0.6rem;letter-spacing:1px;color:rgba(255,255,255,0.3);">● OFFLINE</span>
-    </div>
-    <div class="menu-btns" style="flex-direction:column;gap:7px;">
-      <div style="display:flex;gap:8px;">
-        <button class="play-btn" id="menu-play" onclick="startGame()" data-i18n="menu.local">⚡ LOCAL</button>
-        <button class="shop-btn" id="menu-shop" data-i18n="menu.shop">🎁 SHOP</button>
       </div>
-      <button id="menu-challenge" onclick="var r='INF-'+Math.random().toString(36).substr(2,6).toUpperCase();var m=document.getElementById('screen-challenge');var l=document.getElementById('invite-link');var s=document.getElementById('invite-status');if(m)m.style.display='flex';if(l)l.textContent=location.href.split('?')[0]+'?room='+r;if(s)s.textContent='Send the link to your friend!';setTimeout(function(){if(window.onChallengeModalOpen)onChallengeModalOpen(r);},200);" style="width:100%;padding:11px;font-family:'Cinzel Decorative',serif;font-size:0.75rem;letter-spacing:2px;background:linear-gradient(135deg,#550099,#330066);border:1px solid rgba(150,0,255,0.4);color:#fff;border-radius:6px;cursor:pointer;box-shadow:0 0 14px rgba(100,0,255,0.3);margin-bottom:8px;transition:all 0.2s;" data-i18n="menu.invite">⚔ INVITE FRIEND</button>
-      <!-- [YASAL] Uc belge de OYUN ICINDE acilir (Yandex 3.5). -->
-      <div id="menu-yasal">
-        <button type="button" id="menu-privacy" data-i18n="menu.privacy">PRIVACY</button>
-        <button type="button" id="menu-terms" data-i18n="menu.terms">TERMS</button>
-        <button type="button" id="menu-credits" data-i18n="menu.credits2">CREDITS</button>
+      <div class="hub-oyna">
+        <div class="hub-halka" aria-hidden="true"></div>
+        <button class="play-btn" id="menu-play" onclick="startGame()" data-i18n="menu.playBig">PLAY</button>
       </div>
-      <!-- [SIFIRLA] Veri silme hakki. Yalnizca menude gorunur. -->
-      <button id="menu-reset" type="button" style="width:100%;padding:7px;font-family:'Rajdhani',sans-serif;font-size:0.62rem;letter-spacing:2px;background:transparent;border:1px solid rgba(255,80,0,0.22);color:rgba(255,150,120,0.7);border-radius:6px;cursor:pointer;margin-top:5px;" data-i18n="reset.button">RESET MY LOCAL DATA</button>
-      <!-- [SAHIPLIK] Istaka aktarma. Hesap/e-posta gerektirmez. -->
-      <button id="menu-xfer" type="button" style="width:100%;padding:7px;font-family:'Rajdhani',sans-serif;font-size:0.62rem;letter-spacing:2px;background:transparent;border:1px solid rgba(255,170,0,0.22);color:rgba(255,200,140,0.75);border-radius:6px;cursor:pointer;margin-top:5px;" data-i18n="xfer.button">TRANSFER MY CUES</button>
-        <!-- [ASAMA 4] Chat butonu. screen-menu ICINDE oldugu icin yalnizca
-             menu ekrani aktifken gorunur; mac sirasinda DOM'da gorunmez.
-             chatAc() ayrica G.phase kontrolu yapar (menu / over). -->
-        <button id="menu-chat" type="button" style="width:100%;padding:9px;font-family:'Cinzel Decorative',serif;font-size:0.68rem;letter-spacing:2px;background:linear-gradient(135deg,#0a5c3a,#063d26);border:1px solid rgba(0,255,136,0.28);color:#dff5e8;border-radius:6px;cursor:pointer;box-shadow:0 0 12px rgba(0,200,120,0.18);" data-i18n="chat.open">💬 CHAT</button>
-      <!-- [ASAMA 2.1] Dil secici. Etiketler data-i18n ile bagli oldugu icin
-           i18nUygula() hem metni yazar hem Kiril icin .i18n-kiril sinifini
-           kendisi atar; ayri bir font mantigi gerekmez. -->
+      <div class="hub-yan">
+        <button id="menu-online" onclick="startOnlineMode()" data-i18n="menu.playOnline">🌐 PLAY ONLINE</button>
+        <button id="menu-challenge" onclick="var r='INF-'+Math.random().toString(36).substr(2,6).toUpperCase();var m=document.getElementById('screen-challenge');var l=document.getElementById('invite-link');var s=document.getElementById('invite-status');if(m)m.style.display='flex';if(l)l.textContent=location.href.split('?')[0]+'?room='+r;if(s)s.textContent='Send the link to your friend!';setTimeout(function(){if(window.onChallengeModalOpen)onChallengeModalOpen(r);},200);" data-i18n="menu.invite">⚔ INVITE FRIEND</button>
+      </div>
+    </main>
+
+    <nav class="hub-moduller">
+      <button class="shop-btn" id="menu-shop" data-i18n="menu.shop">🎁 SHOP</button>
+      <button id="menu-collection" data-i18n="col.button">🎴 MY CUES</button>
+      <button id="menu-free" data-i18n="col.free">🎁 FREE CUE</button>
+      <button id="menu-chat" type="button" data-i18n="chat.open">💬 CHAT</button>
+      <button id="menu-event" style="display:none" data-i18n="event.button">🎯 EVENT</button>
+      <button id="menu-adcoin" type="button" style="display:none">🎬</button>
+    </nav>
+
+    <footer class="hub-alt">
       <div class="lang-row" id="lang-row">
         <button class="lang-btn" type="button" data-lang-sec="en"><span class="lang-bayrak">🇬🇧</span><span data-i18n="settings.langEn">English</span></button>
         <button class="lang-btn" type="button" data-lang-sec="ru"><span class="lang-bayrak">🇷🇺</span><span data-i18n="settings.langRu">Русский</span></button>
         <button class="lang-btn" type="button" data-lang-sec="tr"><span class="lang-bayrak">🇹🇷</span><span data-i18n="settings.langTr">Türkçe</span></button>
       </div>
-      <!-- [KOLEKSIYON V2] -->
-      <button id="menu-collection" data-i18n="col.button">🎴 MY CUES</button>
-      <button id="menu-free" data-i18n="col.free">🎁 FREE CUE</button>
-      <!-- [EKONOMI] Odullu reklam -> jeton. Reklam gercekten
-           kullanilabilir DEGILSE gizlenir; oyun akisi etkilenmez. -->
-      <button id="menu-adcoin" type="button" style="display:none">🎬</button>
-      <!-- [ETKINLIK] Yalnizca aktif sezon varken gorunur; refreshMenu() ayarlar. -->
-      <button id="menu-event" style="display:none" data-i18n="event.button">🎯 EVENT</button>
-      <button id="menu-online" onclick="startOnlineMode()" data-i18n="menu.playOnline">🌐 PLAY ONLINE</button>
-    </div>
+      <div id="menu-yasal">
+        <button type="button" id="menu-privacy" data-i18n="menu.privacy">PRIVACY</button>
+        <button type="button" id="menu-terms" data-i18n="menu.terms">TERMS</button>
+        <button type="button" id="menu-credits" data-i18n="menu.credits2">CREDITS</button>
+      </div>
+      <div class="hub-veri">
+        <button id="menu-reset" type="button" data-i18n="reset.button">RESET MY LOCAL DATA</button>
+        <button id="menu-xfer" type="button" data-i18n="xfer.button">TRANSFER MY CUES</button>
+      </div>
+    </footer>
+
   </div>
 </div>
 
@@ -3823,6 +3987,7 @@ en: {
   'menu.hard':'HARD',
   'menu.best':'🏆 BEST',
   'menu.local':'⚡ LOCAL',
+  'menu.playBig':'PLAY',
   'menu.shop':'🎁 SHOP',
   'menu.invite':'⚔ INVITE FRIEND',
   'menu.credits':'CREDITS',
@@ -4266,6 +4431,7 @@ tr: {
   'menu.hard':'ZOR',
   'menu.best':'🏆 EN İYİ',
   'menu.local':'⚡ YEREL',
+  'menu.playBig':'OYNA',
   'menu.shop':'🎁 MAĞAZA',
   'menu.invite':'⚔ ARKADAŞ DAVET ET',
   'menu.credits':'EMEĞİ GEÇENLER',
@@ -4694,6 +4860,7 @@ ru: {
   'menu.hard':'СЛОЖНО',
   'menu.best':'🏆 РЕКОРД',
   'menu.local':'⚡ ЛОКАЛЬНО',
+  'menu.playBig':'ИГРАТЬ',
   'menu.shop':'🎁 МАГАЗИН',
   'menu.invite':'⚔ ПРИГЛАСИТЬ ДРУГА',
   'menu.credits':'АВТОРЫ',
