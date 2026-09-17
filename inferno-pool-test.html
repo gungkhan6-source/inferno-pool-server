@@ -1621,6 +1621,8 @@ function cgHazirKancasi(){
   // [CG-12] Oyun acikken gelen katilim (CrazyGames arayuzu) + auth + davet arayuzu.
   try{ _cgKatilimDinleyiciKur(); }catch(e){}
   try{ _cgAuthDinleyiciKur(); }catch(e){}
+  // [BULUT] CrazyGames hesabindaki ilerleme (yalnizca giris yapmis oyuncu).
+  try{ bulutBaslat('acilis'); }catch(e){}
   try{ _cgDavetArayuzuBagla(); }catch(e){}
   let davetOdasi = null, instant = false;
   try{ davetOdasi = cgDavetParam('room'); }catch(e){}
@@ -1745,6 +1747,8 @@ function _cgAuthDinleyiciKur(){
   if(typeof CG_SDK.user.addAuthListener !== 'function') return;
   CG_SDK.user.addAuthListener(function(u){
     try{ _cgKullaniciAyarla(u); }catch(e){}
+    // [BULUT] Oturum ici giris/cikis: SDK data modulu yenilenir.
+    try{ bulutCgHesapDegisti(u); }catch(e){}
     // Profil onbellegi tazelenir (giris/cikis sonrasi dogru ad ve avatar).
     try{
       if(typeof PROFIL !== 'undefined' && PROFIL){ PROFIL._sozu = null; PROFIL._onbellek = null; }
@@ -2812,7 +2816,7 @@ function evYukle(){
   }catch(e){}
   return { v:1, s:{}, sonGun:0 };
 }
-function evKaydet(){ try{ localStorage.setItem(EV_ANAHTAR, JSON.stringify(EV)); }catch(e){} }
+function evKaydet(){ try{ localStorage.setItem(EV_ANAHTAR, JSON.stringify(EV)); }catch(e){} try{ bulutKayitPlanla(); }catch(e){} }
 const EV = evYukle();
 
 // Donem kimligi: yillik -> yil; tarihli -> aktif araligin baslangici.
@@ -5170,7 +5174,7 @@ try{ i18nSeciciKur(); }catch(e){}
 // ── Profile (localStorage) ──
 const LEVELS=['Novice','Apprentice','Amateur','Contender','Expert','Master','Grand Master','Legend','Inferno Lord','God of Pool'];
 function loadP(){try{const d=localStorage.getItem('inferno_p');if(d)return JSON.parse(d);}catch(e){}return{coins:200,xp:0,level:1,hs:0,owned:['cosmic_eclipse'],equipped:'cosmic_eclipse'};}
-function saveP(){try{localStorage.setItem('inferno_p',JSON.stringify(P));}catch(e){}}
+function saveP(){try{localStorage.setItem('inferno_p',JSON.stringify(P));}catch(e){}try{bulutKayitPlanla();}catch(e){}}
 const P=loadP();
 selectedSkin=P.equipped||'cosmic_eclipse';
 function addXP(n){P.xp+=n;const need=P.level*300;if(P.xp>=need&&P.level<10){P.level++;P.xp-=need;toast2('LEVEL UP! '+LEVELS[P.level-1]);}saveP();refreshMenu();}
@@ -5327,6 +5331,7 @@ function reklamSayacYukle(){
 }
 function reklamSayacKaydet(){
   try{ localStorage.setItem(REKLAM_ANAHTAR, JSON.stringify(REKLAM_SAYAC)); }catch(e){}
+  try{ bulutKayitPlanla(); }catch(e){}
 }
 const REKLAM_SAYAC = reklamSayacYukle();
 
@@ -5792,7 +5797,9 @@ const SIFIRLA_ANAHTARLAR = [
 
   'inferno_chat_block',   // engelleme listesi
   'inferno_chat_mute',    // susturma listesi
-  'inferno_ads'           // gunluk odullu reklam sayaci
+  'inferno_ads',          // gunluk odullu reklam sayaci
+  'inferno_bulut',        // [BULUT] bu cihazin bagli oldugu hesap ozeti + son senkron tabani
+  'inferno_p_yedek'       // [BULUT] hesap degisiminde alinan yerel profil yedegi
 ];
 let _sifirlaOnaylandi = false;
 
@@ -5826,6 +5833,417 @@ function sifirlaUygula(){
   // yazabilecegi icin temiz baslangic SART.
   setTimeout(function(){ try{ location.reload(); }catch(e){} }, 700);
   return silinen;
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  [BULUT] PLATFORM HESABINA ILERLEME KAYDI (cloud save)
+// ═════════════════════════════════════════════════════════════════
+// KAPSAM: owned, equipped, coins, xp, level, hs + etkinlik ilerlemesi (EV)
+// + gunluk reklam sayaci. BULUTA GITMEYENLER: sohbet sid'leri, sohbet
+// engel/susturma listeleri, 24 saatlik deneme, dil tercihi.
+//
+// MISAFIR: bu katman HIC calismaz; oyun yalnizca localStorage kullanir.
+// PLATFORM IZOLASYONU: adaptor AD.platform() ile secilir ve kendi SDK
+// kontrolunu yapar. Pixidus bulut API'si icin kamuya acik dokuman
+// BULUNAMADI -> adaptor kayitli ama KAPALI (tahmin edilmez).
+//
+// BIRLESTIRME (hicbir sey silinmez):
+//   owned  = yerel ∪ bulut   (bu surumde taninmayan bulut kimlikleri 'u'da korunur)
+//   jeton  = delta:  k = max(k_bulut, taban) + max(0, k_yerel - taban)
+//            coins = max(0, k - harcanmisJeton(owned))
+//            (k = jetonGuvenlikDegeri(): jeton + satin alinan istakalarin fiyati)
+//   xp     = ayni delta, toplam XP uzerinden; seviye addXP kuraliyla geri cevrilir
+//   hs     = max ;  equipped = yalnizca SAHIP olunan istaka
+//   taban  = bu cihazin ayni hesapla SON gonderdigi deger (yerel 'inferno_bulut').
+//            Gonderimden ONCE yerelde saklanir -> cift sayim imkansiz.
+// HESAP DEGISIMI: onceki hesabin yerel profili 'inferno_p_yedek'e yedeklenir,
+//   yeni hesabin bulutu yuklenir; A'nin verisi B'ye ASLA yazilmaz.
+// BOZUK / DAHA YENI SEMA: salt-okuma; yerel korunur, bulutun USTUNE YAZILMAZ.
+const BULUT_ANAHTAR     = 'inferno_progress';
+const BULUT_SEMA        = 1;
+const BULUT_META        = 'inferno_bulut';
+const BULUT_YEDEK       = 'inferno_p_yedek';
+const BULUT_BASLANGIC_K = 200;       // loadP varsayilani: 200 jeton + cosmic_eclipse (fiyat 0)
+const BULUT_OKUMA_MS    = 12000;     // SDK'nin kendi bulut bekleme suresi 10 sn
+const BULUT_MAX_BAYT    = 180000;    // Yandex 200 KB, CrazyGames 1 MB siniri altinda
+
+const BULUT_ADAPTOR = {
+  // CrazyGames Data Module: getItem/setItem SENKRON. Oturum ici giriste SDK
+  // data nesnesini YENILER -> CG_SDK.data her seferinde yeniden okunur.
+  crazygames: {
+    debounceMs: 1500, minAralikMs: 2000,
+    uygun: function(){
+      try{ return AD.platform() === 'crazygames' && typeof cgAktif === 'function' && cgAktif() && !!CG_SDK.data; }
+      catch(e){ return false; }
+    },
+    hesap: function(){ return _cgKullaniciYukle().then(function(){ return _cgKullaniciAd || null; }); },
+    oku: function(){ return CG_SDK.data.getItem(BULUT_ANAHTAR); },
+    yaz: function(json){ CG_SDK.data.setItem(BULUT_ANAHTAR, json); }
+  },
+  // Yandex: player.getData(keys) / player.setData(data, flush). Resmi sinir:
+  // oyuncu basina 200 KB, 5 dakikada 100 istek -> yazma en az 15 sn arayla.
+  yandex: {
+    debounceMs: 4000, minAralikMs: 15000,
+    _oyuncu: null,
+    uygun: function(){
+      try{ return AD.platform() === 'yandex' && _yaOrtamiMi() && !!_ysdk && typeof _ysdk.getPlayer === 'function'; }
+      catch(e){ return false; }
+    },
+    oyuncu: function(){
+      if(!this._oyuncu) this._oyuncu = Promise.resolve(_ysdk.getPlayer());
+      return this._oyuncu;
+    },
+    hesap: function(){
+      return this.oyuncu().then(function(p){
+        if(!p || typeof p.isAuthorized !== 'function' || !p.isAuthorized()) return null;   // misafir
+        return (typeof p.getUniqueID === 'function') ? (p.getUniqueID() || null) : null;
+      });
+    },
+    oku: function(){
+      return this.oyuncu().then(function(p){ return p.getData([BULUT_ANAHTAR]); }).then(function(o){
+        const v = o ? o[BULUT_ANAHTAR] : undefined;
+        if(v === undefined || v === null) return null;
+        return (typeof v === 'string') ? v : JSON.stringify(v);
+      });
+    },
+    yaz: function(json, acil){
+      return this.oyuncu().then(function(p){
+        const o = {}; o[BULUT_ANAHTAR] = json;
+        return p.setData(o, !!acil);
+      });
+    }
+  },
+  // Pixidus: bulut veri API'si icin kamuya acik dokuman BULUNAMADI.
+  // TAHMIN EDILMEZ. Dokuman geldiginde YALNIZCA bu govde doldurulur.
+  pixidus: { uygun: function(){ return false; } }
+};
+
+const BULUT = { durum:'kapali', sebep:'', platform:null, adaptor:null, hesapK:null, nesil:0,
+                sonYazma:0, zaman:null, kirli:false, uyguluyor:false, bilinmeyen:[],
+                bekleyenEquip:null, equipZaman:null };
+
+function _bulutSayi(v){ v = Number(v); return (isFinite(v) && v >= 0) ? Math.floor(v) : 0; }
+function _bulutHash(s){
+  let x = 0x811c9dc5;
+  for(let i = 0; i < s.length; i++){ x ^= s.charCodeAt(i); x = Math.imul(x, 0x01000193) >>> 0; }
+  return ('0000000' + x.toString(16)).slice(-8);
+}
+function _bulutMetaOku(){
+  try{ const d = localStorage.getItem(BULUT_META); const o = d ? JSON.parse(d) : null;
+       return (o && typeof o === 'object' && typeof o.h === 'string') ? o : null; }catch(e){ return null; }
+}
+function _bulutMetaYaz(o){ try{ localStorage.setItem(BULUT_META, JSON.stringify(o)); }catch(e){} }
+function _bulutZamanli(soz, ms){
+  return new Promise(function(coz, red){
+    const z = setTimeout(function(){ red(new Error('timeout')); }, ms);
+    Promise.resolve(soz).then(function(v){ clearTimeout(z); coz(v); }, function(e){ clearTimeout(z); red(e); });
+  });
+}
+function bulutToplamXP(level, xp){
+  let t = 0;
+  const L = Math.max(1, Math.min(10, _bulutSayi(level) || 1));
+  for(let l = 1; l < L; l++) t += l * 300;
+  return t + _bulutSayi(xp);
+}
+function bulutXPdenSeviye(t){
+  t = _bulutSayi(t);
+  let level = 1;
+  while(level < 10 && t >= level * 300){ t -= level * 300; level++; }   // addXP ile ayni kural
+  return { level: level, xp: t };
+}
+function _bulutK(p){ return Math.min(JETON_TAVAN, _bulutSayi(p.coins) + harcanmisJeton(p.owned || [])); }
+
+// Buluttan gelen ham veri: {durum:'yok'|'gecerli'|'bozuk'|'yeni', veri}
+function bulutCoz(ham){
+  if(ham === null || ham === undefined || ham === '') return { durum:'yok' };
+  let o;
+  try{ o = (typeof ham === 'string') ? JSON.parse(ham) : ham; }catch(e){ return { durum:'bozuk' }; }
+  if(!o || typeof o !== 'object' || Array.isArray(o) || typeof o.sema !== 'number') return { durum:'bozuk' };
+  if(o.sema > BULUT_SEMA) return { durum:'yeni' };
+  const p = o.p;
+  if(!p || typeof p !== 'object' || !Array.isArray(p.owned)) return { durum:'bozuk' };
+  if(p.owned.some(function(x){ return typeof x !== 'string'; })) return { durum:'bozuk' };
+  const alanlar = ['coins','xp','level','hs'];
+  for(let i = 0; i < alanlar.length; i++){
+    const v = p[alanlar[i]];
+    if(v !== undefined && !(typeof v === 'number' && isFinite(v) && v >= 0)) return { durum:'bozuk' };
+  }
+  if(o.u !== undefined && !Array.isArray(o.u)) return { durum:'bozuk' };
+  return { durum:'gecerli', veri:o };
+}
+
+// Etkinlik ilerlemesi: ayni donem -> gorev basina max, odul listesi birlesim;
+// farkli donem -> sezonun SU ANKI donemine uyan kayit (yoksa yerel).
+function bulutEvBirlestir(yEv, bEv){
+  const gecerli = function(k){ return k && typeof k === 'object' && k.p && typeof k.p === 'object' && Array.isArray(k.v); };
+  const kopya = function(k){ return JSON.parse(JSON.stringify(k)); };
+  const s = {}, idler = {};
+  Object.keys(yEv || {}).forEach(function(i){ idler[i] = 1; });
+  Object.keys(bEv || {}).forEach(function(i){ idler[i] = 1; });
+  Object.keys(idler).forEach(function(id){
+    const a = yEv && yEv[id], b = bEv && bEv[id];
+    if(!gecerli(b)){ if(a) s[id] = a; return; }
+    if(!gecerli(a)){ s[id] = kopya(b); return; }
+    if(a.donem === b.donem){
+      const k = { donem:a.donem, p:{}, v:a.v.slice() };
+      Object.keys(a.p).forEach(function(g){ k.p[g] = _bulutSayi(a.p[g]); });
+      Object.keys(b.p).forEach(function(g){ k.p[g] = Math.max(k.p[g] || 0, _bulutSayi(b.p[g])); });
+      b.v.forEach(function(g){ if(k.v.indexOf(g) < 0) k.v.push(g); });
+      s[id] = k;
+    } else {
+      let simdiki = null;
+      try{ const sz = sezonBul(id); if(sz) simdiki = evDonem(sz, _bugun()); }catch(e){}
+      s[id] = (simdiki !== null && b.donem === simdiki && a.donem !== simdiki) ? kopya(b) : a;
+    }
+  });
+  return s;
+}
+function _bulutGunSayi(g){
+  const m = /^(\d+)-(\d+)-(\d+)$/.exec(String(g || ''));
+  return m ? (+m[1]) * 10000 + (+m[2]) * 100 + (+m[3]) : 0;
+}
+function bulutReklamBirlestir(a, b){
+  a = a || { gun:'', sayi:0 }; b = b || { gun:'', sayi:0 };
+  if(a.gun === b.gun) return { gun:a.gun, sayi:Math.max(_bulutSayi(a.sayi), _bulutSayi(b.sayi)) };
+  return (_bulutGunSayi(b.gun) > _bulutGunSayi(a.gun)) ? { gun:b.gun, sayi:_bulutSayi(b.sayi) }
+                                                       : { gun:a.gun, sayi:_bulutSayi(a.sayi) };
+}
+
+// SAF birlestirme (yan etkisiz). yerel/bulut: {p, ev, ads, sonGun}; taban: {k, xp}
+function bulutBirlestir(yerel, bulut, taban){
+  const bilinen = function(id){ return CUE_DEFTER_INDEKS[id] !== undefined; };
+  const owned = [];
+  (yerel.p.owned || []).forEach(function(id){ if(typeof id === 'string' && owned.indexOf(id) < 0) owned.push(id); });
+  const bilinmeyen = [];
+  if(bulut){
+    (bulut.p.owned || []).forEach(function(id){
+      if(bilinen(id)){ if(owned.indexOf(id) < 0) owned.push(id); }
+      else if(bilinmeyen.indexOf(id) < 0) bilinmeyen.push(id);
+    });
+    (bulut.u || []).forEach(function(id){
+      if(typeof id !== 'string') return;
+      if(bilinen(id)){ if(owned.indexOf(id) < 0) owned.push(id); }
+      else if(bilinmeyen.indexOf(id) < 0) bilinmeyen.push(id);
+    });
+  }
+  if(owned.indexOf('cosmic_eclipse') < 0) owned.unshift('cosmic_eclipse');
+
+  const kY = _bulutK(yerel.p);
+  const tY = bulutToplamXP(yerel.p.level, yerel.p.xp);
+  let k, coins, tx;
+  if(!bulut){
+    k = kY; coins = _bulutSayi(yerel.p.coins); tx = tY;
+  } else {
+    const kB = (typeof bulut.k === 'number' && isFinite(bulut.k)) ? Math.min(JETON_TAVAN, _bulutSayi(bulut.k)) : _bulutK(bulut.p);
+    const tB = (typeof bulut.tx === 'number' && isFinite(bulut.tx)) ? _bulutSayi(bulut.tx) : bulutToplamXP(bulut.p.level, bulut.p.xp);
+    const tabK = _bulutSayi(taban.k), tabX = _bulutSayi(taban.xp);
+    k  = Math.min(JETON_TAVAN, Math.max(kB, tabK) + Math.max(0, kY - tabK));
+    tx = Math.max(tB, tabX) + Math.max(0, tY - tabX);
+    coins = Math.max(0, k - harcanmisJeton(owned));
+  }
+  const sv = bulutXPdenSeviye(tx);
+  const hs = Math.max(_bulutSayi(yerel.p.hs), bulut ? _bulutSayi(bulut.p.hs) : 0);
+
+  // equipped: YALNIZCA sahip olunan. Yerel secim korunur; yerel varsayilandaysa
+  // (yeni cihaz) buluttaki sahipli secim alinir.
+  const yEq = yerel.p.equipped, bEq = bulut ? bulut.p.equipped : null;
+  let equipped;
+  if(typeof yEq === 'string' && owned.indexOf(yEq) >= 0 && !(yEq === 'cosmic_eclipse' && typeof bEq === 'string' && bEq !== 'cosmic_eclipse' && owned.indexOf(bEq) >= 0)) equipped = yEq;
+  else if(typeof bEq === 'string' && owned.indexOf(bEq) >= 0) equipped = bEq;
+  else equipped = 'cosmic_eclipse';
+
+  return {
+    p: { coins:coins, xp:sv.xp, level:sv.level, hs:hs, owned:owned, equipped:equipped },
+    k: k, tx: tx, bilinmeyen: bilinmeyen,
+    ev: bulutEvBirlestir(yerel.ev, bulut ? bulut.ev : null),
+    sonGun: Math.max(_bulutSayi(yerel.sonGun), bulut ? _bulutSayi(bulut.sonGun) : 0),
+    ads: bulutReklamBirlestir(yerel.ads, bulut ? bulut.ads : null)
+  };
+}
+
+function _bulutYerelAnlik(){
+  return { p: JSON.parse(JSON.stringify(P)), ev: JSON.parse(JSON.stringify(EV.s || {})),
+           sonGun: EV.sonGun || 0, ads: { gun:REKLAM_SAYAC.gun, sayi:REKLAM_SAYAC.sayi } };
+}
+function _bulutVarsayilanYerel(){
+  return { p: { coins:200, xp:0, level:1, hs:0, owned:['cosmic_eclipse'], equipped:'cosmic_eclipse' },
+           ev:{}, sonGun:0, ads:{ gun:'', sayi:0 } };
+}
+
+// Sonucu oyuna uygular. mod 'birlestir': owned YALNIZCA EKLENIR (sahiplikBirlestir).
+// mod 'degistir': hesap degisimi -> profil yeni hesabinkiyle degisir (yedek ONCEDEN alinmistir).
+function bulutUygula(s, mod){
+  BULUT.uyguluyor = true;
+  try{
+    if(mod === 'degistir'){
+      P.owned = s.p.owned.filter(function(id){ return CUE_DEFTER_INDEKS[id] !== undefined; });
+      if(P.owned.indexOf('cosmic_eclipse') < 0) P.owned.unshift('cosmic_eclipse');
+    } else {
+      sahiplikBirlestir(s.p.owned);                     // ASLA silmez
+    }
+    P.coins = s.p.coins; P.xp = s.p.xp; P.level = s.p.level; P.hs = s.p.hs;
+    if(mod === 'degistir' && P.owned.indexOf(P.equipped) < 0){ P.equipped = 'cosmic_eclipse'; selectedSkin = 'cosmic_eclipse'; }
+    saveP();
+    EV.s = s.ev; EV.sonGun = s.sonGun; evKaydet();
+    REKLAM_SAYAC.gun = s.ads.gun; REKLAM_SAYAC.sayi = s.ads.sayi; reklamSayacKaydet();
+  } finally {
+    BULUT.uyguluyor = false;
+  }
+  bulutEquipIste(s.p.equipped);
+  try{ refreshMenu(); }catch(e){}
+  try{ refreshSkinBar(); }catch(e){}
+  try{ const sh = document.getElementById('screen-shop'); if(sh && sh.classList.contains('active')) renderShop(); }catch(e){}
+  try{ const co = document.getElementById('screen-collection'); if(co && co.classList.contains('active')) renderCollection(); }catch(e){}
+}
+// Istaka secimi: yalnizca SAHIP olunan; aktif 24 saatlik deneme bozulmaz;
+// mac SURERKEN istaka degismez (mac bitince uygulanir).
+function bulutEquipIste(eq){
+  BULUT.bekleyenEquip = eq;
+  if(BULUT.equipZaman) return;
+  const dene = function(){
+    BULUT.equipZaman = null;
+    const e = BULUT.bekleyenEquip;
+    if(typeof e !== 'string') return;
+    if(G.phase === 'playing'){ BULUT.equipZaman = setTimeout(dene, 1000); return; }
+    BULUT.bekleyenEquip = null;
+    if(P.owned.indexOf(e) < 0 || P.equipped === e) return;
+    try{ if(typeof denemeAktifMi === 'function' && denemeAktifMi(P.equipped)) return; }catch(x){}
+    P.equipped = e; selectedSkin = e;
+    try{ applyCueStats(); }catch(x){}
+    saveP();
+    try{ refreshSkinBar(); }catch(x){}
+  };
+  dene();
+}
+
+function bulutPaketiOlustur(){
+  const owned = P.owned.slice();
+  let eq = P.equipped;
+  if(owned.indexOf(eq) < 0){
+    eq = (typeof DENEME !== 'undefined' && DENEME && owned.indexOf(DENEME.onceki) >= 0) ? DENEME.onceki : 'cosmic_eclipse';
+  }
+  return {
+    sema: BULUT_SEMA, t: Date.now(),
+    k: jetonGuvenlikDegeri(), tx: bulutToplamXP(P.level, P.xp),
+    p: { coins:_bulutSayi(P.coins), xp:_bulutSayi(P.xp), level:_bulutSayi(P.level) || 1,
+         hs:_bulutSayi(P.hs), owned:owned, equipped:eq },
+    u: BULUT.bilinmeyen.slice(0, 500),
+    ev: EV.s || {}, sonGun: EV.sonGun || 0,
+    ads: { gun:REKLAM_SAYAC.gun || '', sayi:_bulutSayi(REKLAM_SAYAC.sayi) }
+  };
+}
+
+function bulutYaz(acil){
+  if(BULUT.durum !== 'aktif' || !BULUT.adaptor) return false;
+  if(BULUT.zaman){ clearTimeout(BULUT.zaman); BULUT.zaman = null; }
+  const paket = bulutPaketiOlustur();
+  const json = JSON.stringify(paket);
+  if(json.length > BULUT_MAX_BAYT) return false;
+  // TABAN gonderimden ONCE yerelde saklanir: gonderim basarisiz olsa bile
+  // sonraki birlestirme hicbir jetonu kaybetmez ve cift SAYMAZ.
+  _bulutMetaYaz({ v:1, h:BULUT.hesapK, k:paket.k, xp:paket.tx, t:paket.t });
+  BULUT.kirli = false;
+  BULUT.sonYazma = Date.now();
+  try{
+    const r = BULUT.adaptor.yaz(json, !!acil);
+    if(r && typeof r.then === 'function') r.then(null, function(){ BULUT.kirli = true; });
+  }catch(e){ BULUT.kirli = true; }
+  return true;
+}
+function bulutKayitPlanla(){
+  if(BULUT.durum !== 'aktif' || BULUT.uyguluyor || !BULUT.adaptor) return;
+  BULUT.kirli = true;
+  if(BULUT.zaman) return;
+  const ad = BULUT.adaptor;
+  const bekle = Math.max(ad.debounceMs, ad.minAralikMs - (Date.now() - BULUT.sonYazma));
+  BULUT.zaman = setTimeout(function(){ BULUT.zaman = null; if(BULUT.kirli) bulutYaz(false); }, bekle);
+}
+// Sekme gizlenirken / sayfa kapanirken bekleyen kaydi tamamlamayi dene.
+function bulutHemenYaz(zorla){
+  if(BULUT.durum !== 'aktif' || !BULUT.kirli) return false;
+  if(!zorla && (Date.now() - BULUT.sonYazma) < 3000) return false;   // sekme gecisi seli olmasin
+  return bulutYaz(true);
+}
+try{
+  window.addEventListener('pagehide', function(){ try{ bulutHemenYaz(true); }catch(e){} });
+  document.addEventListener('visibilitychange', function(){
+    try{ if(document.visibilityState === 'hidden') bulutHemenYaz(false); }catch(e){}
+  });
+}catch(e){}
+
+function _bulutYedekle(eskiHesapK){
+  try{
+    localStorage.setItem(BULUT_YEDEK, JSON.stringify({ t:Date.now(), h:eskiHesapK,
+      p:P, ev:EV, ads:REKLAM_SAYAC }));
+    return true;
+  }catch(e){ return false; }
+}
+
+// ANA AKIS. Her cagri yeni bir 'nesil' baslatir; eskisinin gec gelen sonucu yok sayilir.
+async function bulutBaslat(neden){
+  const nesil = ++BULUT.nesil;
+  if(BULUT.zaman){ clearTimeout(BULUT.zaman); BULUT.zaman = null; }
+  BULUT.durum = 'kapali'; BULUT.adaptor = null;
+  const pl = (function(){ try{ return AD.platform(); }catch(e){ return 'web'; } })();
+  const ad = BULUT_ADAPTOR[pl];
+  BULUT.platform = pl;
+  if(!ad || typeof ad.uygun !== 'function' || !ad.uygun()){ BULUT.sebep = 'platform_yok'; return BULUT.sebep; }
+
+  let hesap = null;
+  try{ hesap = await _bulutZamanli(ad.hesap(), BULUT_OKUMA_MS); }catch(e){ hesap = null; }
+  if(nesil !== BULUT.nesil) return 'eski';
+  if(!hesap){ BULUT.sebep = 'misafir'; return BULUT.sebep; }
+
+  let ham;
+  try{ ham = await _bulutZamanli(Promise.resolve().then(function(){ return ad.oku(); }), BULUT_OKUMA_MS); }
+  catch(e){ BULUT.sebep = 'api_yok'; return BULUT.sebep; }            // kapali / zaman asimi: yalnizca yerel
+  if(nesil !== BULUT.nesil) return 'eski';
+
+  const c = bulutCoz(ham);
+  if(c.durum === 'bozuk' || c.durum === 'yeni'){
+    BULUT.durum = 'salt'; BULUT.sebep = c.durum;                       // bulutun USTUNE YAZILMAZ
+    return BULUT.sebep;
+  }
+  const hk = _bulutHash(pl + ':' + String(hesap));
+  const meta = _bulutMetaOku();
+  const bulutVeri = (c.durum === 'gecerli') ? c.veri : null;
+  let sonuc, mod;
+  if(meta && meta.h !== hk){
+    // HESAP DEGISIMI: yerel profil baska hesaba ait. Once YEDEK, sonra bu
+    // hesabin verisi. Yerel veri bu hesaba ASLA birlestirilmez.
+    if(!_bulutYedekle(meta.h)){ BULUT.durum = 'salt'; BULUT.sebep = 'yedek_hatasi'; return BULUT.sebep; }
+    sonuc = bulutBirlestir(_bulutVarsayilanYerel(), bulutVeri, { k:BULUT_BASLANGIC_K, xp:0 });
+    mod = 'degistir';
+    BULUT.sebep = 'hesap_degisti';
+  } else {
+    const taban = meta ? { k:meta.k, xp:meta.xp } : { k:BULUT_BASLANGIC_K, xp:0 };
+    sonuc = bulutBirlestir(_bulutYerelAnlik(), bulutVeri, taban);
+    mod = 'birlestir';
+    BULUT.sebep = meta ? 'senkron' : 'ilk_baglanti';
+  }
+  BULUT.adaptor = ad; BULUT.hesapK = hk; BULUT.bilinmeyen = sonuc.bilinmeyen;
+  bulutUygula(sonuc, mod);
+  BULUT.durum = 'aktif';
+  bulutYaz(true);                                                      // birlesik durum hemen buluta
+  return BULUT.sebep;
+}
+
+// CrazyGames oturum ici giris/cikis. SDK girisle data modulunu YENILER.
+function bulutCgHesapDegisti(u){
+  let pl = 'web'; try{ pl = AD.platform(); }catch(e){}
+  if(pl !== 'crazygames') return;
+  if(!u){
+    try{ bulutHemenYaz(true); }catch(e){}                              // cikistan once son kayit
+    BULUT.nesil++; BULUT.durum = 'kapali'; BULUT.adaptor = null; BULUT.sebep = 'cikis';
+    return;
+  }
+  let eski = null; try{ eski = CG_SDK.data; }catch(e){}
+  const bas = Date.now();
+  (function bekle(){
+    let yeni = null; try{ yeni = CG_SDK.data; }catch(e){}
+    if((yeni && yeni !== eski) || (Date.now() - bas) > BULUT_OKUMA_MS){ bulutBaslat('giris'); return; }
+    setTimeout(bekle, 250);
+  })();
 }
 
 // ── [YASAL] Platform duyarli dis link politikasi ─────────────────
@@ -9542,6 +9960,8 @@ function _yandexBaslat(){
     return Promise.resolve(window.YaGames.init())
       .then(function(s){
         _ysdk = s || null;
+        // [BULUT] Yandex hesabindaki ilerleme (yalnizca yetkili oyuncu).
+        try{ setTimeout(function(){ try{ bulutBaslat('acilis'); }catch(e){} }, 0); }catch(e){}
         // Otomatik dil, SDK hazir olur olmaz uygulanir.
         try{ yaDiliUygula(); }catch(e){}
         // Oyun bu noktada zaten oynanabilir hale gelmis olabilir.
