@@ -69,6 +69,9 @@ function bekleyenBul(ws){
   for (const [id, oda] of bekleyenOdalar) {
     if (!oda || !oda.host) { bekleyenOdalar.delete(id); continue; }
     if (oda.host === ws) continue;
+    // [OZEL-ODA] Arkadas davetiyle acilan oda kor eslestirmeye ASLA verilmez;
+    // yalnizca oda kimligini bilen join_room ile girilebilir.
+    if (oda.ozel === true) continue;
     if (oda.host.readyState !== WebSocket.OPEN) { bekleyenOdalar.delete(id); continue; }
     return oda;
   }
@@ -219,6 +222,8 @@ wss.on('connection', (ws) => {
         // [ODA-MAP] Platform davet linkiyle BELIRLI odaya katilma.
         // find_match AKISINA DOKUNMAZ; yanina eklenmistir.
         case 'join_room':  joinRoom(ws, msg); break;
+        // [OZEL-ODA] Arkadas daveti icin yalnizca kimlikle girilebilen oda.
+        case 'create_private_room': createPrivateRoom(ws, msg); break;
         case 'relay':
         case 'rematch_request':
         case 'rematch_decline':
@@ -584,6 +589,54 @@ function findMatch(ws, msg) {
 }
 
 // ════════════════════════════════════════════════════════════════════
+// [OZEL-ODA] create_private_room — arkadas daveti icin OZEL bekleyen oda
+// ════════════════════════════════════════════════════════════════════
+// * Oda kimligi TAHMIN EDILEMEZ (96 bit, base64url, 16 karakter) ve
+//   ODA_ID_DESEN'e uyar.
+// * bekleyenBul() ozel odalari ATLAR: find_match bu odaya hicbir kosulda
+//   eslesmez. Girmenin tek yolu mevcut join_room (davet linkindeki kimlik).
+// * Esleme, TTL, sahip kopunca silme, shot clock ve rematch MEVCUT kodla
+//   aynidir. Yeni sunucu->istemci mesaji: yalnizca create_error.
+function ozelOdaKimligi() {
+  let id;
+  do {
+    id = require('crypto').randomBytes(12).toString('base64')
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  } while (bekleyenOdalar.has(id) || rooms.has(id));
+  return id;
+}
+
+function createPrivateRoom(ws, msg) {
+  // Aktif macin odasindaki soket yeni oda acamaz (findMatch D1 ile ayni kural).
+  if (ws.roomId && rooms.has(ws.roomId)) {
+    return send(ws, {type:'create_error', code:'already_in_room'});
+  }
+  // Soket basina TEK bekleyen oda: eskisi (genel veya ozel) dusurulur.
+  const kendi = bekleyenKendi(ws);
+  if (kendi) bekleyenOdalar.delete(kendi.id);
+
+  // Kimlik alanlari: findMatch ile AYNI islem.
+  if (msg && typeof msg.nickname === 'string') {
+    ws.nick = msg.nickname.slice(0, 24);
+  }
+  ws.profil = davetProfilTemizle(msg && msg.profil);
+  if (msg && typeof msg.chatSid === 'string' && msg.chatSid.length <= 128) {
+    ws.chatSid = msg.chatSid;
+  }
+
+  const id = ozelOdaKimligi();
+  const oda = { id, host: ws, guest: null, turn: 0, inHandFor: null,
+                pending: false, olusturma: Date.now(), ozel: true };
+  bekleyenOdalar.set(id, oda);
+
+  ws.roomId = id;
+  ws.slot = 0;
+
+  send(ws, {type:'waiting', roomId:id, private:true});
+  console.log('WAIT-PRIVATE', id);
+}
+
+// ════════════════════════════════════════════════════════════════════
 // [ODA-MAP] join_room — BELIRLI bir bekleyen odaya katilma
 // ════════════════════════════════════════════════════════════════════
 // KULLANIM: platform davet linki (CrazyGames inviteParams.room).
@@ -644,10 +697,12 @@ function joinRoom(ws, msg) {
   const guestProfil = room.guest.profil || { ad:'', avatar:'', kaynak:'guest' };
   try { davetMacSinirindaSifirla(room.host); davetMacSinirindaSifirla(room.guest); } catch(e) {}
 
+  // [OZEL-ODA] private: istemci ozel macta rakip ayrilinca genel kuyruga DONMEZ.
+  const ozel = (room.ozel === true);
   send(room.host,  {type:'game_start', slot:0, ballSeed:seed, hostNick:hostNick, guestNick:guestNick,
-                    hostProfile:hostProfil, guestProfile:guestProfil, roomId:room.id});
+                    hostProfile:hostProfil, guestProfile:guestProfil, roomId:room.id, private:ozel});
   send(room.guest, {type:'game_start', slot:1, ballSeed:seed, hostNick:hostNick, guestNick:guestNick,
-                    hostProfile:hostProfil, guestProfile:guestProfil, roomId:room.id});
+                    hostProfile:hostProfil, guestProfile:guestProfil, roomId:room.id, private:ozel});
 
   atisSaatiBaslat(room);
   console.log('JOIN', room.id, hostNick, 'vs', guestNick);

@@ -1476,13 +1476,12 @@ function cgAktif(){
 // Giris yapilmamissa null doner; cagiran taraf mevcut guest nick'ine duser.
 // Mevcut nickname sistemi DEGISMEZ, yalnizca CG ortaminda tercih edilir.
 function cgKullaniciAdi(){
+  // [CG-10] SDK v3'te getUser() ASYNC'tir; senkron okuma her zaman null
+  // donuyordu. Ad artik _cgKullaniciYukle() / auth dinleyicisi ile
+  // onbellege alinir ve buradan okunur. Giris yoksa null -> guest fallback.
   try{
-    if(!cgAktif() || !CG_SDK.user) return null;
-    const k = CG_SDK.user.getUser;
-    if(typeof k !== 'function') return null;
-    const s = CG_SDK.user.getUser();
-    if(s && typeof s.then === 'function') return null;   // async surum: profilYukle kullanir
-    if(s && typeof s.username === 'string' && s.username) return s.username.slice(0, 24);
+    if(!cgAktif()) return null;
+    return _cgKullaniciAd;
   }catch(e){}
   return null;
 }
@@ -1503,11 +1502,12 @@ function cgOdaBildir(odaId, katilabilir){
   try{
     if(typeof CG_SDK.game.updateRoom !== 'function') return false;
     CG_ODA_ID = odaId;
-    CG_SDK.game.updateRoom({
+    // [CG-9] Dogrudan cagri yerine hiz siniri kuyrugu (SDK: 250 ms).
+    _cgOdaKuyruk({ tur: 'update', veri: {
       roomId: odaId,
       isJoinable: !!katilabilir,
       inviteParams: { room: odaId }
-    });
+    }});
     return true;
   }catch(e){ return false; }
 }
@@ -1517,8 +1517,8 @@ function cgOdaKapat(){
   if(!cgAktif() || !CG_ODA_ID) return false;
   try{
     if(typeof CG_SDK.game.updateRoom !== 'function') return false;
-    CG_SDK.game.updateRoom({ roomId: CG_ODA_ID, isJoinable: false,
-                             inviteParams: { room: CG_ODA_ID } });
+    _cgOdaKuyruk({ tur: 'update', veri: { roomId: CG_ODA_ID, isJoinable: false,
+                                          inviteParams: { room: CG_ODA_ID } }});
     return true;
   }catch(e){ return false; }
 }
@@ -1544,6 +1544,12 @@ function cgDavetLinki(odaId){
 }
 function cgDavetParam(anahtar){
   if(!cgAktif()) return null;
+  // [CG-11] Once SDK'nin ayristirdigi inviteParams (czy_invite=true linkleri).
+  try{
+    const ip = CG_SDK.game.inviteParams;
+    const k = anahtar || 'room';
+    if(ip && typeof ip === 'object' && typeof ip[k] === 'string' && ip[k]) return ip[k];
+  }catch(e){}
   try{
     if(typeof CG_SDK.game.getInviteParam !== 'function') return null;
     const v = CG_SDK.game.getInviteParam(anahtar || 'room');
@@ -1612,21 +1618,319 @@ function cgAyarDinleyiciKur(){
 function cgHazirKancasi(){
   if(!cgAktif()) return;
   try{ cgAyarlariOku(); cgAyarUygula(); cgAyarDinleyiciKur(); }catch(e){}
-  // Instant multiplayer VEYA davet linkiyle gelis: dogrudan cevrimici
-  // akisa gir. Menu/onboarding adimi atlanir.
+  // [CG-12] Oyun acikken gelen katilim (CrazyGames arayuzu) + auth + davet arayuzu.
+  try{ _cgKatilimDinleyiciKur(); }catch(e){}
+  try{ _cgAuthDinleyiciKur(); }catch(e){}
+  try{ _cgDavetArayuzuBagla(); }catch(e){}
+  let davetOdasi = null, instant = false;
+  try{ davetOdasi = cgDavetParam('room'); }catch(e){}
+  try{ instant = cgInstantMi(); }catch(e){}
+  // Kullanici adi (en fazla ~1,5 sn) beklenir ki ilk eslesmede dogru ad gitsin.
+  _cgKullaniciYukle().then(function(){
+    _cgAcilisSonrasi(function(){
+      try{
+        // Davetle gelis: TEK katilim giris noktasi. Gecersiz davet -> instant akisi.
+        if(davetOdasi && cgOdayaKatil(davetOdasi, 'acilis')) return;
+        if(instant && typeof startOnlineMode === 'function') startOnlineMode();
+      }catch(e){}
+    });
+  });
+}
+// Acilis intro'su (acilisiTamamla -> DOMContentLoaded -> showIntro) online
+// ekranin USTUNE binmesin: islem sabit gecikme yerine DOM hazir olduktan
+// SONRA planlanir. (Eski sabit 400 ms bir zamanlama yarisina aciktir.)
+function _cgAcilisSonrasi(fn){
+  const planla = function(){ setTimeout(fn, 400); };
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', planla, { once: true });
+  } else {
+    planla();
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  [CG-OZEL] Ozel oda daveti + runtime join + leftRoom + kullanici adi
+// ═════════════════════════════════════════════════════════════════
+// Hepsi cgAktif() korumasi arkasindadir: CrazyGames disinda (Bot, 2 Player,
+// Yandex, Pixidus, Android, yerel tarayici) HICBIRI calismaz.
+// Sunucu protokolu: create_private_room -> waiting{private:true} ;
+// katilim MEVCUT join_room ; hata: join_error / create_error.
+const CG_ODA_DESEN     = /^[A-Za-z0-9_-]{4,32}$/;   // sunucu ODA_ID_DESEN ile ayni
+const CG_ODA_ARALIK_MS = 300;                        // SDK ROOM_METHODS_DELAY=250 + pay
+const CG_OZEL_YANIT_MS = 8000;                       // baglanti acildiktan sonra yanit tavani
+let _cgOdada           = false;   // updateRoom GERCEKTEN gonderildi mi (leftRoom kosulu)
+let _cgOzelMac         = false;   // aktif mac ozel oda maci mi (sunucu game_start.private)
+let _cgOzelHost        = false;   // INVITE FRIEND ile ozel oda kuruluyor/bekleniyor
+let _cgOzelZaman       = null;
+let _cgOzelDeneme      = 0;
+let _cgDavetKatilimi   = false;   // su anki join_room bir davetten mi
+let _cgOdaSon          = 0;
+let _cgOdaBekleyen     = null;
+let _cgOdaZamanlayici  = null;
+let _cgKullaniciAd     = null;
+let _cgKullaniciSozu   = null;
+let _cgKatilimKurulu   = false;
+let _cgAuthKurulu      = false;
+
+// ── [CG-9] updateRoom / leftRoom hiz siniri kuyrugu ──────────────────
+// SDK ayni metodu 250 ms icinde ikinci kez cagirinca HATA firlatir; eskiden
+// try/catch bunu yutuyor ve guncelleme KAYBOLUYORDU. En son durum kazanir.
+function _cgOdaGonder(is){
   try{
-    const davetOdasi = cgDavetParam('room');
-    if(cgInstantMi() || davetOdasi){
-      if(davetOdasi){
-        CG_ODA_ID = davetOdasi;
-        // [CG-5] fbFindMatch bunu gorup find_match yerine join_room yollar.
-        try{ _CG_KATIL_ODA = davetOdasi; }catch(e){}
-      }
-      setTimeout(function(){
-        try{ if(typeof startOnlineMode === 'function') startOnlineMode(); }catch(e){}
-      }, 400);
+    if(is.tur === 'update'){
+      if(typeof CG_SDK.game.updateRoom === 'function'){ CG_SDK.game.updateRoom(is.veri); _cgOdada = true; }
+    } else if(is.tur === 'left'){
+      if(typeof CG_SDK.game.leftRoom === 'function') CG_SDK.game.leftRoom();
     }
   }catch(e){}
+  _cgOdaSon = Date.now();
+}
+function _cgOdaKuyruk(is){
+  if(!cgAktif() || !is) return false;
+  _cgOdaBekleyen = is;
+  if(_cgOdaZamanlayici) return true;             // zaten planli: en son durum gidecek
+  const kalan = CG_ODA_ARALIK_MS - (Date.now() - _cgOdaSon);
+  if(kalan <= 0){
+    const x = _cgOdaBekleyen; _cgOdaBekleyen = null; _cgOdaGonder(x);
+    return true;
+  }
+  _cgOdaZamanlayici = setTimeout(function(){
+    _cgOdaZamanlayici = null;
+    const x = _cgOdaBekleyen; _cgOdaBekleyen = null;
+    if(x) _cgOdaGonder(x);
+  }, kalan);
+  return true;
+}
+
+// ── [CG-13] leftRoom: YALNIZCA gercekten odadayken, BIR KEZ ─────────
+function cgOdadanCik(){
+  if(!cgAktif()) return false;
+  const odadaydi = _cgOdada;
+  _cgOdada = false; CG_ODA_ID = null; _cgOzelMac = false;
+  if(!odadaydi){
+    // Hic gonderilmemis bekleyen updateRoom varsa iptal: odaya hic girilmedi.
+    if(_cgOdaBekleyen && _cgOdaBekleyen.tur === 'update') _cgOdaBekleyen = null;
+    return false;
+  }
+  _cgOdaKuyruk({ tur: 'left' });
+  return true;
+}
+// showScreen('menu') kancasi: online odadan menuye donus.
+function cgMenuyeDonus(){
+  if(!cgAktif() || _cgOzelHost) return;
+  if(_cgOdada) cgOdadanCik();
+}
+
+// ── [CG-10] Kullanici adi onbellegi + auth dinleyicisi ──────────────
+function _cgKullaniciAyarla(u){
+  _cgKullaniciAd = (u && typeof u.username === 'string' && u.username) ? u.username.slice(0, 24) : null;
+}
+function _cgKullaniciYukle(){
+  if(_cgKullaniciSozu) return _cgKullaniciSozu;
+  _cgKullaniciSozu = new Promise(function(coz){
+    let bitti = false;
+    const son = function(){ if(!bitti){ bitti = true; coz(_cgKullaniciAd); } };
+    try{
+      if(!cgAktif() || !CG_SDK.user || typeof CG_SDK.user.getUser !== 'function') return son();
+      setTimeout(son, 1500);                       // SDK gecikirse fallback ad kullanilir
+      Promise.resolve(CG_SDK.user.getUser())
+        .then(function(u){ _cgKullaniciAyarla(u); son(); })
+        .catch(function(){ son(); });
+    }catch(e){ son(); }
+  });
+  return _cgKullaniciSozu;
+}
+function _cgAuthDinleyiciKur(){
+  if(_cgAuthKurulu || !cgAktif() || !CG_SDK.user) return;
+  if(typeof CG_SDK.user.addAuthListener !== 'function') return;
+  CG_SDK.user.addAuthListener(function(u){
+    try{ _cgKullaniciAyarla(u); }catch(e){}
+    // Profil onbellegi tazelenir (giris/cikis sonrasi dogru ad ve avatar).
+    try{
+      if(typeof PROFIL !== 'undefined' && PROFIL){ PROFIL._sozu = null; PROFIL._onbellek = null; }
+      if(typeof profilYukle === 'function'){
+        profilYukle().then(function(){ try{ ghKimlikTazele(); }catch(e){} });
+      }
+    }catch(e){}
+  });
+  _cgAuthKurulu = true;
+}
+
+// ── [CG-12] Tek katilim giris noktasi (acilis / runtime) ─────────────
+function _cgMacSuruyor(){
+  // Bot, 2 Player veya Online maci SURERKEN phase 'playing'dir.
+  try{ return G.phase === 'playing'; }catch(e){ return false; }
+}
+function _cgOnlineSifirla(){
+  // opponent_left (D7) blogundaki temizligin AYNISI; yalnizca online state.
+  try{
+    if(!G.onlineMode) return;
+    G.onlineMode = false; G.moving = false; G.inHand = false;
+    G.sunkThisShot = false; G._cueFoul = false;
+    clearInterval(G.timerInt);
+    if(_physTimer){ clearInterval(_physTimer); _physTimer = null; }
+    drag.active = false; drag.power = 0;
+  }catch(e){}
+}
+function _cgDavetPenceresiKapat(){
+  _cgOzelHost = false; _cgOzelDeneme = 0;
+  if(_cgOzelZaman){ clearTimeout(_cgOzelZaman); _cgOzelZaman = null; }
+  try{ const m = document.getElementById('screen-challenge'); if(m) m.style.display = 'none'; }catch(e){}
+}
+function cgOdayaKatil(odaId, kaynak){
+  if(!cgAktif()) return false;
+  const oda = (typeof odaId === 'string') ? odaId.trim() : '';
+  if(!CG_ODA_DESEN.test(oda)) return false;
+  // A) Devam eden mac ASLA bozulmaz: davet reddedilir, bilgi verilir.
+  if(_cgMacSuruyor()){
+    try{ toast2(t(G.onlineMode ? 'cg.inv.busyOnline' : 'cg.inv.busyMatch')); }catch(e){}
+    return false;
+  }
+  // Ayni odaya zaten baglaniliyor / bagli.
+  if(oda === CG_ODA_ID && (_cgOdada || G.phase === 'online-waiting')) return false;
+  // Uygun bos durum (menu, lobi, sonuc, magaza...): eski oda ve baglanti temizlenir.
+  if(_cgOzelHost) _cgDavetPenceresiKapat();
+  try{ fbCancelMatch(); }catch(e){}           // soket kapanir, sunucu eski odayi siler; leftRoom
+  _cgOnlineSifirla();
+  _CG_KATIL_ODA   = oda;                       // fbFindMatch bunu gorup join_room yollar
+  CG_ODA_ID       = oda;
+  _cgDavetKatilimi = true;
+  try{ startOnlineMode(); }catch(e){ _cgDavetKatilimi = false; return false; }
+  return true;
+}
+function _cgKatilimDinleyici(params){
+  try{
+    const oda = (params && typeof params.room === 'string') ? params.room : null;
+    cgOdayaKatil(oda, 'runtime');
+  }catch(e){}
+}
+function _cgKatilimDinleyiciKur(){
+  if(_cgKatilimKurulu || !cgAktif()) return;
+  if(typeof CG_SDK.game.addJoinRoomListener !== 'function') return;
+  CG_SDK.game.addJoinRoomListener(_cgKatilimDinleyici);
+  _cgKatilimKurulu = true;
+}
+// join_error: davetle katilimda GENEL kuyruga dusulmez, anlasilir hata verilir.
+function cgKatilimHatasi(kod){
+  if(!cgAktif() || !_cgDavetKatilimi) return false;
+  _cgDavetKatilimi = false;
+  const m = _cgKatilHataMetni(kod);
+  try{ const e = document.getElementById('online-msg'); if(e) e.textContent = m; }catch(e){}
+  try{ toast2(m); }catch(e){}
+  try{ setOnlineStatus('idle'); }catch(e){}
+  cgOdadanCik();
+  return true;
+}
+
+// ── [CG-14] INVITE FRIEND: gercek ozel oda + inviteLink ──────────────
+function cgOzelOdaAc(){
+  if(!cgAktif()) return false;
+  if(_cgMacSuruyor()){
+    try{ toast2(t(G.onlineMode ? 'cg.inv.busyOnline' : 'cg.inv.busyMatch')); }catch(e){}
+    return false;
+  }
+  try{ fbCancelMatch(); }catch(e){}           // eski baglanti/oda temizlenir
+  _cgOnlineSifirla();
+  _CG_KATIL_ODA = null; _cgDavetKatilimi = false;
+  const m = document.getElementById('screen-challenge');
+  const l = document.getElementById('invite-link');
+  const s = document.getElementById('invite-status');
+  if(l) l.textContent = '';
+  if(s) s.textContent = t('cg.inv.creating');
+  if(m) m.style.display = 'flex';
+  _cgOzelHost = true; _cgOzelDeneme = 0;
+  // Faz 'online-waiting': Render uyanirken mevcut yeniden deneme mantigi calisir.
+  G.phase = 'online-waiting';
+  try{ setOnlineStatus('searching'); }catch(e){}
+  _cgOzelIstekGonder();
+  return true;
+}
+function _cgOzelIstekGonder(){
+  wsConnect(function(){
+    if(!_cgOzelHost) return;
+    try{
+      const p = _eslesmePaketi();
+      p.type = 'create_private_room';
+      wsSend(p);
+    }catch(e){}
+    if(_cgOzelZaman) clearTimeout(_cgOzelZaman);
+    _cgOzelZaman = setTimeout(function(){
+      _cgOzelZaman = null;
+      if(_cgOzelHost && !CG_ODA_ID) cgOzelOdaHatasi('timeout');
+    }, CG_OZEL_YANIT_MS);
+  });
+}
+// waiting{private:true}: gercek sunucu oda kimligi -> updateRoom + inviteLink.
+function cgDavetPenceresiGuncelle(odaId){
+  if(!cgAktif() || !_cgOzelHost) return;
+  if(_cgOzelZaman){ clearTimeout(_cgOzelZaman); _cgOzelZaman = null; }
+  const l = document.getElementById('invite-link');
+  const s = document.getElementById('invite-status');
+  const link = cgDavetLinki(odaId);
+  if(link){
+    if(l) l.textContent = String(link);
+    if(s) s.textContent = t('cg.inv.ready');
+  } else {
+    cgOzelOdaHatasi('no_link');
+  }
+}
+// create_error / zaman asimi / link uretilemedi.
+function cgOzelOdaHatasi(kod){
+  if(!cgAktif() || !_cgOzelHost) return;
+  if(kod === 'already_in_room' && _cgOzelDeneme < 1){
+    _cgOzelDeneme++;
+    try{ _wsRetryTemizle(); _wsNesil++; _wsBaglaniyor = false; if(WS){ try{ WS.close(); }catch(e){} } }catch(e){}
+    _cgOzelIstekGonder();
+    return;
+  }
+  const s = document.getElementById('invite-status');
+  if(s) s.textContent = t('cg.inv.createFail');
+  const l = document.getElementById('invite-link');
+  if(l) l.textContent = '';
+  _cgOzelHost = false;
+  if(_cgOzelZaman){ clearTimeout(_cgOzelZaman); _cgOzelZaman = null; }
+  try{ fbCancelMatch(); }catch(e){}
+  try{ G.phase = 'menu'; }catch(e){}
+}
+function cgDavetIptal(){
+  const hostti = _cgOzelHost;
+  _cgDavetPenceresiKapat();
+  if(hostti || _cgOdada){ try{ fbCancelMatch(); }catch(e){} }
+  try{ showScreen('menu'); }catch(e){}
+}
+// Mevcut INVITE FRIEND butonu ve pencere CANCEL'i YALNIZCA CrazyGames'te baglanir.
+function _cgDavetArayuzuBagla(){
+  if(!cgAktif()) return;
+  const b = document.getElementById('menu-challenge');
+  if(b) b.onclick = function(){ cgOzelOdaAc(); };
+  const m = document.getElementById('screen-challenge');
+  if(m){
+    const btns = m.querySelectorAll('button');
+    for(let i = 0; i < btns.length; i++){
+      if((btns[i].textContent || '').indexOf('CANCEL') >= 0){
+        btns[i].onclick = function(){ cgDavetIptal(); };
+      }
+    }
+  }
+}
+// game_start: pencere kapanir, ozel mac bayragi sunucudan alinir.
+function cgMacBasladi(msg){
+  if(!cgAktif()) return;
+  _cgDavetKatilimi = false;
+  if(_cgOzelHost) _cgDavetPenceresiKapat();
+  _cgOzelMac = !!(msg && msg.private === true);
+}
+// opponent_left: OZEL macta genel kuyruga DONULMEZ, menuye gidilir.
+function cgOzelRakipAyrildi(){
+  if(!cgAktif() || !_cgOzelMac) return false;
+  try{ toast2(t('cg.inv.friendLeft')); }catch(e){}
+  cgOdadanCik();
+  setTimeout(function(){
+    try{ G.phase = 'menu'; }catch(e){}
+    _cgOnlineSifirla();
+    try{ showScreen('menu'); }catch(e){}
+  }, 2000);
+  return true;
 }
 
 initCrazyGames();
@@ -1791,13 +2095,8 @@ let _CG_KATIL_ODA = null;
 // [CG-5] join_room hata kodlari -> kullaniciya gosterilecek metin.
 // Sunucu YALNIZCA sabit kod gonderir; metin burada uretilir.
 function _cgKatilHataMetni(kod){
-  return kod === 'room_full'       ? 'Room is full'
-       : kod === 'room_not_found'  ? 'Room not found'
-       : kod === 'room_closed'     ? 'Room closed'
-       : kod === 'room_invalid'    ? 'Invalid room'
-       : kod === 'room_self'       ? 'That is your own room'
-       : kod === 'already_in_room' ? 'Already in a match'
-       : 'Could not join room';
+  const bilinen = ['room_full','room_not_found','room_closed','room_invalid','room_self','already_in_room'];
+  return t('cg.join.' + (bilinen.indexOf(kod) >= 0 ? kod : 'generic'));
 }
 
 function handleWsMsg(msg) {
@@ -1807,6 +2106,8 @@ function handleWsMsg(msg) {
     // [CG-5] Davet edilen oda kullanilamadi. Oyuncu ORTADA BIRAKILMAZ:
     // uyari gosterilir ve NORMAL eslestirmeye dusulur.
     case 'join_error':
+      // [CG-12] Davetle katilim: genel kuyruga DUSULMEZ, anlasilir hata.
+      try{ if(typeof cgKatilimHatasi === 'function' && cgKatilimHatasi(msg && msg.code)) break; }catch(e){}
       try{
         const _m = _cgKatilHataMetni(msg && msg.code);
         const _e = document.getElementById('online-msg');
@@ -1825,9 +2126,17 @@ function handleWsMsg(msg) {
       // KATILIMA ACIK. Render eslestirme mantigi DEGISMEZ.
       try{ if(typeof cgOdaBildir === 'function' && msg && msg.roomId)
              cgOdaBildir(String(msg.roomId), true); }catch(e){}
+      // [CG-14] Ozel oda: gercek sunucu oda kimligiyle davet linki.
+      try{ if(msg && msg.private === true && msg.roomId && typeof cgDavetPenceresiGuncelle === 'function')
+             cgDavetPenceresiGuncelle(String(msg.roomId)); }catch(e){}
+      break;
+    // [CG-14] Ozel oda olusturulamadi.
+    case 'create_error':
+      try{ if(typeof cgOzelOdaHatasi === 'function') cgOzelOdaHatasi(msg && msg.code); }catch(e){}
       break;
     case 'game_start':
       MY_SLOT = msg.slot;
+      try{ if(typeof cgMacBasladi === 'function') cgMacBasladi(msg); }catch(e){}
       // [DAVET] Sunucudan gelen SANITIZE edilmis public profiller.
       try{ RAKIP_PROFIL = (MY_SLOT === 1) ? msg.hostProfile : msg.guestProfile; }catch(e){ RAKIP_PROFIL = null; }
       // [CG-2] Sunucu artik roomId'yi IKI tarafa da gonderiyor; guest de
@@ -1847,6 +2156,8 @@ function handleWsMsg(msg) {
       break;
     case 'opponent_left':
       toast2('Opponent left the game!');
+      // [CG-14] Ozel macta rakip ayrildi: genel kuyruga otomatik DONULMEZ.
+      try{ if(typeof cgOzelRakipAyrildi === 'function' && cgOzelRakipAyrildi()) break; }catch(e){}
       // [CG-6] Rakip ayrildi: oda artik 1/2. Platform tarafinda tekrar
       // katilima acilir. Oyun akisi (otomatik yeniden eslestirme) DEGISMEZ.
       try{ if(typeof cgOdaYenidenAc === 'function') cgOdaYenidenAc(); }catch(e){}
@@ -1929,20 +2240,26 @@ function handleRelay(msg) {
   }
 }
 
+// Eslesme kimlik paketi: find_match / join_room / create_private_room ORTAK.
+// Icerik fbFindMatch'teki eski kodla BIREBIR aynidir.
+function _eslesmePaketi(){
+  // [DAVET] Public profil ve chat sid'i de gonderilir; sunucu sanitize eder.
+  let _sid = '';
+  try{ _sid = (typeof chatSidOku === 'function') ? chatSidOku() : ''; }catch(e){}
+  // [CG-1] CrazyGames ortaminda giris yapilmis kullanicinin adi tercih
+  // edilir; giris yoksa MEVCUT guest/nickname sistemi aynen calisir.
+  let _ad = P.nickname || _NICK;
+  try{ if(typeof cgOyuncuAdi === 'function') _ad = cgOyuncuAdi() || _ad; }catch(e){}
+  return { nickname: _ad,
+           profil: (typeof profilAl === 'function') ? profilAl() : null,
+           chatSid: _sid };
+}
+
 async function fbFindMatch() {
   setOnlineStatus('searching');
   el('online-msg').textContent = t('online.connectingServer');
   wsConnect(() => {
-    // [DAVET] Public profil ve chat sid'i de gonderilir; sunucu sanitize eder.
-    let _sid = '';
-    try{ _sid = (typeof chatSidOku === 'function') ? chatSidOku() : ''; }catch(e){}
-    // [CG-1] CrazyGames ortaminda giris yapilmis kullanicinin adi tercih
-    // edilir; giris yoksa MEVCUT guest/nickname sistemi aynen calisir.
-    let _ad = P.nickname || _NICK;
-    try{ if(typeof cgOyuncuAdi === 'function') _ad = cgOyuncuAdi() || _ad; }catch(e){}
-    const _paket = { nickname: _ad,
-                     profil: (typeof profilAl === 'function') ? profilAl() : null,
-                     chatSid: _sid };
+    const _paket = _eslesmePaketi();
     // [CG-4/5] Platform davet linkiyle gelindiyse BELIRLI odaya katil.
     // Davet yoksa MEVCUT kor eslestirme (find_match) aynen calisir.
     // _CG_KATIL_ODA yalnizca BIR KEZ kullanilir; basarisiz olursa
@@ -2049,6 +2366,8 @@ async function fbCancelMatch() {
   try{ _wsNesil++; _wsBaglaniyor = false; }catch(e){}
   if (WS) { try{ WS.close(); }catch(e){} }
   setOnlineStatus('idle');
+  // [CG-13] Eslesme iptali: gercekten odadaysa platformdan BIR KEZ cik.
+  try{ if(typeof cgOdadanCik === 'function') cgOdadanCik(); }catch(e){}
 }
 async function fbCleanupRoom(winner, reason) {
   // WS sisteminde gerek yok
@@ -3590,6 +3909,19 @@ en: {
   'event.eightEarly':'💀 8-Ball too early — Forfeit!',
   'event.shotTimeout':'TIME OUT — BALL IN HAND',
   'event.eightFirst':'8-BALL HIT FIRST — BALL IN HAND',
+  'cg.inv.creating':'Creating a private room…',
+  'cg.inv.ready':'Private room ready — send the link to your friend!',
+  'cg.inv.createFail':'Could not create a private room. Please try again.',
+  'cg.inv.busyMatch':'Finish your current match to join the invite.',
+  'cg.inv.busyOnline':'You can’t join an invite during an online match.',
+  'cg.inv.friendLeft':'Your friend left the private match.',
+  'cg.join.room_full':'This room is already full.',
+  'cg.join.room_not_found':'This invite has expired or the room no longer exists.',
+  'cg.join.room_closed':'This room has been closed.',
+  'cg.join.room_invalid':'Invalid invite link.',
+  'cg.join.room_self':'This is your own room.',
+  'cg.join.already_in_room':'You are already in a match.',
+  'cg.join.generic':'Could not join the room.',
   'event.opponentFrozen':'OPPONENT FROZEN!',
   // botShot() icinde — Asama 1'de BAGLANMAZ
   'event.botFrozen':'BOT FROZEN!',
@@ -4011,6 +4343,19 @@ tr: {
   'event.eightEarly':'💀 8 Numara çok erken — Kayıp!',
   'event.shotTimeout':'SÜRE DOLDU — TOP ELDE',
   'event.eightFirst':'ÖNCE 8 NUMARAYA VURULDU — TOP ELDE',
+  'cg.inv.creating':'Özel oda hazırlanıyor…',
+  'cg.inv.ready':'Özel oda hazır — linki arkadaşına gönder!',
+  'cg.inv.createFail':'Özel oda oluşturulamadı. Lütfen tekrar dene.',
+  'cg.inv.busyMatch':'Daveti kabul etmek için önce maçını bitir.',
+  'cg.inv.busyOnline':'Online maç sürerken davet kabul edilemez.',
+  'cg.inv.friendLeft':'Arkadaşın özel maçtan ayrıldı.',
+  'cg.join.room_full':'Bu oda dolu.',
+  'cg.join.room_not_found':'Davetin süresi dolmuş veya oda artık yok.',
+  'cg.join.room_closed':'Bu oda kapatıldı.',
+  'cg.join.room_invalid':'Geçersiz davet linki.',
+  'cg.join.room_self':'Bu senin kendi odan.',
+  'cg.join.already_in_room':'Zaten bir maçtasın.',
+  'cg.join.generic':'Odaya katılınamadı.',
   'event.opponentFrozen':'RAKİP DONDU!',
   'event.botFrozen':'BOT DONDU!',
   'event.levelUp':'SEVİYE ATLADIN!',
@@ -4422,6 +4767,19 @@ ru: {
   'event.eightEarly':'💀 Восьмёрка слишком рано — Поражение!',
   'event.shotTimeout':'ВРЕМЯ ВЫШЛО — МЯЧ В РУКЕ',
   'event.eightFirst':'СНАЧАЛА ЗАДЕТА ВОСЬМЁРКА — МЯЧ В РУКЕ',
+  'cg.inv.creating':'Создаём приватную комнату…',
+  'cg.inv.ready':'Приватная комната готова — отправьте ссылку другу!',
+  'cg.inv.createFail':'Не удалось создать приватную комнату. Попробуйте ещё раз.',
+  'cg.inv.busyMatch':'Завершите текущий матч, чтобы принять приглашение.',
+  'cg.inv.busyOnline':'Во время онлайн-матча принять приглашение нельзя.',
+  'cg.inv.friendLeft':'Ваш друг покинул приватный матч.',
+  'cg.join.room_full':'Эта комната уже заполнена.',
+  'cg.join.room_not_found':'Срок приглашения истёк или комнаты больше нет.',
+  'cg.join.room_closed':'Эта комната закрыта.',
+  'cg.join.room_invalid':'Недействительная ссылка-приглашение.',
+  'cg.join.room_self':'Это ваша собственная комната.',
+  'cg.join.already_in_room':'Вы уже в матче.',
+  'cg.join.generic':'Не удалось войти в комнату.',
   'event.opponentFrozen':'СОПЕРНИК ЗАМОРОЖЕН!',
   'event.botFrozen':'БОТ ЗАМОРОЖЕН!',
   'event.levelUp':'НОВЫЙ УРОВЕНЬ!',
@@ -8511,6 +8869,8 @@ function showScreen(n){
   });
   if(n==='game') layoutTable();
   if(n==='menu') refreshMenu();
+  // [CG-13] Online odadan menuye donus (CrazyGames disinda no-op).
+  if(n==='menu'){ try{ if(typeof cgMenuyeDonus === 'function') cgMenuyeDonus(); }catch(e){} }
   if(n==='shop') renderShop();
   if(n==='event') renderEvent();
   if(n==='collection') renderCollection();
